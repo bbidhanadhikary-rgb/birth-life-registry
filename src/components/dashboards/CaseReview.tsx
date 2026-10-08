@@ -17,7 +17,7 @@ export function CaseReview({ c, mode }: { c: RegCase; mode: "admin" | "uno" }) {
 
   const setStatus = (s: Status) => {
     if (s === "completed") {
-      if (!/^\d{17}$/.test(regNo)) return toast.error(L("সম্পন্ন করতে ১৭ অঙ্কের সরকারি নিবন্ধন নম্বর দিন", "Enter the 17-digit Govt. Registration Number to complete"));
+      if (!/^\d{17}$/.test(regNo)) { toast.error(L("সম্পন্ন করতে ১৭ অঙ্কের সরকারি নিবন্ধন নম্বর দিন", "Enter the 17-digit Govt. Registration Number to complete")); return; }
       patchCase(c.id, { status: s, regNo, completedAt: Date.now() }, "status:completed");
     } else patchCase(c.id, { status: s }, `status:${s}`);
     toast.success(L("অবস্থা হালনাগাদ হয়েছে", "Status updated"));

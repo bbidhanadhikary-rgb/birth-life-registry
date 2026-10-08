@@ -19,16 +19,16 @@ export function SuperDashboard() {
 
   const onboard = () => {
     const lines = f.unions.split("\n").map((l) => l.split("|").map((s) => s.trim())).filter((l) => l[0]);
-    if (!f.bn || !f.en || !f.dBn || !lines.length) return toast.error(L("সব ঘর পূরণ করুন", "Fill all fields"));
+    if (!f.bn || !f.en || !f.dBn || !lines.length) { toast.error(L("সব ঘর পূরণ করুন", "Fill all fields")); return; }
     const id = f.en.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    if (state.upazilas.some((u) => u.id === id)) return toast.error(L("উপজেলা আগে থেকেই আছে", "Upazila already exists"));
+    if (state.upazilas.some((u) => u.id === id)) { toast.error(L("উপজেলা আগে থেকেই আছে", "Upazila already exists")); return; }
     addUpazila({ id, bn: f.bn, en: f.en, districtBn: f.dBn, districtEn: f.dEn, divisionBn: f.vBn, divisionEn: f.vEn,
       unions: makeUnions(lines.map((l, i) => [`u${i}`, l[0], l[1] || l[0]] as [string, string, string]), id) });
     toast.success(L("উপজেলা যুক্ত হয়েছে", "Upazila onboarded")); setSel(id);
     setF({ bn: "", en: "", dBn: "", dEn: "", vBn: "", vEn: "", unions: "" });
   };
   const createUser = () => {
-    if (!nu.bn || !nu.contact || (["worker", "admin", "police"].includes(nu.role) && !nu.unionId)) return toast.error(L("সব ঘর পূরণ করুন", "Fill all fields"));
+    if (!nu.bn || !nu.contact || (["worker", "admin", "police"].includes(nu.role) && !nu.unionId)) { toast.error(L("সব ঘর পূরণ করুন", "Fill all fields")); return; }
     const pwRole = ["admin", "uno"].includes(nu.role);
     addUser({ id: `u${Date.now()}`, name: { bn: nu.bn, en: nu.en || nu.bn }, role: nu.role, upazilaId: sel,
       unionId: nu.unionId || undefined, ward: +nu.ward || 1,

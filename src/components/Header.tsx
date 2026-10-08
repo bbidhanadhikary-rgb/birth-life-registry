@@ -73,17 +73,17 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
   const done = (id: string) => { login(id); onClose(); setSent(null); setOtp(""); setPw(""); nav({ to: "/dashboard" }); toast.success(L("স্বাগতম!", "Welcome!")); };
   const sendOtp = () => {
     const u = state.users.find((x) => x.mobile === mobile.trim() && (x.role === "worker" || x.role === "police"));
-    if (!u) return toast.error(L("এই মোবাইল নম্বর নিবন্ধিত নয়", "Mobile number not registered"));
+    if (!u) { toast.error(L("এই মোবাইল নম্বর নিবন্ধিত নয়", "Mobile number not registered")); return; }
     const code = String(Math.floor(1000 + Math.random() * 9000)); setSent(code);
     toast.info(L(`ডেমো OTP: ${code}`, `Demo OTP: ${code}`), { duration: 15000 });
   };
   const verify = () => {
-    if (otp !== sent) return toast.error(L("ভুল OTP", "Wrong OTP"));
+    if (otp !== sent) { toast.error(L("ভুল OTP", "Wrong OTP")); return; }
     done(state.users.find((x) => x.mobile === mobile.trim())!.id);
   };
   const pwLogin = () => {
     const u = state.users.find((x) => x.email === email.trim().toLowerCase() && x.password === pw && ["admin", "uno", "super"].includes(x.role));
-    if (!u) return toast.error(L("ইমেইল বা পাসওয়ার্ড ভুল", "Invalid email or password"));
+    if (!u) { toast.error(L("ইমেইল বা পাসওয়ার্ড ভুল", "Invalid email or password")); return; }
     done(u.id);
   };
 
@@ -114,7 +114,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
             {forgot ? (<>
               <Label>{L("ইমেইল", "Email")}</Label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <Button className="w-full" onClick={() => { toast.success(L("রিসেট লিংক পাঠানো হয়েছে (ডেমো)", "Reset link sent (demo)")); setForgot(false); }}>{L("রিসেট লিংক পাঠান", "Send reset link")}</Button>
+              <Button className="w-full" onClick={() => { toast.success(L("রিসেট লিংক পাঠানো হয়েছে (ডেমো)", "Reset link sent (demo)")); return; } setForgot(false); }}>{L("রিসেট লিংক পাঠান", "Send reset link")}</Button>
               <button className="text-sm text-primary underline" onClick={() => setForgot(false)}>{L("ফিরে যান", "Back")}</button>
             </>) : (<>
               <p className="text-xs text-muted-foreground">{L("প্রশাসনিক কর্মকর্তা, ইউএনও ও সুপার অ্যাডমিনের জন্য", "For Admin Officers, UNOs & Super Admins")}</p>

@@ -13,7 +13,7 @@ export function StatusBadge({ s }: { s: Status }) {
   return <Badge className={`${m[0]} border-0`}>{m[1]}</Badge>;
 }
 
-export function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: "danger" }) {
+export function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: "danger" | undefined }) {
   return (
     <div className={`rounded-xl border p-4 ${tone === "danger" ? "border-destructive/50 bg-destructive/10" : "border-border bg-card"}`}>
       <div className="text-xs text-muted-foreground">{label}</div>

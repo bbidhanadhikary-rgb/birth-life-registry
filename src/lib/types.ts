@@ -12,7 +12,7 @@ export interface Upazila {
 export interface User {
   id: string; name: Bi; role: Role;
   mobile?: string; email?: string; password?: string;
-  upazilaId: string; unionId?: string; ward?: number;
+  upazilaId: string; unionId?: string | undefined; ward?: number | undefined;
 }
 
 export interface Remark { by: string; role: Role; text: string; at: number }
@@ -23,7 +23,7 @@ export interface RegCase {
   name: Bi; father: Bi; mother: Bi;
   nid: string; // parent NID (birth) or deceased NID/BRN (death)
   gender: "male" | "female" | "other";
-  dob: string; order?: string; dod?: string; cause?: Bi;
+  dob: string; order?: string | undefined; dod?: string | undefined; cause?: Bi | undefined;
   villageId: string;
   files: { name: string; size: number }[]; filesPurged?: boolean;
   status: Status; regNo?: string;
