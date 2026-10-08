@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { seedState } from "./seed";
 import type { AppState, RegCase, Remark, Upazila, User, Village } from "./types";
@@ -108,7 +108,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     addUser: (u) => setState((s) => audit({ ...s, users: [...s.users, u] }, `user:${u.id}`)),
     findVillage,
   };
-  return <C.Provider value={useMemo(() => value, [value])}>{children}</C.Provider>;
+  return <C.Provider value={value}>{children}</C.Provider>;
 }
 
 export function useApp() {
