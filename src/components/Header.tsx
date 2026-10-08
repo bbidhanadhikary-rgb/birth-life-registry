@@ -114,7 +114,7 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
             {forgot ? (<>
               <Label>{L("ইমেইল", "Email")}</Label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <Button className="w-full" onClick={() => { toast.success(L("রিসেট লিংক পাঠানো হয়েছে (ডেমো)", "Reset link sent (demo)")); return; } setForgot(false); }}>{L("রিসেট লিংক পাঠান", "Send reset link")}</Button>
+              <Button className="w-full" onClick={() => { toast.success(L("রিসেট লিংক পাঠানো হয়েছে (ডেমো)", "Reset link sent (demo)")); setForgot(false); }}>{L("রিসেট লিংক পাঠান", "Send reset link")}</Button>
               <button className="text-sm text-primary underline" onClick={() => setForgot(false)}>{L("ফিরে যান", "Back")}</button>
             </>) : (<>
               <p className="text-xs text-muted-foreground">{L("প্রশাসনিক কর্মকর্তা, ইউএনও ও সুপার অ্যাডমিনের জন্য", "For Admin Officers, UNOs & Super Admins")}</p>
