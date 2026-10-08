@@ -46,7 +46,7 @@ export function seedState(): AppState {
     unions: makeUnions(MANIRAMPUR, "mn"),
   };
   // Realistic village names for Rohita
-  mani.unions[1].villages = [
+  mani.unions[1]!.villages = [
     { id: "mn-rohita-v1", bn: "রোহিতা", en: "Rohita", poBn: "রোহিতা", poEn: "Rohita", ward: 1 },
     { id: "mn-rohita-v2", bn: "নেংগুড়াহাট", en: "Nengurahat", poBn: "রোহিতা", poEn: "Rohita", ward: 2 },
     { id: "mn-rohita-v3", bn: "খোদ্দ", en: "Khodda", poBn: "রোহিতা", poEn: "Rohita", ward: 3 },

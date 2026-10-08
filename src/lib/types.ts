@@ -33,7 +33,7 @@ export interface RegCase {
   createdAt: number; completedAt?: number; synced: boolean; smsSent: boolean;
 }
 
-export interface AuditEntry { at: number; userId: string; action: string; caseId?: string }
+export interface AuditEntry { at: number; userId: string; action: string; caseId?: string | undefined }
 
 export interface AppState {
   upazilas: Upazila[]; users: User[]; cases: RegCase[]; audit: AuditEntry[];
