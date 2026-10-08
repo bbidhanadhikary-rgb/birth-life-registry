@@ -43,7 +43,7 @@ function Index() {
           <div className="grid grid-cols-2 gap-3 self-center">
             {[["১৮", "18", L("ইউনিয়ন/পৌরসভা", "Unions/Municipality")], ["৫০", "50", L("মাসিক জন্ম লক্ষ্য", "Monthly birth target")], ["২০", "20", L("মাসিক মৃত্যু লক্ষ্য", "Monthly death target")], ["৪", "4", L("ব্যবহারকারী ভূমিকা", "User roles")]].map(([b, e, l]) => (
               <div key={l} className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="font-display text-4xl font-bold text-primary">{L(b, e)}</div>
+                <div className="font-display text-4xl font-bold text-primary">{L(b!, e!)}</div>
                 <div className="text-sm text-muted-foreground">{l}</div>
               </div>
             ))}

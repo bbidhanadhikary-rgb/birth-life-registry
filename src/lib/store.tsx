@@ -70,7 +70,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ({ ...s, audit: [...s.audit, { at: Date.now(), userId: s.sessionId ?? "system", action, caseId }] });
 
   const L = useCallback((bn: string, en: string) => (lang === "bn" ? bn : en), [lang]);
-  const n = useCallback((v: number | string) => lang === "bn" ? String(v).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[+d]) : String(v), [lang]);
+  const n = useCallback((v: number | string) => lang === "bn" ? String(v).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[+d]!) : String(v), [lang]);
 
   const findVillage = useCallback((id: string) => {
     for (const up of state.upazilas) for (const un of up.unions) {
