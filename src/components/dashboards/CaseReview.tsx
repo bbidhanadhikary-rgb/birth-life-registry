@@ -15,11 +15,11 @@ export function CaseReview({ c, mode }: { c: RegCase; mode: "admin" | "uno" }) {
   const [remark, setRemark] = useState(""); const [regNo, setRegNo] = useState(c.regNo ?? "");
   const worker = state.users.find((u) => u.id === c.createdBy);
 
-  const setStatus = (s: Status) => {
+  const setStatus = async (s: Status) => {
     if (s === "completed") {
       if (!/^\d{17}$/.test(regNo)) { toast.error(L("সম্পন্ন করতে ১৭ অঙ্কের সরকারি নিবন্ধন নম্বর দিন", "Enter the 17-digit Govt. Registration Number to complete")); return; }
-      patchCase(c.id, { status: s, regNo, completedAt: Date.now() }, "status:completed");
-    } else patchCase(c.id, { status: s }, `status:${s}`);
+      if (!(await patchCase(c.id, { status: s, regNo }))) return;
+    } else if (!(await patchCase(c.id, { status: s }))) return;
     toast.success(L("অবস্থা হালনাগাদ হয়েছে", "Status updated"));
   };
 
@@ -57,7 +57,7 @@ export function CaseReview({ c, mode }: { c: RegCase; mode: "admin" | "uno" }) {
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         <Input className="min-w-48 flex-1" maxLength={500} placeholder={mode === "uno" ? L("ইউএনও মন্তব্য (আবশ্যক)", "UNO remark (mandatory)") : L("মন্তব্য লিখুন", "Add a remark")} value={remark} onChange={(e) => setRemark(e.target.value)} />
-        <Button variant="secondary" onClick={() => { if (!remark.trim()) return; addRemark(c.id, remark.trim()); setRemark(""); toast.success(L("মন্তব্য যুক্ত হয়েছে", "Remark added")); }}>{L("মন্তব্য", "Remark")}</Button>
+        <Button variant="secondary" onClick={async () => { if (!remark.trim()) return; await addRemark(c.id, remark.trim()); setRemark(""); toast.success(L("মন্তব্য যুক্ত হয়েছে", "Remark added")); }}>{L("মন্তব্য", "Remark")}</Button>
       </div>
       {mode === "admin" && (
         <div className="mt-2 flex flex-wrap gap-2">
@@ -71,7 +71,7 @@ export function CaseReview({ c, mode }: { c: RegCase; mode: "admin" | "uno" }) {
           </Select>
           <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("সরকারি নিবন্ধন নং (১৭ অঙ্ক)", "Govt. Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} />
           {!c.police && c.status !== "completed" && (
-            <Button variant="outline" onClick={() => { patchCase(c.id, { police: { epiCard: false, parentNid: false, collected: false }, status: "progress" }, "police:assigned"); toast.success(L("গ্রাম পুলিশকে কাজ দেওয়া হয়েছে", "Task sent to Village Police")); }}>
+            <Button variant="outline" onClick={async () => { if (!(await patchCase(c.id, { police: { epiCard: false, parentNid: false, collected: false }, status: "progress" }))) return; toast.success(L("গ্রাম পুলিশকে কাজ দেওয়া হয়েছে", "Task sent to Village Police")); }}>
               <ShieldCheck className="mr-1 h-4 w-4" />{L("গ্রাম পুলিশকে যাচাই দিন", "Send to Village Police")}
             </Button>
           )}

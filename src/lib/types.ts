@@ -11,7 +11,7 @@ export interface Upazila {
 
 export interface User {
   id: string; name: Bi; role: Role;
-  mobile?: string; email?: string; password?: string;
+  mobile?: string | undefined; email?: string | undefined; password?: string;
   upazilaId: string; unionId?: string | undefined; ward?: number | undefined;
 }
 
@@ -25,12 +25,12 @@ export interface RegCase {
   gender: "male" | "female" | "other";
   dob: string; order?: string | undefined; dod?: string | undefined; cause?: Bi | undefined;
   villageId: string;
-  files: { name: string; size: number }[]; filesPurged?: boolean;
-  status: Status; regNo?: string;
+  files: { name: string; size: number; path?: string }[]; filesPurged?: boolean | undefined;
+  status: Status; regNo?: string | undefined;
   remarks: Remark[];
-  police?: { epiCard: boolean; parentNid: boolean; collected: boolean; collectedAt?: number };
+  police?: undefined | { epiCard: boolean; parentNid: boolean; collected: boolean; collectedAt?: number };
   createdBy: string; upazilaId: string; unionId: string; ward: number;
-  createdAt: number; completedAt?: number; synced: boolean; smsSent: boolean;
+  createdAt: number; completedAt?: number | undefined; synced: boolean; smsSent: boolean;
 }
 
 export interface AuditEntry { at: number; userId: string; action: string; caseId?: string | undefined }

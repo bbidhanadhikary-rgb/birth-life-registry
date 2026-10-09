@@ -9,6 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { roleLabel, useApp } from "@/lib/store";
+import { useServerFn } from "@tanstack/react-start";
+import { supabase } from "@/integrations/supabase/client";
+import { passwordSignIn, requestPasswordReset, sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth.functions";
 
 export function Header() {
   const { user, L, lang, toggleLang, dark, toggleTheme, logout, online } = useApp();
@@ -48,7 +51,8 @@ export function Header() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => nav({ to: "/dashboard" })}>{L("ড্যাশবোর্ড", "Dashboard")}</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { logout(); nav({ to: "/", replace: true }); }}>
+              <DropdownMenuItem onClick={() => nav({ to: "/security" })}>{L("নিরাপত্তা ও সেশন", "Security & sessions")}</DropdownMenuItem>
+              <DropdownMenuItem onClick={async () => { await logout(); nav({ to: "/", replace: true }); }}>
                 <LogOut className="mr-2 h-4 w-4" />{L("লগআউট", "Logout")}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -65,27 +69,27 @@ export function Header() {
 }
 
 export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { state, L, login } = useApp();
+  const { L, n } = useApp();
   const nav = useNavigate();
-  const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState<string | null>(null);
+  const sendOtp = useServerFn(sendPhoneOtp), verifyOtp = useServerFn(verifyPhoneOtp);
+  const pwSignIn = useServerFn(passwordSignIn), reset = useServerFn(requestPasswordReset);
+  const [mobile, setMobile] = useState(""); const [otp, setOtp] = useState(""); const [sent, setSent] = useState(false);
   const [email, setEmail] = useState(""); const [pw, setPw] = useState(""); const [forgot, setForgot] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const done = (id: string) => { login(id); onClose(); setSent(null); setOtp(""); setPw(""); nav({ to: "/dashboard" }); toast.success(L("স্বাগতম!", "Welcome!")); };
-  const sendOtp = () => {
-    const u = state.users.find((x) => x.mobile === mobile.trim() && (x.role === "worker" || x.role === "police"));
-    if (!u) { toast.error(L("এই মোবাইল নম্বর নিবন্ধিত নয়", "Mobile number not registered")); return; }
-    const code = String(Math.floor(1000 + Math.random() * 9000)); setSent(code);
-    toast.info(L(`ডেমো OTP: ${code}`, `Demo OTP: ${code}`), { duration: 15000 });
+  const fail = (r: { error?: string; lockedMinutes?: number }) => {
+    if (r.error === "locked" || r.error === "too_many")
+      toast.error(L(`অনেকবার চেষ্টা করা হয়েছে। ${n(r.lockedMinutes ?? 15)} মিনিট পর আবার চেষ্টা করুন`, `Too many attempts. Try again in ${r.lockedMinutes ?? 15} minutes`));
+    else if (r.error === "bad_phone") toast.error(L("সঠিক মোবাইল নম্বর দিন (01XXXXXXXXX)", "Enter a valid mobile number (01XXXXXXXXX)"));
+    else if (r.error === "sms_failed") toast.error(L("SMS পাঠানো যায়নি, পরে চেষ্টা করুন", "Could not send SMS, try later"));
+    else toast.error(L("তথ্য সঠিক নয়", "Details are incorrect"));
   };
-  const verify = () => {
-    if (otp !== sent) { toast.error(L("ভুল OTP", "Wrong OTP")); return; }
-    done(state.users.find((x) => x.mobile === mobile.trim())!.id);
+  const done = async (tokens: { access_token: string; refresh_token: string }) => {
+    const { error } = await supabase.auth.setSession(tokens);
+    if (error) { toast.error(error.message); return; }
+    onClose(); setSent(false); setOtp(""); setPw(""); nav({ to: "/dashboard" });
   };
-  const pwLogin = () => {
-    const u = state.users.find((x) => x.email === email.trim().toLowerCase() && x.password === pw && ["admin", "uno", "super"].includes(x.role));
-    if (!u) { toast.error(L("ইমেইল বা পাসওয়ার্ড ভুল", "Invalid email or password")); return; }
-    done(u.id);
-  };
+  const run = async (f: () => Promise<void>) => { setBusy(true); try { await f(); } finally { setBusy(false); } };
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -102,44 +106,44 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
           <TabsContent value="otp" className="space-y-3 pt-2">
             <p className="text-xs text-muted-foreground">{L("স্বাস্থ্যকর্মী ও গ্রাম পুলিশের জন্য", "For Health Workers & Village Police")}</p>
             <Label>{L("মোবাইল নম্বর", "Mobile number")}</Label>
-            <Input inputMode="numeric" maxLength={11} value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))} placeholder="017XXXXXXXX" />
+            <Input inputMode="numeric" maxLength={11} value={mobile} disabled={sent} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))} placeholder="017XXXXXXXX" />
             {sent ? (<>
-              <Label>OTP</Label>
-              <Input inputMode="numeric" maxLength={4} value={otp} onChange={(e) => setOtp(e.target.value)} />
-              <Button className="w-full" onClick={verify}>{L("যাচাই করুন", "Verify")}</Button>
-            </>) : <Button className="w-full" onClick={sendOtp}>{L("OTP পাঠান", "Send OTP")}</Button>}
-            <Demo rows={[["01711000001", L("স্বাস্থ্যকর্মী, রোহিতা", "Worker, Rohita")], ["01811000001", L("গ্রাম পুলিশ, রোহিতা", "Village Police, Rohita")], ["01711000009", L("স্বাস্থ্যকর্মী, কেশবপুর", "Worker, Keshabpur")]]} />
+              <Label>{L("৬ অঙ্কের কোড", "6-digit code")}</Label>
+              <Input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} />
+              <Button className="w-full" disabled={busy || otp.length !== 6} onClick={() => run(async () => {
+                const r = await verifyOtp({ data: { mobile, code: otp } }); if (r.ok) await done(r.tokens); else fail(r);
+              })}>{L("যাচাই করুন", "Verify")}</Button>
+              <button className="text-sm text-primary underline" onClick={() => { setSent(false); setOtp(""); }}>{L("নম্বর বদলান / আবার পাঠান", "Change number / resend")}</button>
+            </>) : <Button className="w-full" disabled={busy || mobile.length !== 11} onClick={() => run(async () => {
+              const r = await sendOtp({ data: { mobile } });
+              if (r.ok) { setSent(true); toast.success(L("নিবন্ধিত হলে আপনার মোবাইলে কোড পাঠানো হয়েছে", "If registered, a code was sent to your mobile")); } else fail(r);
+            })}>{L("OTP পাঠান", "Send OTP")}</Button>}
           </TabsContent>
           <TabsContent value="pw" className="space-y-3 pt-2">
             {forgot ? (<>
               <Label>{L("ইমেইল", "Email")}</Label>
               <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <Button className="w-full" onClick={() => { toast.success(L("রিসেট লিংক পাঠানো হয়েছে (ডেমো)", "Reset link sent (demo)")); setForgot(false); }}>{L("রিসেট লিংক পাঠান", "Send reset link")}</Button>
+              <Button className="w-full" disabled={busy} onClick={() => run(async () => {
+                await reset({ data: { email } });
+                toast.success(L("অ্যাকাউন্ট থাকলে একটি রিসেট লিংক পাঠানো হয়েছে (১ ঘণ্টা মেয়াদি)", "If the account exists, a reset link was sent (valid 1 hour)"));
+                setForgot(false);
+              })}>{L("রিসেট লিংক পাঠান", "Send reset link")}</Button>
               <button className="text-sm text-primary underline" onClick={() => setForgot(false)}>{L("ফিরে যান", "Back")}</button>
             </>) : (<>
               <p className="text-xs text-muted-foreground">{L("প্রশাসনিক কর্মকর্তা, ইউএনও ও সুপার অ্যাডমিনের জন্য", "For Admin Officers, UNOs & Super Admins")}</p>
               <Label>{L("ইমেইল", "Email")}</Label>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
               <Label>{L("পাসওয়ার্ড", "Password")}</Label>
-              <Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && pwLogin()} />
-              <Button className="w-full" onClick={pwLogin}>{L("লগইন", "Login")}</Button>
+              <Input type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+              <Button className="w-full" disabled={busy || !email || !pw} onClick={() => run(async () => {
+                const r = await pwSignIn({ data: { email, password: pw } }); if (r.ok) await done(r.tokens); else fail(r);
+              })}>{L("লগইন", "Login")}</Button>
               <button className="text-sm text-primary underline" onClick={() => setForgot(true)}>{L("পাসওয়ার্ড ভুলে গেছেন?", "Forgot password?")}</button>
-              <Demo rows={[["admin.rohita@demo.gov.bd", L("প্রশাসনিক কর্মকর্তা", "Admin Officer")], ["uno@manirampur.gov.bd", "UNO"], ["super@demo.gov.bd", "Super Admin"]]} note={L("পাসওয়ার্ড: 123456", "Password: 123456")} />
             </>)}
           </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Demo({ rows, note }: { rows: string[][]; note?: string }) {
-  const { L } = useApp();
-  return (
-    <div className="rounded-md border border-dashed border-border bg-muted/50 p-2 text-xs">
-      <div className="mb-1 font-semibold">{L("ডেমো অ্যাকাউন্ট", "Demo accounts")} {note && `· ${note}`}</div>
-      {rows.map(([a, b]) => <div key={a} className="flex justify-between gap-2"><code>{a}</code><span className="text-muted-foreground">{b}</span></div>)}
-    </div>
   );
 }
 

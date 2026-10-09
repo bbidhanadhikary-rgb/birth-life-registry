@@ -37,15 +37,15 @@ function RegForm({ type }: { type: "birth" | "death" }) {
   const [err, setErr] = useState("");
   const v = un.villages.find((x) => x.id === villageId);
 
-  const submit = () => {
+  const submit = async () => {
     setErr("");
     if (!name.bn.trim() || !name.en.trim() || !father.bn.trim() || !mother.bn.trim()) return setErr(L("নাম (বাংলা ও ইংরেজি) আবশ্যক", "Names in Bangla & English are required"));
     if (!/^(\d{10}|\d{13}|\d{17})$/.test(nid)) return setErr(L("NID/জন্ম নিবন্ধন নম্বর ১০, ১৩ বা ১৭ অঙ্কের হতে হবে", "NID/BRN must be 10, 13 or 17 digits"));
     if (!dob || !villageId || (type === "death" && (!dod || !cause.bn.trim()))) return setErr(L("সব তারিখ ও গ্রাম পূরণ করুন", "Fill in all dates and the village"));
-    const e = addCase({
+    const e = await addCase({
       type, name, father, mother, nid, gender, dob, villageId,
       order: type === "birth" ? order : undefined, dod: type === "death" ? dod : undefined, cause: type === "death" ? cause : undefined,
-      files: files.filter(Boolean).map((f) => ({ name: f!.name, size: f!.size })),
+      files: files.filter((f): f is File => !!f),
     });
     if (e) { setErr(e); toast.error(e); return; }
     toast.success(L("জমা হয়েছে · অভিভাবককে SMS পাঠানো হয়েছে", "Submitted · SMS sent to parent"));
@@ -140,7 +140,7 @@ export function WorkerDashboard() {
               </div>
               <div className="mt-1 text-sm text-muted-foreground">{address(c)}</div>
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                {c.smsSent && <span className="rounded bg-success/15 px-2 py-0.5 text-success">✓ {L("অভিভাবককে SMS পাঠানো হয়েছে", "SMS Sent to Parent")}</span>}
+                {c.smsSent && c.synced && <span className="rounded bg-success/15 px-2 py-0.5 text-success">✓ {L("অভিভাবককে SMS পাঠানো হয়েছে", "SMS Sent to Parent")}</span>}
                 {!c.synced && <span className="flex items-center gap-1 rounded bg-warning/20 px-2 py-0.5"><CloudOff className="h-3 w-3" />{L("সিঙ্কের অপেক্ষায়", "Awaiting sync")}</span>}
                 {c.regNo && <span className="rounded bg-muted px-2 py-0.5">{L("নিবন্ধন নং", "Reg. No")}: {c.regNo}</span>}
               </div>

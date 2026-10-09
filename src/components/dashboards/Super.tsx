@@ -6,35 +6,37 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { roleLabel, useApp } from "@/lib/store";
+import { useServerFn } from "@tanstack/react-start";
+import { createStaff } from "@/lib/auth.functions";
 import { makeUnions } from "@/lib/seed";
 import type { Role } from "@/lib/types";
 import { PageTitle, Stat } from "../shared";
 
 export function SuperDashboard() {
-  const { L, n, state, addUpazila, addUser } = useApp();
+  const { L, n, state, addUpazila, refresh } = useApp();
+  const mkStaff = useServerFn(createStaff);
   const [f, setF] = useState({ bn: "", en: "", dBn: "", dEn: "", vBn: "", vEn: "", unions: "" });
   const [sel, setSel] = useState(state.upazilas[0]?.id ?? "");
   const [nu, setNu] = useState({ bn: "", en: "", role: "worker" as Role, contact: "", unionId: "", ward: "1" });
   const selUp = state.upazilas.find((u) => u.id === sel);
 
-  const onboard = () => {
+  const onboard = async () => {
     const lines = f.unions.split("\n").map((l) => l.split("|").map((s) => s.trim())).filter((l) => l[0]);
     if (!f.bn || !f.en || !f.dBn || !lines.length) { toast.error(L("সব ঘর পূরণ করুন", "Fill all fields")); return; }
     const id = f.en.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     if (state.upazilas.some((u) => u.id === id)) { toast.error(L("উপজেলা আগে থেকেই আছে", "Upazila already exists")); return; }
-    addUpazila({ id, bn: f.bn, en: f.en, districtBn: f.dBn, districtEn: f.dEn, divisionBn: f.vBn, divisionEn: f.vEn,
-      unions: makeUnions(lines.map((l, i) => [`u${i}`, l[0], l[1] || l[0]] as [string, string, string]), id) });
+    if (!(await addUpazila({ id, bn: f.bn, en: f.en, districtBn: f.dBn, districtEn: f.dEn, divisionBn: f.vBn, divisionEn: f.vEn,
+      unions: makeUnions(lines.map((l, i) => [`u${i}`, l[0], l[1] || l[0]] as [string, string, string]), id) }))) return;
     toast.success(L("উপজেলা যুক্ত হয়েছে", "Upazila onboarded")); setSel(id);
     setF({ bn: "", en: "", dBn: "", dEn: "", vBn: "", vEn: "", unions: "" });
   };
-  const createUser = () => {
-    if (!nu.bn || !nu.contact || (["worker", "admin", "police"].includes(nu.role) && !nu.unionId)) { toast.error(L("সব ঘর পূরণ করুন", "Fill all fields")); return; }
-    const pwRole = ["admin", "uno"].includes(nu.role);
-    addUser({ id: `u${Date.now()}`, name: { bn: nu.bn, en: nu.en || nu.bn }, role: nu.role, upazilaId: sel,
-      unionId: nu.unionId || undefined, ward: +nu.ward || 1,
-      ...(pwRole ? { email: nu.contact.toLowerCase(), password: "123456" } : { mobile: nu.contact }) });
-    toast.success(pwRole ? L("ব্যবহারকারী তৈরি · পাসওয়ার্ড 123456", "User created · password 123456") : L("ব্যবহারকারী তৈরি", "User created"));
-    setNu({ ...nu, bn: "", en: "", contact: "" });
+  const createUser = async () => {
+    if (!nu.bn || !nu.contact || (nu.role !== "uno" && !nu.unionId)) { toast.error(L("সব ঘর পূরণ করুন", "Fill all fields")); return; }
+    const r = await mkStaff({ data: { role: nu.role as "worker" | "police" | "admin" | "uno", nameBn: nu.bn, nameEn: nu.en || nu.bn, contact: nu.contact,
+      upazilaId: sel, ...(nu.unionId ? { unionId: nu.unionId } : {}), ward: +nu.ward || 1 } });
+    if (!r.ok) { toast.error(r.error); return; }
+    toast.success(["admin", "uno"].includes(nu.role) ? L("তৈরি হয়েছে · পাসওয়ার্ড সেট করার লিংক ইমেইলে গেছে", "Created · password setup link emailed") : L("তৈরি হয়েছে · মোবাইল OTP দিয়ে লগইন করবেন", "Created · they sign in with mobile OTP"));
+    setNu({ ...nu, bn: "", en: "", contact: "" }); await refresh();
   };
 
   return (
