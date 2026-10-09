@@ -8,3 +8,6 @@
 - [ ] Waiting on user: Twilio credentials in Cloud phone settings
 - [ ] Password reset: expiring one-time email link + confirmation email, /reset-password page
 - [ ] Sign-in rate limiting, temporary lockout, sign-in attempt audit trail
+- [ ] 2-step sign-in (authenticator app) required for Admin/UNO/Super, with one-time recovery codes
+- [ ] Active sessions page: review and sign out unrecognised sessions
+- [ ] Security emails: privileged sign-ins, 2-step changes, recovery code use (needs email domain)
