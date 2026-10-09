@@ -6,3 +6,5 @@
 - [ ] Super Admin / UNO create staff accounts with role + area
 - [ ] Move all dashboards to online data; keep offline queue for workers
 - [ ] Waiting on user: Twilio credentials in Cloud phone settings
+- [ ] Password reset: expiring one-time email link + confirmation email, /reset-password page
+- [ ] Sign-in rate limiting, temporary lockout, sign-in attempt audit trail
