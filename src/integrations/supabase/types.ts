@@ -202,6 +202,30 @@ export type Database = {
         }
         Relationships: []
       }
+      mfa_recovery_codes: {
+        Row: {
+          code_hash: string
+          created_at: string
+          id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          code_hash: string
+          created_at?: string
+          id?: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          code_hash?: string
+          created_at?: string
+          id?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           active: boolean
@@ -318,6 +342,19 @@ export type Database = {
         }
         Returns: boolean
       }
+      list_my_sessions: {
+        Args: never
+        Returns: {
+          aal: string
+          created_at: string
+          id: string
+          ip: string
+          updated_at: string
+          user_agent: string
+        }[]
+      }
+      mfa_ok: { Args: never; Returns: boolean }
+      revoke_my_session: { Args: { _session_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "worker" | "admin" | "police" | "uno" | "super"
