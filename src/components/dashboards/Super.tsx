@@ -26,7 +26,7 @@ export function SuperDashboard() {
     const id = f.en.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     if (state.upazilas.some((u) => u.id === id)) { toast.error(L("উপজেলা আগে থেকেই আছে", "Upazila already exists")); return; }
     if (!(await addUpazila({ id, bn: f.bn, en: f.en, districtBn: f.dBn, districtEn: f.dEn, divisionBn: f.vBn, divisionEn: f.vEn,
-      unions: makeUnions(lines.map((l, i) => [`u${i}`, l[0], l[1] || l[0]] as [string, string, string]), id) });
+      unions: makeUnions(lines.map((l, i) => [`u${i}`, l[0], l[1] || l[0]] as [string, string, string]), id) }))) return;
     toast.success(L("উপজেলা যুক্ত হয়েছে", "Upazila onboarded")); setSel(id);
     setF({ bn: "", en: "", dBn: "", dEn: "", vBn: "", vEn: "", unions: "" });
   };
