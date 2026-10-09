@@ -8,6 +8,7 @@ import { AdminDashboard } from "@/components/dashboards/Admin";
 import { PoliceDashboard } from "@/components/dashboards/Police";
 import { UnoDashboard } from "@/components/dashboards/Uno";
 import { SuperDashboard } from "@/components/dashboards/Super";
+import { MfaGate } from "@/components/MfaGate";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -23,8 +24,10 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Dashboard() {
-  const { user, L } = useApp();
+  const { user, L, authReady, mfa } = useApp();
   const [open, setOpen] = useState(false);
+  if (!authReady) return <div className="py-20 text-center text-muted-foreground">…</div>;
+  if (user && mfa !== "ok") return <MfaGate />;
   if (!user) return (
     <div className="mx-auto max-w-md py-20 text-center">
       <p className="mb-4 text-muted-foreground">{L("ড্যাশবোর্ড দেখতে লগইন করুন", "Please log in to view your dashboard")}</p>
