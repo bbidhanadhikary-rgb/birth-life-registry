@@ -1,13 +1,13 @@
 # Roadmap
-- [ ] Database: areas, staff profiles, roles, records, remarks, audit log, strict area isolation
-- [ ] Private file storage for attachments
-- [ ] Real sign-in: phone OTP (Twilio) for workers/police, email+password for officers; no public sign-up
-- [ ] First-run setup page to create the first Super Admin
-- [ ] Super Admin / UNO create staff accounts with role + area
-- [ ] Move all dashboards to online data; keep offline queue for workers
+- [x] Database: areas, staff profiles, roles, records, remarks, audit log, strict area isolation
+- [x] Private file storage for attachments
+- [x] Real sign-in: phone OTP (Twilio) for workers/police, email+password for officers; no public sign-up
+- [x] First-run setup page to create the first Super Admin
+- [x] Super Admin / UNO create staff accounts with role + area
+- [x] Move all dashboards to online data; keep offline queue for workers
 - [ ] Waiting on user: Twilio credentials in Cloud phone settings
-- [ ] Password reset: expiring one-time email link + confirmation email, /reset-password page
-- [ ] Sign-in rate limiting, temporary lockout, sign-in attempt audit trail
-- [ ] 2-step sign-in (authenticator app) required for Admin/UNO/Super, with one-time recovery codes
-- [ ] Active sessions page: review and sign out unrecognised sessions
+- [x] Password reset: expiring one-time email link + confirmation email, /reset-password page
+- [x] Sign-in rate limiting, temporary lockout, sign-in attempt audit trail
+- [x] 2-step sign-in (authenticator app) required for Admin/UNO/Super, with one-time recovery codes
+- [x] Active sessions page: review and sign out unrecognised sessions
 - [ ] Security emails: privileged sign-ins, 2-step changes, recovery code use (needs email domain)
