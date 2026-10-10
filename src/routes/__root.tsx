@@ -13,7 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "../lib/store";
-import { Header } from "../components/Header";
+import { Header, RoleSwitcherBar } from "../components/Header";
 import { Toaster } from "sonner";
 
 function NotFoundComponent() {
@@ -125,7 +125,8 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <StoreProvider>
         <Header />
-        <main className="min-h-[calc(100vh-4rem)]"><Outlet /></main>
+        <main className="min-h-[calc(100svh-6.6rem)]"><Outlet /></main>
+        <RoleSwitcherBar />
         <Toaster richColors position="top-center" />
       </StoreProvider>
     </QueryClientProvider>

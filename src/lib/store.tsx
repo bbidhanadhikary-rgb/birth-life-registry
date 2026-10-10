@@ -1,18 +1,35 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
+import { MAX_IMAGE_BYTES } from "./compress-image";
+import { seedState } from "./seed";
 import type { AppState, RegCase, Role, Upazila, User, Village, Union } from "./types";
 
 type Lang = "bn" | "en";
 export type Mfa = "ok" | "enroll" | "challenge";
+type EpiVisit = Database["public"]["Tables"]["epi_visits"]["Row"];
+type NewEpiVisit = Pick<EpiVisit, "child_name_bn" | "child_name_en" | "parent_mobile" | "village_id">;
+const localDemoLoginAvailable =
+  import.meta.env.DEV &&
+  (!import.meta.env["VITE_SUPABASE_URL"] || !import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"]);
 type NewCase = Omit<RegCase, "id" | "createdAt" | "synced" | "smsSent" | "remarks" | "status" | "createdBy" | "upazilaId" | "unionId" | "ward" | "files"> & { files: File[] };
+type CaseCorrection = Pick<RegCase, "type" | "name" | "father" | "mother" | "nid" | "gender" | "dob" | "villageId"> &
+  Pick<RegCase, "parentMobile"> & {
+    order?: string | undefined;
+    dod?: string | undefined;
+    cause?: RegCase["cause"];
+    files?: File[] | undefined;
+  };
 
 interface Ctx {
-  state: AppState; user: User | null; authReady: boolean; mfa: Mfa; online: boolean;
+  state: AppState; user: User | null; authReady: boolean; mfa: Mfa; online: boolean; demoMode: boolean; demoLoginAvailable: boolean;
+  epiVisits: EpiVisit[]; enterDemoLogin: (role: "worker" | "police" | "admin" | "uno") => void; addEpiVisit: (visit: NewEpiVisit) => Promise<string | null>;
   lang: Lang; toggleLang: () => void; L: (bn: string, en: string) => string; n: (v: number | string) => string;
   dark: boolean; toggleTheme: () => void;
   logout: () => Promise<void>; refresh: () => Promise<void>; refreshAuth: () => Promise<void>;
   addCase: (c: NewCase) => Promise<string | null>;
+  updateCase: (id: string, correction: CaseCorrection) => Promise<boolean>;
   patchCase: (id: string, patch: { status?: RegCase["status"]; regNo?: string; police?: RegCase["police"] }) => Promise<boolean>;
   addRemark: (id: string, text: string) => Promise<void>;
   addUpazila: (u: Upazila) => Promise<boolean>;
@@ -27,7 +44,7 @@ const empty: AppState = { upazilas: [], users: [], cases: [], audit: [], session
 const mapCase = (r: any, remarks: any[]): RegCase => ({
   id: r.id, type: r.type,
   name: { bn: r.name_bn, en: r.name_en }, father: { bn: r.father_bn, en: r.father_en }, mother: { bn: r.mother_bn, en: r.mother_en },
-  nid: r.nid, gender: r.gender, dob: r.dob, order: r.child_order ?? undefined, dod: r.dod ?? undefined,
+  nid: r.nid, parentMobile: r.parent_mobile ?? undefined, gender: r.gender, dob: r.dob, order: r.child_order ?? undefined, dod: r.dod ?? undefined,
   cause: r.cause_bn ? { bn: r.cause_bn, en: r.cause_en ?? "" } : undefined,
   villageId: r.village_id, files: r.files ?? [], filesPurged: r.files_purged,
   status: r.status, regNo: r.reg_no ?? undefined,
@@ -43,6 +60,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [mfa, setMfa] = useState<Mfa>("ok");
+  const [demoMode, setDemoMode] = useState(false);
+  const [epiVisits, setEpiVisits] = useState<EpiVisit[]>([]);
   const [online, setOnline] = useState(true);
   const [lang, setLang] = useState<Lang>("bn");
   const [dark, setDark] = useState(false);
@@ -52,7 +71,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const L = useCallback((bn: string, en: string) => (lang === "bn" ? bn : en), [lang]);
   const n = useCallback((v: number | string) => lang === "bn" ? String(v).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[+d]!) : String(v), [lang]);
 
+  const enterDemoLogin = useCallback((role: "worker" | "police" | "admin" | "uno") => {
+    if (!localDemoLoginAvailable) return;
+    const demo = demoMode ? state : seedState();
+    const demoUserIds = { worker: "u-w1", police: "u-p1", admin: "u-a1", uno: "u-uno" };
+    const previewUser = demo.users.find((candidate) => candidate.id === demoUserIds[role]);
+    if (!previewUser) throw new Error(`The seeded ${role} account is missing`);
+    const upazila = demo.upazilas.find((area) => area.id === previewUser.upazilaId);
+    const union = upazila?.unions.find((area) => area.id === previewUser.unionId);
+    const village = union?.villages[0];
+    if (!upazila || !village || (role !== "uno" && !union)) {
+      throw new Error(`The seeded ${role} account's area is incomplete`);
+    }
+    const attendedAt = new Date().toISOString();
+    if (!demoMode) setState(demo);
+    setUser(previewUser);
+    setMfa("ok");
+    setEpiVisits(role === "worker" && union ? [
+      {
+        id: "demo-epi-visit-1",
+        child_name_bn: "মাহিরা আক্তার",
+        child_name_en: "Mahira Akter",
+        parent_mobile: "01711000051",
+        village_id: village.id,
+        upazila_id: upazila.id,
+        union_id: union.id,
+        ward: previewUser.ward ?? 1,
+        attended_at: attendedAt,
+        registration_case_id: null,
+        created_by: previewUser.id,
+        created_at: attendedAt,
+      },
+    ] : []);
+    setDemoMode(true);
+    setAuthReady(true);
+  }, [demoMode, state]);
+
   const loadData = useCallback(async () => {
+    if (localDemoLoginAvailable && demoMode) return;
     const [ups, profs, roles, cases, remarks] = await Promise.all([
       supabase.from("upazilas").select("*").order("created_at"),
       supabase.from("profiles").select("*"),
@@ -66,9 +122,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       role: (roles.data ?? []).find((r) => r.user_id === p.id)?.role ?? "worker",
       mobile: p.mobile ?? undefined, email: p.email ?? undefined, upazilaId: p.upazila_id ?? "", unionId: p.union_id ?? undefined, ward: p.ward ?? undefined }));
     setState({ upazilas, users, cases: (cases.data ?? []).map((c) => mapCase(c, remarks.data ?? [])), audit: [], sessionId: null });
-  }, []);
+  }, [demoMode]);
 
   const refreshAuth = useCallback(async () => {
+    if (localDemoLoginAvailable && demoMode) {
+      setAuthReady(true);
+      return;
+    }
+    if (localDemoLoginAvailable) {
+      setAuthReady(true);
+      return;
+    }
     const { data: { user: au } } = await supabase.auth.getUser();
     if (!au) { setUser(null); setState(empty); setMfa("ok"); setAuthReady(true); return; }
     const [{ data: p }, { data: r }] = await Promise.all([
@@ -90,7 +154,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setMfa(m);
     if (m === "ok") await loadData();
     setAuthReady(true);
-  }, [L, loadData]);
+  }, [L, loadData, demoMode]);
 
   useEffect(() => {
     try {
@@ -102,6 +166,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setOnline(navigator.onLine);
     const up = () => setOnline(true), down = () => setOnline(false);
     window.addEventListener("online", up); window.addEventListener("offline", down);
+    if (localDemoLoginAvailable) {
+      setAuthReady(true);
+      return () => {
+        window.removeEventListener("online", up);
+        window.removeEventListener("offline", down);
+      };
+    }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED" || event === "MFA_CHALLENGE_VERIFIED") {
         setTimeout(() => { void refreshAuth(); }, 0);
@@ -120,7 +191,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Offline queue: flush when back online
   useEffect(() => {
-    if (!online || !user || user.role !== "worker" || !pending.length) return;
+    if (demoMode || !online || !user || user.role !== "worker" || !pending.length) return;
     (async () => {
       const left: any[] = [];
       for (const row of pending) {
@@ -131,7 +202,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setPending(left);
       if (synced) { toast.success(L(`${n(synced)}টি অফলাইন এন্ট্রি সিঙ্ক হয়েছে`, `${synced} offline entries synced`)); void loadData(); }
     })();
-  }, [online, user, pending, L, n, loadData]);
+  }, [demoMode, online, user, pending, L, n, loadData]);
 
   const findVillage = useCallback((id: string) => {
     for (const up of state.upazilas) for (const un of up.unions) {
@@ -146,18 +217,64 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const value: Ctx = {
     state: { ...state, cases: [...pending.filter((p) => p.created_by === user?.id).map((p) => ({ ...mapCase({ ...p, created_at: p.queued_at, files: [], files_purged: false, status: "pending", sms_sent: false }, []), synced: false })), ...state.cases] },
-    user, authReady, mfa, online, lang, L, n, dark,
+    user, authReady, mfa, online, lang, L, n, dark, demoMode, demoLoginAvailable: localDemoLoginAvailable, epiVisits,
+    enterDemoLogin,
     toggleLang: () => setLang((l) => (l === "bn" ? "en" : "bn")),
     toggleTheme: () => setDark((d) => !d),
     refresh: loadData, refreshAuth,
-    logout: async () => { await supabase.auth.signOut(); setUser(null); setState(empty); },
+    logout: async () => {
+      if (demoMode) {
+        setDemoMode(false);
+        setUser(null);
+        setState(empty);
+        setEpiVisits([]);
+        setAuthReady(true);
+        return;
+      }
+      await supabase.auth.signOut(); setUser(null); setState(empty);
+    },
     addCase: async (c) => {
       if (!user || user.role !== "worker") return L("শুধু স্বাস্থ্যকর্মী তথ্য দিতে পারবেন", "Only health workers can enter data");
+      if (c.files.some((file) => !file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES)) {
+        return L("প্রতিটি ছবি ১৫০ KB-এর মধ্যে হতে হবে", "Each image must be 150 KB or smaller");
+      }
       const id = crypto.randomUUID();
+      if (demoMode) {
+        if (state.cases.some((existing) => existing.type === c.type && existing.nid === c.nid && (c.type === "death" || existing.order === c.order))) {
+          return dupMsg(c.type);
+        }
+        const localCase: RegCase = {
+          ...c,
+          id,
+          createdAt: Date.now(),
+          synced: false,
+          smsSent: false,
+          remarks: [],
+          status: "pending",
+          createdBy: user.id,
+          upazilaId: user.upazilaId,
+          unionId: user.unionId ?? "",
+          ward: user.ward ?? 1,
+          files: c.files.map((file) => ({ name: file.name, size: file.size })),
+        };
+        setState((current) => ({ ...current, cases: [localCase, ...current.cases] }));
+        if (localCase.type === "birth" && localCase.parentMobile) {
+          setEpiVisits((current) =>
+            current.map((visit) =>
+              !visit.registration_case_id &&
+              visit.parent_mobile === localCase.parentMobile &&
+              (visit.child_name_bn === localCase.name.bn || visit.child_name_en.toLocaleLowerCase() === localCase.name.en.toLocaleLowerCase())
+                ? { ...visit, registration_case_id: id }
+                : visit,
+            ),
+          );
+        }
+        return null;
+      }
       const row: any = {
         id, client_id: id, type: c.type, name_bn: c.name.bn, name_en: c.name.en, father_bn: c.father.bn, father_en: c.father.en,
         mother_bn: c.mother.bn, mother_en: c.mother.en, nid: c.nid, gender: c.gender, dob: c.dob, child_order: c.order ?? null,
-        dod: c.dod ?? null, cause_bn: c.cause?.bn ?? null, cause_en: c.cause?.en ?? null, village_id: c.villageId,
+        parent_mobile: c.parentMobile ?? null, dod: c.dod ?? null, cause_bn: c.cause?.bn ?? null, cause_en: c.cause?.en ?? null, village_id: c.villageId,
         created_by: user.id, upazila_id: user.upazilaId, union_id: user.unionId, ward: user.ward ?? 1,
       };
       if (state.cases.some((x) => x.type === c.type && x.nid === c.nid && (c.type === "death" || x.order === c.order))) return dupMsg(c.type);
@@ -179,7 +296,149 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await loadData();
       return null;
     },
+    updateCase: async (id, correction) => {
+      if (!user || user.role !== "worker") {
+        toast.error(L("শুধু স্বাস্থ্যকর্মী তথ্য সংশোধন করতে পারবেন", "Only health workers can correct entries"));
+        return false;
+      }
+      if (correction.files?.some((file) => !file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES)) {
+        toast.error(L("প্রতিটি ছবি ১৫০ KB-এর মধ্যে হতে হবে", "Each image must be 150 KB or smaller"));
+        return false;
+      }
+      const existing = state.cases.find((item) => item.id === id);
+      if (!existing || existing.createdBy !== user.id || existing.status === "completed") {
+        toast.error(L("এই এন্ট্রি আর সংশোধন করা যাবে না", "This entry can no longer be corrected"));
+        return false;
+      }
+
+      if (demoMode) {
+        if (state.cases.some((item) => item.id !== id && item.type === correction.type && item.nid === correction.nid && (correction.type === "death" || item.order === correction.order))) {
+          toast.error(dupMsg(correction.type));
+          return false;
+        }
+        const updatedCase: RegCase = {
+          ...existing,
+          ...correction,
+          files: correction.files
+            ? correction.files.map((file) => ({ name: file.name, size: file.size }))
+            : existing.files,
+          synced: false,
+        };
+        setState((current) => ({
+          ...current,
+          cases: current.cases.map((item) => item.id === id ? updatedCase : item),
+        }));
+        if (updatedCase.type === "birth" && updatedCase.parentMobile) {
+          setEpiVisits((current) =>
+            current.map((visit) =>
+              !visit.registration_case_id &&
+              visit.parent_mobile === updatedCase.parentMobile &&
+              (visit.child_name_bn === updatedCase.name.bn || visit.child_name_en.toLocaleLowerCase() === updatedCase.name.en.toLocaleLowerCase())
+                ? { ...visit, registration_case_id: id }
+                : visit,
+            ),
+          );
+        }
+        return true;
+      }
+
+      const uploads: { name: string; size: number; path: string }[] = [];
+      for (const file of (correction.files ?? []).slice(0, 3)) {
+        const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-80);
+        const path = `${user.upazilaId}/${user.unionId}/${id}/${Date.now()}-${crypto.randomUUID()}-${safe}`;
+        const { error } = await supabase.storage.from("case-files").upload(path, file, { contentType: file.type });
+        if (error) {
+          if (uploads.length) await supabase.storage.from("case-files").remove(uploads.map((item) => item.path));
+          toast.error(L("ফাইল আপলোড ব্যর্থ", "File upload failed") + `: ${error.message}`);
+          return false;
+        }
+        uploads.push({ name: file.name, size: file.size, path });
+      }
+
+      const update: Database["public"]["Tables"]["cases"]["Update"] = {
+        type: correction.type,
+        name_bn: correction.name.bn,
+        name_en: correction.name.en,
+        father_bn: correction.father.bn,
+        father_en: correction.father.en,
+        mother_bn: correction.mother.bn,
+        mother_en: correction.mother.en,
+        nid: correction.nid,
+        parent_mobile: correction.parentMobile ?? null,
+        gender: correction.gender,
+        dob: correction.dob,
+        child_order: correction.order ?? null,
+        dod: correction.dod ?? null,
+        cause_bn: correction.cause?.bn ?? null,
+        cause_en: correction.cause?.en ?? null,
+        village_id: correction.villageId,
+      };
+      if (correction.files) update.files = uploads;
+      const { data, error } = await supabase.from("cases").update(update).eq("id", id).select("id").maybeSingle();
+      if (error || !data) {
+        if (uploads.length) await supabase.storage.from("case-files").remove(uploads.map((item) => item.path));
+        toast.error(error?.message ?? L("এন্ট্রি সংশোধন করা যায়নি", "Could not update this entry"));
+        return false;
+      }
+      if (correction.files) {
+        const oldPaths = existing.files.flatMap((item) => item.path ? [item.path] : []);
+        if (oldPaths.length) {
+          const { error: removeError } = await supabase.storage.from("case-files").remove(oldPaths);
+          if (removeError) toast.error(L("পুরোনো সংযুক্তি মুছে ফেলা যায়নি", "Could not remove previous attachments") + `: ${removeError.message}`);
+        }
+      }
+      await loadData();
+      return true;
+    },
+    addEpiVisit: async (visit) => {
+      if (!user || user.role !== "worker") {
+        return L("শুধু স্বাস্থ্যকর্মী EPI উপস্থিতি দিতে পারবেন", "Only health workers can record EPI attendance");
+      }
+      const upazila = state.upazilas.find((area) => area.id === user.upazilaId);
+      const union = upazila?.unions.find((area) => area.id === user.unionId);
+      if (!upazila || !union?.villages.some((village) => village.id === visit.village_id)) {
+        return L("নির্বাচিত গ্রাম নির্ধারিত এলাকার মধ্যে নেই", "Selected village is outside the assigned area");
+      }
+      if (demoMode) {
+        const timestamp = new Date().toISOString();
+        setEpiVisits((current) => [
+          {
+            ...visit,
+            id: crypto.randomUUID(),
+            upazila_id: upazila.id,
+            union_id: union.id,
+            ward: user.ward ?? 1,
+            attended_at: timestamp,
+            registration_case_id: null,
+            created_by: user.id,
+            created_at: timestamp,
+          },
+          ...current,
+        ]);
+        return null;
+      }
+      const { error } = await supabase.from("epi_visits").insert({
+        ...visit,
+        upazila_id: upazila.id,
+        union_id: union.id,
+        ward: user.ward ?? 1,
+        created_by: user.id,
+      });
+      return error?.message ?? null;
+    },
     patchCase: async (id, patch) => {
+      if (demoMode) {
+        if (!state.cases.some((item) => item.id === id)) return false;
+        setState((current) => ({
+          ...current,
+          cases: current.cases.map((item) => item.id === id ? {
+            ...item,
+            ...patch,
+            completedAt: patch.status === undefined ? item.completedAt : patch.status === "completed" ? Date.now() : undefined,
+          } : item),
+        }));
+        return true;
+      }
       const upd: any = {};
       if (patch.status) upd.status = patch.status;
       if (patch.regNo !== undefined) upd.reg_no = patch.regNo;
@@ -190,10 +449,25 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     },
     addRemark: async (id, text) => {
       if (!user) return;
+      if (demoMode) {
+        setState((current) => ({
+          ...current,
+          cases: current.cases.map((item) => item.id === id ? {
+            ...item,
+            remarks: [...item.remarks, { by: user.name.bn, role: user.role, text, at: Date.now() }],
+          } : item),
+        }));
+        return;
+      }
       const { error } = await supabase.from("case_remarks").insert({ case_id: id, role: user.role, text, author: user.id });
       if (error) toast.error(error.message); else await loadData();
     },
     addUpazila: async (u) => {
+      if (demoMode) {
+        if (state.upazilas.some((area) => area.id === u.id)) return false;
+        setState((current) => ({ ...current, upazilas: [...current.upazilas, u] }));
+        return true;
+      }
       const { error } = await supabase.from("upazilas").insert({ id: u.id, bn: u.bn, en: u.en, district_bn: u.districtBn, district_en: u.districtEn,
         division_bn: u.divisionBn, division_en: u.divisionEn, unions: u.unions as any });
       if (error) { toast.error(error.message); return false; }

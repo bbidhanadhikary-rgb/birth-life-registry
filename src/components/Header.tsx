@@ -5,6 +5,7 @@ import { BookOpen, Headphones, Languages, LogIn, LogOut, Moon, Sun, Landmark, Wi
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AnnouncementTicker } from "@/components/AnnouncementTicker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -14,12 +15,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { passwordSignIn, requestPasswordReset, sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth.functions";
 
 export function Header() {
-  const { user, L, lang, toggleLang, dark, toggleTheme, logout, online } = useApp();
+  const { user, L, lang, toggleLang, dark, toggleTheme, logout, online, demoLoginAvailable } = useApp();
   const [dlg, setDlg] = useState<null | "login" | "manual" | "support">(null);
   const nav = useNavigate();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-sm">
       {!online && (
         <div className="flex items-center justify-center gap-2 bg-warning px-3 py-1 text-xs font-medium text-warning-foreground">
           <WifiOff className="h-3 w-3" /> {L("অফলাইন — তথ্য ডিভাইসে জমা থাকবে, অনলাইনে এলে স্বয়ংক্রিয়ভাবে সিঙ্ক হবে", "Offline — entries are cached and will auto-sync")}
@@ -27,22 +28,22 @@ export function Header() {
       )}
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 sm:px-6">
         <Link to="/" className="mr-auto flex items-center gap-2">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground"><Landmark className="h-5 w-5" /></span>
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-800 text-white"><Landmark className="h-5 w-5" /></span>
           <span className="leading-tight">
             <span className="block font-display text-base font-bold">{L("ই-নিবন্ধন ট্র্যাকার", "E-Registration Tracker")}</span>
-            <span className="hidden text-xs text-muted-foreground sm:block">{L("জন্ম ও মৃত্যু নিবন্ধন · উপজেলা", "Birth & Death · Upazila")}</span>
+            <span className="hidden text-xs text-emerald-50 sm:block">{L("জন্ম ও মৃত্যু নিবন্ধন · উপজেলা", "Birth & Death · Upazila")}</span>
           </span>
         </Link>
-        <Button variant="ghost" size="sm" onClick={toggleLang} aria-label="Language">
+        <Button variant="ghost" size="sm" className="text-white hover:bg-emerald-700 hover:text-white" onClick={toggleLang} aria-label="Language">
           <Languages className="h-4 w-4" /><span className="ml-1">{lang === "bn" ? "EN" : "বাং"}</span>
         </Button>
-        <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Theme">{dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button>
-        <Button variant="ghost" size="icon" onClick={() => setDlg("manual")} aria-label="Manual"><BookOpen className="h-4 w-4" /></Button>
-        <Button variant="ghost" size="icon" onClick={() => setDlg("support")} aria-label="Support"><Headphones className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="text-white hover:bg-emerald-700 hover:text-white" onClick={toggleTheme} aria-label="Theme">{dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button>
+        <Button variant="ghost" size="icon" className="text-white hover:bg-emerald-700 hover:text-white" onClick={() => setDlg("manual")} aria-label="Manual"><BookOpen className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="text-white hover:bg-emerald-700 hover:text-white" onClick={() => setDlg("support")} aria-label="Support"><Headphones className="h-4 w-4" /></Button>
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="max-w-40 truncate">{L(user.name.bn, user.name.en)}</Button>
+              <Button variant="outline" size="sm" className="max-w-40 truncate border-white/40 bg-emerald-700/40 text-white hover:bg-emerald-700 hover:text-white">{L(user.name.bn, user.name.en)}</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
@@ -57,10 +58,15 @@ export function Header() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        ) : demoLoginAvailable ? (
+          <span className="rounded-full border border-white/40 bg-emerald-700/35 px-2 py-1 text-[10px] font-semibold text-white sm:px-3 sm:text-xs">
+            {L("লোকাল টেস্ট মোড", "Local test mode")}
+          </span>
         ) : (
-          <Button size="sm" onClick={() => setDlg("login")}><LogIn className="mr-1 h-4 w-4" />{L("লগইন", "Login")}</Button>
+          <Button size="sm" className="bg-emerald-800 text-white hover:bg-emerald-900" onClick={() => setDlg("login")}><LogIn className="mr-1 h-4 w-4" /><span className="max-[360px]:sr-only">{L("লগইন", "Login")}</span></Button>
         )}
       </div>
+      <AnnouncementTicker />
       <LoginDialog open={dlg === "login"} onClose={() => setDlg(null)} />
       <ManualDialog open={dlg === "manual"} onClose={() => setDlg(null)} />
       <SupportDialog open={dlg === "support"} onClose={() => setDlg(null)} />
@@ -68,8 +74,50 @@ export function Header() {
   );
 }
 
+export function RoleSwitcherBar() {
+  const { user, L, demoLoginAvailable, enterDemoLogin } = useApp();
+  const nav = useNavigate();
+  if (!demoLoginAvailable) return null;
+
+  const roles = [
+    ["worker", "স্বাস্থ্যকর্মী", "Health Worker"],
+    ["police", "গ্রাম পুলিশ", "Village Police"],
+    ["admin", "ইউপি কর্মকর্তা", "UP Official"],
+    ["uno", "ইউএনও", "UNO"],
+  ] as const;
+
+  return (
+    <nav
+      aria-label={L("লোকাল ডেমো রোল পরিবর্তন", "Local demo role switcher")}
+      className="fixed bottom-3 right-3 z-50 w-56 rounded-xl border border-emerald-200 bg-background/95 p-2 shadow-lg backdrop-blur sm:bottom-5 sm:right-5"
+    >
+      <p className="px-1 pb-1.5 text-xs font-semibold text-muted-foreground">
+        {L("রোল পরিবর্তন · টেস্ট মোড", "Switch role · Test mode")}
+      </p>
+      <div className="grid grid-cols-2 gap-1.5">
+        {roles.map(([role, bn, en]) => (
+          <Button
+            key={role}
+            type="button"
+            size="sm"
+            variant={user?.role === role && demoLoginAvailable ? "default" : "outline"}
+            aria-pressed={user?.role === role && demoLoginAvailable}
+            className="h-auto min-h-9 whitespace-normal px-1.5 py-1.5 text-xs"
+            onClick={() => {
+              enterDemoLogin(role);
+              nav({ to: "/dashboard" });
+            }}
+          >
+            {L(bn, en)}
+          </Button>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
 export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { L, n } = useApp();
+  const { L, n, demoLoginAvailable, enterDemoLogin } = useApp();
   const nav = useNavigate();
   const sendOtp = useServerFn(sendPhoneOtp), verifyOtp = useServerFn(verifyPhoneOtp);
   const pwSignIn = useServerFn(passwordSignIn), reset = useServerFn(requestPasswordReset);
@@ -89,6 +137,12 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
     if (error) { toast.error(error.message); return; }
     onClose(); setSent(false); setOtp(""); setPw(""); nav({ to: "/dashboard" });
   };
+  const enterLocalRolePreview = (role: "worker" | "police" | "admin" | "uno") => {
+    enterDemoLogin(role);
+    toast.info(L("ডেমো ড্যাশবোর্ড · পরিবর্তন শুধু এই ট্যাবে থাকবে", "Demo dashboard · changes stay in this tab"));
+    onClose();
+    nav({ to: "/dashboard" });
+  };
   const run = async (f: () => Promise<void>) => { setBusy(true); try { await f(); } finally { setBusy(false); } };
 
   return (
@@ -105,6 +159,11 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
           </TabsList>
           <TabsContent value="otp" className="space-y-3 pt-2">
             <p className="text-xs text-muted-foreground">{L("স্বাস্থ্যকর্মী ও গ্রাম পুলিশের জন্য", "For Health Workers & Village Police")}</p>
+            {demoLoginAvailable && (
+              <p className="text-xs text-amber-800">
+                {L("লোকাল প্রিভিউতে OTP পাঠানো বন্ধ। নিচে একটি ভূমিকা বেছে নিন।", "OTP is unavailable in local preview. Choose a role below.")}
+              </p>
+            )}
             <Label>{L("মোবাইল নম্বর", "Mobile number")}</Label>
             <Input inputMode="numeric" maxLength={11} value={mobile} disabled={sent} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ""))} placeholder="017XXXXXXXX" />
             {sent ? (<>
@@ -114,10 +173,34 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
                 const r = await verifyOtp({ data: { mobile, code: otp } }); if (r.ok) await done(r.tokens); else fail(r);
               })}>{L("যাচাই করুন", "Verify")}</Button>
               <button className="text-sm text-primary underline" onClick={() => { setSent(false); setOtp(""); }}>{L("নম্বর বদলান / আবার পাঠান", "Change number / resend")}</button>
-            </>) : <Button className="w-full" disabled={busy || mobile.length !== 11} onClick={() => run(async () => {
-              const r = await sendOtp({ data: { mobile } });
-              if (r.ok) { setSent(true); toast.success(L("নিবন্ধিত হলে আপনার মোবাইলে কোড পাঠানো হয়েছে", "If registered, a code was sent to your mobile")); } else fail(r);
-            })}>{L("OTP পাঠান", "Send OTP")}</Button>}
+            </>) : <>
+              <Button className="w-full" disabled={demoLoginAvailable || busy || mobile.length !== 11} onClick={() => {
+                void run(async () => {
+                  const r = await sendOtp({ data: { mobile } });
+                  if (r.ok) {
+                    setSent(true);
+                    toast.success(L("নিবন্ধিত হলে আপনার মোবাইলে কোড পাঠানো হয়েছে", "If registered, a code was sent to your mobile"));
+                  } else {
+                    fail(r);
+                  }
+                });
+              }}>{L("OTP পাঠান", "Send OTP")}</Button>
+              {demoLoginAvailable && (
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ["worker", "স্বাস্থ্যকর্মী ড্যাশবোর্ড"],
+                    ["police", "গ্রাম পুলিশ ড্যাশবোর্ড"],
+                    ["admin", "ইউপি কর্মকর্তা ড্যাশবোর্ড"],
+                    ["uno", "ইউএনও ড্যাশবোর্ড"],
+                  ] as const).map(([role, label]) => (
+                    <Button key={role} type="button" variant="outline" className="h-auto min-h-10 whitespace-normal px-2 py-2 text-xs"
+                      onClick={() => enterLocalRolePreview(role)}>
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </>}
           </TabsContent>
           <TabsContent value="pw" className="space-y-3 pt-2">
             {forgot ? (<>
@@ -142,6 +225,14 @@ export function LoginDialog({ open, onClose }: { open: boolean; onClose: () => v
             </>)}
           </TabsContent>
         </Tabs>
+        {demoLoginAvailable && (
+          <p className="border-t border-dashed pt-3 text-xs text-amber-800">
+            {L(
+              "শুধু লোকাল UI পরীক্ষার জন্য · কোনো বাস্তব অ্যাকাউন্ট বা সেশন তৈরি হয় না",
+              "Local UI preview only · no real account or session is created",
+            )}
+          </p>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -20,7 +20,7 @@ Dual Login Options (Accessible via Header Login Button):
 - Option B (Password Login): For Administrative Officers, UNOs, and Super Admins.
 The system must automatically detect the user's role and route them to their specific dashboard upon authentication.
 Strict Business Logic & Technical Protections:
-1. Data Input Restriction: ONLY EPI/Health Workers can enter new data. Administrative Officers, Village Police, and UNOs CANNOT enter new cases or modify original worker inputs.
+1. Data Input Restriction: ONLY EPI/Health Workers can enter new data. Workers may correct only their own cases until final registration is completed; completed case inputs are locked. Administrative Officers, Village Police, and UNOs cannot enter cases or alter original worker inputs.
 2. Duplicate Prevention: Use the Parent's NID for birth entries and Deceased's NID/Birth Certificate number for death entries as a unique constraint. Show instant validation errors for duplicates.
 3. Offline Sync Capability: Enable local offline caching for Health Workers and Village Police; data should auto-sync once online.
 4. System Audit Logs: Maintain an automated, invisible audit trail tracking timestamps and User IDs for all creations, status changes, or remark updates.
@@ -28,10 +28,10 @@ Strict Business Logic & Technical Protections:
 6. Red Flags: If a Health Worker or Ward registers zero entries for 15 consecutive days, flag that section in Red on the UNO and Admin dashboards.
 Bilingual Ultra-Simple Input Forms (Side-by-Side Bangla/English):
 Fields must be displayed side-by-side (Bangla Box | English Box) to minimize effort for EPI/Health workers.
-1. Birth Registration Form: Child's Name, Father's Name, Mother's Name, Parent's NID, Gender, DOB, Order of Child, 3 File Upload Attachments, and Smart Auto-Address (Worker enters "Village Name" only; Post Office, Ward, Union, Upazila, District, Division, and Country auto-populate instantly in both languages).
-2. Death Registration Form: Mirrors Birth Form layout but replaces Child's Name with "Deceased Person's Name", requires Deceased's NID, and adds "Date of Death" and "Cause of Death". Includes 3 File Upload Attachments.
+1. Birth Registration Form: Child's Name, Father's Name, Mother's Name, Parent's NID, active mobile, Gender, DOB, Order of Child, 3 image attachments compressed to 150 KB or less each, and Smart Auto-Address (Worker enters "Village Name" only; Post Office, Ward, Union, Upazila, District, Division, and Country auto-populate instantly in both languages).
+2. Death Registration Form: Mirrors Birth Form layout but replaces Child's Name with "Deceased Person's Name", requires Deceased's NID, and adds "Date of Death" and "Cause of Death". Includes active mobile and 3 compressed image attachments.
 4 Dedicated User Dashboards & Scope-Limited Reports:
-1. EPI / Health Worker Dashboard: Simple forms, local entry history with Admin/UNO remarks, "SMS Sent to Parent" simulated labels, and a 'Download My Report' button (Excel/PDF).
+1. EPI / Health Worker Dashboard: Single-screen responsive dashboard with modal entry/edit forms, own-case corrections before completion, local entry lists with officer alerts, EPI session attendance follow-up automatically matched to subsequent birth entries, 365-day urgency indicators, compressed photo uploads, simulated parent-SMS status, and CSV/PDF exports.
 2. Administrative Officer Dashboard: Live feed of data/files from their Union, add remarks, update status (Pending, In Progress, Completed), input final Government Registration Number to close cases on system completion, trigger verification tasks to Ward's Village Police, display a progress bar tracking monthly targets (Births: 50, Deaths: 20 per union), and a 'Download Union Report' button.
 3. Village Police Dashboard: Simplified mobile UI showing assigned houses in their Ward with a physical document checklist ([ ] EPI Card, [ ] Parent NID). Tap "Documents Collected" to instantly update the Admin view.
 4. UNO Dashboard: Master view of all Unions within their upazila with analytical graphs tracking monthly targets, ability to add mandatory "UNO Remarks", and a 'Download Master Report' button.
@@ -41,6 +41,10 @@ Completely mobile-responsive, modern, clean, multi-tenant capable, supporting se
 This project was built with [Lovable](https://lovable.dev).
 
 **Live app**: https://birth-life-registry.lovable.app
+
+In local Vite development only, when Supabase URL/publishable-key settings are absent, the login dialog offers a **Direct Test Login · Health Worker** preview. It uses seeded in-memory data and does not create an authenticated Supabase session or persist changes. This preview is disabled in production builds; real sign-in continues to use the server-validated OTP/password flows.
+
+The public landing page's bilingual geographic filters provide five levels: division → district → upazila/city corporation → union/municipality → ward. The bundled upazila and local-area catalog is pinned to [iqbalhasandev/bangladesh-geo-json@28ba44c](https://github.com/iqbalhasandev/bangladesh-geo-json/tree/28ba44c344b72cfe4849f2dde75b98393c8316ae), whose union-level source is [SudipMHX/bd-apis](https://github.com/SudipMHX/bd-apis). It contains 8 divisions, 64 districts, 495 upazilas, 4,540 unions, and 328 pourashavas. Twelve city corporations and their ward-number ranges are overlaid in `src/lib/geography.ts`; the source catalog does not provide official city-corporation ward boundaries. Union/municipality ward numbers 1–9 follow the existing registration schema. Upstream MIT and ISC notices are in `src/lib/data/`.
 
 ## Build with Lovable
 
@@ -60,3 +64,7 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+`npm run build` creates the Nitro deployment output in `.output`. To preview a
+local production build with Vite, run `npm run preview`; it first creates the
+Vite-compatible SSR output in `dist` and then starts the preview server.

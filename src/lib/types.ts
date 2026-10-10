@@ -9,6 +9,30 @@ export interface Upazila {
   unions: Union[];
 }
 
+export interface AdministrativeArea {
+  id: string;
+  level:
+    | "division"
+    | "district"
+    | "upazila"
+    | "city_corporation"
+    | "union"
+    | "municipality"
+    | "ward";
+  bn: string;
+  en: string;
+  parentId: string | null;
+  divisionId: string;
+  districtId: string | null;
+  municipalityId: string | null;
+  upazilaId: string | null;
+  cityCorporationId?: string | null;
+  unionId: string | null;
+  wardNumber: number | null;
+  wardCount?: number;
+  wardNumbers?: readonly number[];
+}
+
 export interface User {
   id: string; name: Bi; role: Role;
   mobile?: string | undefined; email?: string | undefined; password?: string;
@@ -22,6 +46,7 @@ export interface RegCase {
   id: string; type: "birth" | "death";
   name: Bi; father: Bi; mother: Bi;
   nid: string; // parent NID (birth) or deceased NID/BRN (death)
+  parentMobile?: string | undefined;
   gender: "male" | "female" | "other";
   dob: string; order?: string | undefined; dod?: string | undefined; cause?: Bi | undefined;
   villageId: string;

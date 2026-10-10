@@ -70,6 +70,29 @@
 }
 
 @utility bg-hero { background: radial-gradient(circle at 85% 20%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 55%), radial-gradient(circle at 10% 90%, color-mix(in oklch, var(--destructive) 10%, transparent), transparent 50%); }
+
+.announcement-track {
+  display: flex;
+  width: max-content;
+  animation: announcement-marquee 28s linear infinite;
+}
+
+.announcement-viewport:hover .announcement-track {
+  animation-play-state: paused;
+}
+
+@keyframes announcement-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-track {
+    animation: none;
+  }
+}
+
 :root {
   --radius: 0.75rem;
   --success: oklch(0.55 0.13 155); --success-foreground: oklch(0.99 0 0);

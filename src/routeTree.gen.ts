@@ -14,6 +14,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as DashboardSectionRouteImport } from './routes/dashboard.$section'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,41 +41,67 @@ const SetupRoute = SetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardSectionRoute = DashboardSectionRouteImport.update({
+  id: '/$section',
+  path: '/$section',
+  getParentRoute: () => DashboardRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/dashboard': typeof DashboardRoute
+  '/dashboard': typeof DashboardRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
+  '/dashboard/$section': typeof DashboardSectionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/reset-password' | '/security' | '/setup'
+  fullPaths:
+    | '/'
+    | '/dashboard'
+    | '/reset-password'
+    | '/security'
+    | '/setup'
+    | '/dashboard/$section'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/reset-password' | '/security' | '/setup'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/reset-password'
+    | '/security'
+    | '/setup'
+    | '/dashboard/$section'
   id:
-    '__root__' | '/' | '/dashboard' | '/reset-password' | '/security' | '/setup'
+    | '__root__'
+    | '/'
+    | '/dashboard'
+    | '/reset-password'
+    | '/security'
+    | '/setup'
+    | '/dashboard/$section'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DashboardRoute: typeof DashboardRoute
+  DashboardRoute: typeof DashboardRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   SecurityRoute: typeof SecurityRoute
   SetupRoute: typeof SetupRoute
@@ -117,12 +144,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/dashboard/$section': {
+      id: '/dashboard/$section'
+      path: '/$section'
+      fullPath: '/dashboard/$section'
+      preLoaderRoute: typeof DashboardSectionRouteImport
+      parentRoute: typeof DashboardRoute
+    }
   }
 }
 
+interface DashboardRouteChildren {
+  DashboardSectionRoute: typeof DashboardSectionRoute
+}
+
+const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardSectionRoute: DashboardSectionRoute,
+}
+
+const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
+  DashboardRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DashboardRoute: DashboardRoute,
+  DashboardRoute: DashboardRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   SecurityRoute: SecurityRoute,
   SetupRoute: SetupRoute,
