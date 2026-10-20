@@ -19,8 +19,33 @@ export function Header() {
   const [dlg, setDlg] = useState<null | "login" | "manual" | "support">(null);
   const nav = useNavigate();
 
+  const tabs = [
+    [undefined, "মেইন ড্যাশবোর্ড", "Main Dashboard"],
+    ["health_worker", "স্বাস্থ্যকর্মী", "Health Worker"],
+    ["village_police", "গ্রাম পুলিশ", "Village Police"],
+    ["up_official", "ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer"],
+    ["uno", "উপজেলা নির্বাহী অফিসার (ইউএনও)", "Upazila Nirbahi Officer (UNO)"],
+  ] as const;
+
   return (
     <header className="sticky top-0 z-40 border-b border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-sm">
+      <nav aria-label={L("ড্যাশবোর্ড নির্বাচন", "Dashboard switcher")} className="bg-emerald-900/90">
+        <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-3 py-1.5 sm:px-6">
+          {tabs.map(([role, bn, en]) => (
+            <Link
+              key={en}
+              to="/"
+              search={role ? { role } : {}}
+              activeOptions={{ exact: true, includeSearch: true }}
+              className="whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold sm:text-sm"
+              inactiveProps={{ className: "text-emerald-50 hover:bg-emerald-700" }}
+              activeProps={{ className: "bg-white text-emerald-900 hover:bg-white" }}
+            >
+              {L(bn, en)}
+            </Link>
+          ))}
+        </div>
+      </nav>
       {!online && (
         <div className="flex items-center justify-center gap-2 bg-warning px-3 py-1 text-xs font-medium text-warning-foreground">
           <WifiOff className="h-3 w-3" /> {L("অফলাইন — তথ্য ডিভাইসে জমা থাকবে, অনলাইনে এলে স্বয়ংক্রিয়ভাবে সিঙ্ক হবে", "Offline — entries are cached and will auto-sync")}
@@ -82,8 +107,8 @@ export function RoleSwitcherBar() {
   const roles = [
     ["worker", "স্বাস্থ্যকর্মী", "Health Worker"],
     ["police", "গ্রাম পুলিশ", "Village Police"],
-    ["admin", "ইউপি কর্মকর্তা", "UP Official"],
-    ["uno", "ইউএনও", "UNO"],
+    ["admin", "ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer"],
+    ["uno", "উপজেলা নির্বাহী অফিসার (ইউএনও)", "Upazila Nirbahi Officer (UNO)"],
   ] as const;
 
   return (

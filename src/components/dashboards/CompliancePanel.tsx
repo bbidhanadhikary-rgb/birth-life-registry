@@ -24,7 +24,7 @@ export function CompliancePanel({
   mode = "full",
 }: CompliancePanelProps) {
   const { L, n } = useApp();
-  const openCases = useMemo(() => cases.filter((c) => c.status !== "completed"), [cases]);
+  const openCases = useMemo(() => cases.filter((c) => c.status !== "completed" && c.status !== "rejected"), [cases]);
   const deadlines = useMemo(
     () => new Map(openCases.map((c) => [c.id, getCaseDeadline(c)])),
     [openCases],

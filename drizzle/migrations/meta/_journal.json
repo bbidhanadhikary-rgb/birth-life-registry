@@ -15,6 +15,69 @@
       "when": 1791520000696,
       "tag": "0001_mfa_sessions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791648621747,
+      "tag": "0002_district_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791648651395,
+      "tag": "0003_national_scope_and_notices",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791648691840,
+      "tag": "0004_administrative_area_hierarchy",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791681409935,
+      "tag": "0005_worker_epi_workflows",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792156993328,
+      "tag": "0006_case_extra_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792490000000,
+      "tag": "0007_monthly_ward_case_counts",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792509000000,
+      "tag": "0008_optional_birth_nid",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792513000000,
+      "tag": "0009_rejected_case_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792515000000,
+      "tag": "0010_support_requests",
+      "breakpoints": true
     }
   ]
 }

@@ -122,7 +122,7 @@ export function NationalDashboard() {
         (!filters.union || item.unionId === filters.union),
     );
   }, [cases, filters.union, filters.upazila, upazilaOptions]);
-  const outstanding = visibleCases.filter((item) => item.status !== "completed");
+  const outstanding = visibleCases.filter((item) => item.status !== "completed" && item.status !== "rejected");
   const deadlines = useMemo(
     () =>
       outstanding

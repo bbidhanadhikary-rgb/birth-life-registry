@@ -1,4 +1,4 @@
-export type Role = "worker" | "admin" | "police" | "uno" | "super";
+export type Role = "worker" | "admin" | "police" | "uno" | "super" | "district";
 export type Bi = { bn: string; en: string };
 
 export interface Village { id: string; bn: string; en: string; poBn: string; poEn: string; ward: number }
@@ -36,13 +36,23 @@ export interface AdministrativeArea {
 export interface User {
   id: string; name: Bi; role: Role;
   mobile?: string | undefined; email?: string | undefined; password?: string;
-  upazilaId: string; unionId?: string | undefined; ward?: number | undefined;
+  upazilaId: string; unionId?: string | undefined; ward?: number | undefined; districtId?: string | undefined;
 }
 
 export interface Remark { by: string; role: Role; text: string; at: number }
-export type Status = "pending" | "progress" | "completed";
+export type Status = "pending" | "progress" | "completed" | "rejected";
+
+export interface CaseDetails {
+  fatherBrn?: string | undefined; motherBrn?: string | undefined;
+  birthPlace?: Bi | undefined; deathPlace?: Bi | undefined;
+  presentAddress?: Bi | undefined; permanentAddress?: Bi | undefined;
+  spouseName?: Bi | undefined; applicantName?: Bi | undefined;
+  applicantRelationship?: Bi | undefined; applicantNameBn?: string | undefined;
+  applicantRelationshipBn?: string | undefined; childBrn?: string | undefined;
+}
 
 export interface RegCase {
+  details?: CaseDetails | undefined;
   id: string; type: "birth" | "death";
   name: Bi; father: Bi; mother: Bi;
   nid: string; // parent NID (birth) or deceased NID/BRN (death)

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { MAX_IMAGE_BYTES } from "./compress-image";
 import { seedState } from "./seed";
 import type { AppState, RegCase, Role, Upazila, User, Village, Union } from "./types";
@@ -13,9 +13,14 @@ type NewEpiVisit = Pick<EpiVisit, "child_name_bn" | "child_name_en" | "parent_mo
 const localDemoLoginAvailable =
   import.meta.env.DEV &&
   (!import.meta.env["VITE_SUPABASE_URL"] || !import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"]);
+const DEMO_CASES = "uert-demo-cases";
+/** Local testing mode: dev server or Lovable preview hosts only (never the published site). */
+const previewTestingAllowed = () =>
+  typeof window !== "undefined" &&
+  (import.meta.env.DEV || /^(id-preview--|preview--)|lovableproject(-dev)?\.com$|^localhost$/.test(window.location.hostname));
 type NewCase = Omit<RegCase, "id" | "createdAt" | "synced" | "smsSent" | "remarks" | "status" | "createdBy" | "upazilaId" | "unionId" | "ward" | "files"> & { files: File[] };
 type CaseCorrection = Pick<RegCase, "type" | "name" | "father" | "mother" | "nid" | "gender" | "dob" | "villageId"> &
-  Pick<RegCase, "parentMobile"> & {
+  Pick<RegCase, "parentMobile" | "details"> & {
     order?: string | undefined;
     dod?: string | undefined;
     cause?: RegCase["cause"];
@@ -44,8 +49,9 @@ const empty: AppState = { upazilas: [], users: [], cases: [], audit: [], session
 const mapCase = (r: any, remarks: any[]): RegCase => ({
   id: r.id, type: r.type,
   name: { bn: r.name_bn, en: r.name_en }, father: { bn: r.father_bn, en: r.father_en }, mother: { bn: r.mother_bn, en: r.mother_en },
-  nid: r.nid, parentMobile: r.parent_mobile ?? undefined, gender: r.gender, dob: r.dob, order: r.child_order ?? undefined, dod: r.dod ?? undefined,
+  nid: r.nid ?? "", parentMobile: r.parent_mobile ?? undefined, gender: r.gender, dob: r.dob, order: r.child_order ?? undefined, dod: r.dod ?? undefined,
   cause: r.cause_bn ? { bn: r.cause_bn, en: r.cause_en ?? "" } : undefined,
+  details: r.details ?? {},
   villageId: r.village_id, files: r.files ?? [], filesPurged: r.files_purged,
   status: r.status, regNo: r.reg_no ?? undefined,
   remarks: remarks.filter((m) => m.case_id === r.id).map((m) => ({ by: m.author, role: m.role, text: m.text, at: Date.parse(m.created_at) })),
@@ -54,6 +60,26 @@ const mapCase = (r: any, remarks: any[]): RegCase => ({
   createdAt: Date.parse(r.created_at), completedAt: r.completed_at ? Date.parse(r.completed_at) : undefined,
   synced: true, smsSent: r.sms_sent,
 });
+
+function isDuplicateCase(existing: RegCase, candidate: NewCase, user: User): boolean {
+  if (existing.type !== candidate.type) return false;
+  const nid = candidate.nid.trim();
+  if (candidate.type === "death" || nid) {
+    return existing.nid === nid && (candidate.type === "death" || existing.order === candidate.order);
+  }
+  const same = (left: string, right: string) => left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
+  return existing.upazilaId === user.upazilaId &&
+    existing.unionId === user.unionId &&
+    existing.ward === (user.ward ?? 1) &&
+    existing.dob === candidate.dob &&
+    existing.order === candidate.order &&
+    same(existing.name.bn, candidate.name.bn) &&
+    same(existing.name.en, candidate.name.en) &&
+    same(existing.father.bn, candidate.father.bn) &&
+    same(existing.father.en, candidate.father.en) &&
+    same(existing.mother.bn, candidate.mother.bn) &&
+    same(existing.mother.en, candidate.mother.en);
+}
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(empty);
@@ -72,8 +98,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const n = useCallback((v: number | string) => lang === "bn" ? String(v).replace(/\d/g, (d) => "০১২৩৪৫৬৭৮৯"[+d]!) : String(v), [lang]);
 
   const enterDemoLogin = useCallback((role: "worker" | "police" | "admin" | "uno") => {
-    if (!localDemoLoginAvailable) return;
+    if (!localDemoLoginAvailable && !previewTestingAllowed()) return;
     const demo = demoMode ? state : seedState();
+    if (!demoMode) {
+      try {
+        const saved = JSON.parse(localStorage.getItem(DEMO_CASES) || "null") as RegCase[] | null;
+        if (Array.isArray(saved)) demo.cases = [...saved, ...demo.cases.filter((c) => !saved.some((x) => x.id === c.id))];
+      } catch { /* ignore */ }
+    }
     const demoUserIds = { worker: "u-w1", police: "u-p1", admin: "u-a1", uno: "u-uno" };
     const previewUser = demo.users.find((candidate) => candidate.id === demoUserIds[role]);
     if (!previewUser) throw new Error(`The seeded ${role} account is missing`);
@@ -108,7 +140,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [demoMode, state]);
 
   const loadData = useCallback(async () => {
-    if (localDemoLoginAvailable && demoMode) return;
+    if (demoMode) return;
     const [ups, profs, roles, cases, remarks] = await Promise.all([
       supabase.from("upazilas").select("*").order("created_at"),
       supabase.from("profiles").select("*"),
@@ -125,7 +157,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [demoMode]);
 
   const refreshAuth = useCallback(async () => {
-    if (localDemoLoginAvailable && demoMode) {
+    if (demoMode) {
       setAuthReady(true);
       return;
     }
@@ -187,6 +219,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     document.documentElement.lang = lang;
     if (prefsReady.current) { localStorage.setItem("uert-theme", dark ? "dark" : "light"); localStorage.setItem("uert-lang", lang); }
   }, [dark, lang]);
+  useEffect(() => {
+    if (!demoMode) return;
+    try { localStorage.setItem(DEMO_CASES, JSON.stringify(state.cases.filter((c) => c.createdBy === "u-w1"))); } catch { /* ignore */ }
+  }, [demoMode, state.cases]);
   useEffect(() => { if (prefsReady.current) localStorage.setItem(QUEUE, JSON.stringify(pending)); }, [pending]);
 
   // Offline queue: flush when back online
@@ -212,7 +248,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [state.upazilas]);
 
   const dupMsg = (t: string) => t === "birth"
-    ? L("এই পিতা/মাতার NID ও সন্তানের ক্রমে আগেই নিবন্ধন হয়েছে", "A birth with this parent NID and child order already exists")
+    ? L("এই শিশু ও জন্মতারিখের তথ্য আগেই জমা হয়েছে", "This child and date of birth have already been submitted")
     : L("এই NID/জন্ম নিবন্ধন নম্বরে মৃত্যু নিবন্ধন আগেই হয়েছে", "A death with this NID/birth certificate number already exists");
 
   const value: Ctx = {
@@ -240,7 +276,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       const id = crypto.randomUUID();
       if (demoMode) {
-        if (state.cases.some((existing) => existing.type === c.type && existing.nid === c.nid && (c.type === "death" || existing.order === c.order))) {
+        if (state.cases.some((existing) => isDuplicateCase(existing, c, user))) {
           return dupMsg(c.type);
         }
         const localCase: RegCase = {
@@ -273,11 +309,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       const row: any = {
         id, client_id: id, type: c.type, name_bn: c.name.bn, name_en: c.name.en, father_bn: c.father.bn, father_en: c.father.en,
-        mother_bn: c.mother.bn, mother_en: c.mother.en, nid: c.nid, gender: c.gender, dob: c.dob, child_order: c.order ?? null,
-        parent_mobile: c.parentMobile ?? null, dod: c.dod ?? null, cause_bn: c.cause?.bn ?? null, cause_en: c.cause?.en ?? null, village_id: c.villageId,
+        mother_bn: c.mother.bn, mother_en: c.mother.en, nid: c.nid.trim() || null, gender: c.gender, dob: c.dob, child_order: c.order ?? null,
+        parent_mobile: c.parentMobile ?? null, dod: c.dod ?? null, cause_bn: c.cause?.bn ?? null, cause_en: c.cause?.en ?? null, village_id: c.villageId, details: c.details ?? {},
         created_by: user.id, upazila_id: user.upazilaId, union_id: user.unionId, ward: user.ward ?? 1,
       };
-      if (state.cases.some((x) => x.type === c.type && x.nid === c.nid && (c.type === "death" || x.order === c.order))) return dupMsg(c.type);
+      if (state.cases.some((existing) => isDuplicateCase(existing, c, user))) return dupMsg(c.type);
       if (!navigator.onLine) {
         if (c.files.length) return L("অফলাইনে ফাইল যুক্ত করা যায় না — ফাইল ছাড়া জমা দিন বা অনলাইনে আসুন", "Files can't be attached offline — submit without files or reconnect");
         setPending((p) => [...p, { ...row, queued_at: new Date().toISOString() }]);
@@ -306,7 +342,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return false;
       }
       const existing = state.cases.find((item) => item.id === id);
-      if (!existing || existing.createdBy !== user.id || existing.status === "completed") {
+      if (!existing || existing.createdBy !== user.id || existing.status === "completed" || existing.status === "rejected") {
         toast.error(L("এই এন্ট্রি আর সংশোধন করা যাবে না", "This entry can no longer be corrected"));
         return false;
       }
@@ -372,6 +408,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         cause_bn: correction.cause?.bn ?? null,
         cause_en: correction.cause?.en ?? null,
         village_id: correction.villageId,
+        details: JSON.parse(JSON.stringify(correction.details ?? {})) as Json,
       };
       if (correction.files) update.files = uploads;
       const { data, error } = await supabase.from("cases").update(update).eq("id", id).select("id").maybeSingle();

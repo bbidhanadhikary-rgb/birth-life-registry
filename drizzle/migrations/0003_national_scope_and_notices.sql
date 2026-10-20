@@ -18,16 +18,9 @@ DROP POLICY "scoped profiles" ON public.profiles;
 CREATE POLICY "scoped profiles" ON public.profiles FOR SELECT TO authenticated USING (
   id = auth.uid()
   OR public.has_role(auth.uid(),'super')
-  OR (
-    public.has_role(auth.uid(),'district')
-    AND district_id = public.current_district()
-  )
+  OR (public.has_role(auth.uid(),'district') AND district_id = public.current_district())
   OR (public.has_role(auth.uid(),'uno') AND upazila_id = public.current_upazila())
-  OR (
-    public.has_role(auth.uid(),'admin')
-    AND upazila_id = public.current_upazila()
-    AND union_id = public.current_union()
-  )
+  OR (public.has_role(auth.uid(),'admin') AND upazila_id = public.current_upazila() AND union_id = public.current_union())
 );
 
 DROP POLICY "scoped roles" ON public.user_roles;
@@ -40,11 +33,7 @@ CREATE POLICY "scoped roles" ON public.user_roles FOR SELECT TO authenticated US
       AND (
         (public.has_role(auth.uid(),'district') AND p.district_id = public.current_district())
         OR (public.has_role(auth.uid(),'uno') AND p.upazila_id = public.current_upazila())
-        OR (
-          public.has_role(auth.uid(),'admin')
-          AND p.upazila_id = public.current_upazila()
-          AND p.union_id = public.current_union()
-        )
+        OR (public.has_role(auth.uid(),'admin') AND p.upazila_id = public.current_upazila() AND p.union_id = public.current_union())
       )
   )
 );
@@ -54,11 +43,7 @@ CREATE POLICY "scoped case read" ON public.cases FOR SELECT TO authenticated USI
   public.has_role(auth.uid(),'super')
   OR (
     public.has_role(auth.uid(),'district')
-    AND EXISTS (
-      SELECT 1 FROM public.upazilas u
-      WHERE u.id = cases.upazila_id
-        AND u.district_en = public.current_district()
-    )
+    AND EXISTS (SELECT 1 FROM public.upazilas u WHERE u.id = cases.upazila_id AND u.district_en = public.current_district())
   )
   OR (
     upazila_id = public.current_upazila()
@@ -68,11 +53,7 @@ CREATE POLICY "scoped case read" ON public.cases FOR SELECT TO authenticated USI
         union_id = public.current_union()
         AND (
           public.has_role(auth.uid(),'admin')
-          OR (
-            public.has_role(auth.uid(),'police')
-            AND ward = public.current_ward()
-            AND police_task IS NOT NULL
-          )
+          OR (public.has_role(auth.uid(),'police') AND ward = public.current_ward() AND police_task IS NOT NULL)
           OR created_by = auth.uid()
         )
       )
@@ -88,42 +69,27 @@ CREATE TABLE public.upazila_announcements (
   updated_by uuid NOT NULL REFERENCES public.profiles(id),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
-ALTER TABLE public.upazila_announcements ENABLE ROW LEVEL SECURITY;
 GRANT SELECT ON public.upazila_announcements TO anon, authenticated;
 GRANT INSERT, UPDATE ON public.upazila_announcements TO authenticated;
 GRANT ALL ON public.upazila_announcements TO service_role;
+ALTER TABLE public.upazila_announcements ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "read active scoped announcements" ON public.upazila_announcements
 FOR SELECT TO anon, authenticated USING (
   active = true
-  OR (
-    auth.uid() IS NOT NULL
-    AND (
-      public.has_role(auth.uid(),'super')
-      OR (
-        public.has_role(auth.uid(),'uno')
-        AND upazila_id = public.current_upazila()
-      )
-    )
-  )
+  OR (auth.uid() IS NOT NULL AND (
+    public.has_role(auth.uid(),'super')
+    OR (public.has_role(auth.uid(),'uno') AND upazila_id = public.current_upazila())
+  ))
 );
 CREATE POLICY "uno creates own announcement" ON public.upazila_announcements
 FOR INSERT TO authenticated WITH CHECK (
-  public.has_role(auth.uid(),'uno')
-  AND upazila_id = public.current_upazila()
-  AND updated_by = auth.uid()
+  public.has_role(auth.uid(),'uno') AND upazila_id = public.current_upazila() AND updated_by = auth.uid()
 );
 CREATE POLICY "uno updates own announcement" ON public.upazila_announcements
 FOR UPDATE TO authenticated
-USING (
-  public.has_role(auth.uid(),'uno')
-  AND upazila_id = public.current_upazila()
-)
-WITH CHECK (
-  public.has_role(auth.uid(),'uno')
-  AND upazila_id = public.current_upazila()
-  AND updated_by = auth.uid()
-);
+USING (public.has_role(auth.uid(),'uno') AND upazila_id = public.current_upazila())
+WITH CHECK (public.has_role(auth.uid(),'uno') AND upazila_id = public.current_upazila() AND updated_by = auth.uid());
 
 CREATE OR REPLACE FUNCTION public.touch_upazila_announcement()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$

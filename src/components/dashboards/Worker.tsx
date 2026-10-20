@@ -9,6 +9,7 @@ import {
   FileImage,
   FileText,
   HeartPulse,
+  Home,
   MessageSquareWarning,
   Pencil,
   Plus,
@@ -25,6 +26,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -51,59 +54,161 @@ type DialogState =
   | null;
 type EpiVisit = Tables<"epi_visits">;
 
+function FormRow({
+  labelBn,
+  labelEn,
+  required = false,
+  compact = false,
+  labelAccessory,
+  children,
+}: {
+  labelBn: string;
+  labelEn: string;
+  required?: boolean;
+  compact?: boolean;
+  labelAccessory?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={compact ? "grid min-w-0 gap-1 lg:grid-cols-[8rem_minmax(0,1fr)] lg:items-center lg:gap-2" : "grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-start sm:gap-4"}>
+      <div className={`flex items-start ${labelAccessory ? "gap-2" : ""} ${compact ? "lg:pt-0" : "pt-2"}`}>
+        {labelAccessory}
+        <div className="min-w-0">
+          <p className={`${compact ? "text-base" : "text-sm"} font-bold text-slate-800`}>
+            {labelBn}{required && <span className="text-red-600"> *</span>}
+          </p>
+          <p className={`${compact ? "text-sm" : "text-[11px]"} text-slate-500`}>{labelEn}</p>
+        </div>
+      </div>
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
 function BiField({
   label,
+  labelEn,
   value,
   onChange,
   required = false,
+  compact = false,
 }: {
   label: string;
+  labelEn?: string;
   value: Bi;
   onChange: (next: Bi) => void;
   required?: boolean;
+  compact?: boolean;
 }) {
+  const fields = (
+    <div className={compact ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2"}>
+      <Input
+        className={compact ? "h-12 px-3 text-base md:text-base placeholder:text-base" : undefined}
+        aria-label={`${label} — বাংলা`}
+        autoComplete="off"
+        maxLength={100}
+        placeholder="বাংলায় লিখুন"
+        required={required}
+        value={value.bn}
+        onChange={(event) => onChange({ ...value, bn: event.target.value })}
+      />
+      <Input
+        className={compact ? "h-12 px-3 text-base md:text-base placeholder:text-base" : undefined}
+        aria-label={`${label} — English`}
+        autoComplete="off"
+        maxLength={100}
+        placeholder="Enter in English"
+        required={required}
+        value={value.en}
+        onChange={(event) => onChange({ ...value, en: event.target.value })}
+      />
+    </div>
+  );
+  if (labelEn) {
+    return <FormRow labelBn={label} labelEn={labelEn} required={required} compact={compact}>{fields}</FormRow>;
+  }
   return (
     <fieldset className="min-w-0 space-y-1">
-      <legend className="text-xs font-semibold text-slate-700">{label}</legend>
-      <div className="grid grid-cols-2 gap-2">
-        <Input
-          aria-label={`${label} — বাংলা`}
-          autoComplete="off"
-          maxLength={100}
-          placeholder="বাংলা"
-          required={required}
-          value={value.bn}
-          onChange={(event) => onChange({ ...value, bn: event.target.value })}
-        />
-        <Input
-          aria-label={`${label} — English`}
-          autoComplete="off"
-          maxLength={100}
-          placeholder="English"
-          required={required}
-          value={value.en}
-          onChange={(event) => onChange({ ...value, en: event.target.value })}
-        />
-      </div>
+      <legend className="text-xs font-semibold text-slate-700">
+        {label}
+        {required && <span className="text-red-600"> *</span>}
+      </legend>
+      {fields}
     </fieldset>
   );
 }
 
-function RegForm({
+function BiTextAreaField({
+  labelBn,
+  labelEn,
+  value,
+  onChange,
+  required = false,
+  compact = false,
+  labelAccessory,
+}: {
+  labelBn: string;
+  labelEn: string;
+  value: Bi;
+  onChange: (next: Bi) => void;
+  required?: boolean;
+  compact?: boolean;
+  labelAccessory?: React.ReactNode;
+}) {
+  return (
+    <FormRow labelBn={labelBn} labelEn={labelEn} required={required} compact={compact} labelAccessory={labelAccessory}>
+      <div className={compact ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2"}>
+        <Textarea
+          className={compact ? "h-[4.5rem] min-h-[4.5rem] px-3 py-1.5 text-base md:text-base placeholder:text-base" : undefined}
+          aria-label={`${labelBn} — বাংলা`}
+          maxLength={500}
+          placeholder="বাংলায় লিখুন"
+          required={required}
+          rows={compact ? 3 : 2}
+          value={value.bn}
+          onChange={(event) => onChange({ ...value, bn: event.target.value })}
+        />
+        <Textarea
+          className={compact ? "h-[4.5rem] min-h-[4.5rem] px-3 py-1.5 text-base md:text-base placeholder:text-base" : undefined}
+          aria-label={`${labelEn} — English`}
+          maxLength={500}
+          placeholder="Enter in English"
+          required={required}
+          rows={compact ? 3 : 2}
+          value={value.en}
+          onChange={(event) => onChange({ ...value, en: event.target.value })}
+        />
+      </div>
+    </FormRow>
+  );
+}
+
+export function RegForm({
   type,
   entry,
   onSaved,
+  onCancel,
+  onEdit,
 }: {
   type: CaseType;
   entry?: RegCase | undefined;
   onSaved: () => void;
+  onCancel?: () => void;
+  onEdit?: () => void;
 }) {
-  const { L, user, state, addCase, updateCase } = useApp();
+  const { L, user, state, addCase, updateCase, demoMode, enterDemoLogin } = useApp();
   const upazila = user ? state.upazilas.find((area) => area.id === user.upazilaId) : undefined;
   const union = upazila?.unions.find((area) => area.id === user?.unionId);
   const [name, setName] = useState<Bi>(entry?.name ?? emptyBi);
   const [father, setFather] = useState<Bi>(entry?.father ?? emptyBi);
   const [mother, setMother] = useState<Bi>(entry?.mother ?? emptyBi);
+  const [spouseName, setSpouseName] = useState<Bi>(entry?.details?.spouseName ?? emptyBi);
+  const [applicantNameBn, setApplicantNameBn] = useState(
+    entry?.details?.applicantNameBn ?? entry?.details?.applicantName?.bn ?? "",
+  );
+  const [applicantRelationshipBn, setApplicantRelationshipBn] = useState(
+    entry?.details?.applicantRelationshipBn ?? entry?.details?.applicantRelationship?.bn ?? "",
+  );
   const [cause, setCause] = useState<Bi>(entry?.cause ?? emptyBi);
   const [nid, setNid] = useState(entry?.nid ?? "");
   const [mobile, setMobile] = useState(entry?.parentMobile ?? "");
@@ -111,13 +216,30 @@ function RegForm({
   const [dob, setDob] = useState(entry?.dob ?? "");
   const [dod, setDod] = useState(entry?.dod ?? "");
   const [order, setOrder] = useState(entry?.order ?? "1");
-  const [villageId, setVillageId] = useState(entry?.villageId ?? "");
+  const [fatherBrn, setFatherBrn] = useState(entry?.details?.fatherBrn ?? "");
+  const [motherBrn, setMotherBrn] = useState(entry?.details?.motherBrn ?? "");
+  const [birthPlace, setBirthPlace] = useState<Bi>(
+    type === "death"
+      ? entry?.details?.deathPlace ?? entry?.details?.birthPlace ?? emptyBi
+      : entry?.details?.birthPlace ?? emptyBi,
+  );
+  const [present, setPresent] = useState<Bi>(entry?.details?.presentAddress ?? emptyBi);
+  const [permanent, setPermanent] = useState<Bi>(entry?.details?.permanentAddress ?? emptyBi);
+  const [samePermanent, setSamePermanent] = useState(
+    Boolean(entry?.details?.birthPlace &&
+      entry.details.permanentAddress?.bn === entry.details.birthPlace.bn &&
+      entry.details.permanentAddress?.en === entry.details.birthPlace.en),
+  );
+  const [samePresent, setSamePresent] = useState(
+    Boolean(entry?.details?.birthPlace &&
+      entry.details.presentAddress?.bn === entry.details.birthPlace.bn &&
+      entry.details.presentAddress?.en === entry.details.birthPlace.en),
+  );
   const [attachments, setAttachments] = useState<(File | null)[]>([null, null, null]);
   const [filesChanged, setFilesChanged] = useState(false);
   const [compressing, setCompressing] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const village = union?.villages.find((item) => item.id === villageId);
   const oldFiles = entry?.files ?? [];
 
   const chooseImage = async (index: number, file?: File) => {
@@ -148,6 +270,62 @@ function RegForm({
     }
   };
 
+  const attachmentFields = (
+    <fieldset className={type === "birth" ? "space-y-1" : "space-y-2"}>
+      <legend className="text-sm font-semibold text-slate-700">
+        {L("ছবি সংযুক্তি · প্রতিটি সর্বোচ্চ ১৫০ KB", "Photo attachments · maximum 150 KB each")}
+      </legend>
+      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+        {attachments.map((file, index) => (
+          <label
+            key={index}
+            className={`flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-emerald-300 bg-white hover:bg-emerald-50 ${type === "birth" ? "min-h-12 px-2 py-1.5 text-xs sm:text-sm" : "min-h-12 px-3 py-2 text-xs"}`}
+          >
+            <FileImage className="h-4 w-4 shrink-0 text-emerald-700" />
+            <span className="min-w-0 flex-1 truncate">
+              {compressing === index
+                ? L("সংকুচিত হচ্ছে…", "Compressing…")
+                : file
+                  ? `${file.name} · ${Math.ceil(file.size / 1024)} KB`
+                  : (oldFiles[index]?.name ?? L(`ছবি ${index + 1} বাছুন`, `Choose image ${index + 1}`))}
+            </span>
+            {file && (
+              <button
+                type="button"
+                className="font-bold text-red-700"
+                aria-label={L("ছবি সরান", "Remove image")}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setAttachments((current) =>
+                    current.map((item, position) => (position === index ? null : item)),
+                  );
+                  setFilesChanged(true);
+                }}
+              >
+                ×
+              </button>
+            )}
+            <input
+              accept="image/*"
+              className="sr-only"
+              disabled={compressing !== null}
+              type="file"
+              onChange={(event) => void chooseImage(index, event.target.files?.[0])}
+            />
+          </label>
+        ))}
+      </div>
+      {entry && oldFiles.length > 0 && !filesChanged && (
+        <p className="text-[11px] text-slate-500">
+          {L(
+            "সংরক্ষিত ছবি অপরিবর্তিত থাকবে; নতুন ছবি দিলে সংযুক্তি প্রতিস্থাপিত হবে।",
+            "Saved photos remain unless new photos are selected; selecting new photos replaces the attachments.",
+          )}
+        </p>
+      )}
+    </fieldset>
+  );
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
@@ -171,7 +349,11 @@ function RegForm({
       );
       return;
     }
-    if (!/^(\d{10}|\d{13}|\d{17})$/.test(nid)) {
+    if (!applicantNameBn.trim() || !applicantRelationshipBn.trim()) {
+      setError(L("আবেদনকারীর নাম ও সম্পর্ক পূরণ করুন", "Enter the applicant's name and relationship"));
+      return;
+    }
+    if (type === "death" && !/^(\d{10}|\d{13}|\d{17})$/.test(nid)) {
       setError(
         L(
           "NID/জন্ম নিবন্ধন নম্বর ১০, ১৩ বা ১৭ অঙ্কের হতে হবে",
@@ -191,7 +373,6 @@ function RegForm({
     }
     if (
       !dob ||
-      !villageId ||
       (type === "death" && (!dod || !cause.bn.trim() || !cause.en.trim()))
     ) {
       setError(
@@ -200,6 +381,21 @@ function RegForm({
           "Complete the dates, village and, for death entries, cause of death",
         ),
       );
+      return;
+    }
+    if ((fatherBrn && !/^\d{17}$/.test(fatherBrn)) || (motherBrn && !/^\d{17}$/.test(motherBrn))) {
+      setError(L("পিতা/মাতার জন্ম নিবন্ধন নম্বর ১৭ অঙ্কের হতে হবে", "Father's/mother's BRN must be exactly 17 digits"));
+      return;
+    }
+    if (
+      !birthPlace.bn.trim() || !birthPlace.en.trim() ||
+      !present.bn.trim() || !present.en.trim() || !permanent.bn.trim() || !permanent.en.trim()
+    ) {
+      setError(L("জন্ম/মৃত্যুর স্থান এবং বর্তমান ও স্থায়ী ঠিকানা বাংলা ও ইংরেজিতে দিন", "Enter the place of birth/death and present and permanent addresses in Bangla and English"));
+      return;
+    }
+    if (dob > new Date().toISOString().slice(0, 10) || (type === "death" && (dod < dob || dod > new Date().toISOString().slice(0, 10)))) {
+      setError(L("তারিখ ভবিষ্যতের হতে পারবে না এবং মৃত্যুর তারিখ জন্ম তারিখের পরে হতে হবে", "Dates can't be in the future and date of death must be after date of birth"));
       return;
     }
     if (type === "birth" && (!/^\d+$/.test(order) || Number(order) < 1 || Number(order) > 20)) {
@@ -221,7 +417,20 @@ function RegForm({
         order: type === "birth" ? order : undefined,
         dod: type === "death" ? dod : undefined,
         cause: type === "death" ? cause : undefined,
-        villageId,
+        villageId: entry?.villageId ?? "",
+        details: {
+          fatherBrn: fatherBrn || undefined,
+          motherBrn: motherBrn || undefined,
+          birthPlace: type === "birth" ? { bn: birthPlace.bn.trim(), en: birthPlace.en.trim() } : undefined,
+          deathPlace: type === "death" ? { bn: birthPlace.bn.trim(), en: birthPlace.en.trim() } : undefined,
+          presentAddress: { bn: present.bn.trim(), en: present.en.trim() },
+          permanentAddress: { bn: permanent.bn.trim(), en: permanent.en.trim() },
+          spouseName: type === "death" ? spouseName : undefined,
+          applicantName: undefined,
+          applicantRelationship: undefined,
+          applicantNameBn: applicantNameBn.trim(),
+          applicantRelationshipBn: applicantRelationshipBn.trim(),
+        },
       };
       if (entry) {
         const updated = await updateCase(entry.id, {
@@ -250,6 +459,14 @@ function RegForm({
     }
   };
 
+  const needsTestArea = !upazila || !union;
+  useEffect(() => {
+    // Local testing mode: open the form with the sample health worker's area.
+    if (needsTestArea && (!user || demoMode)) {
+      try { enterDemoLogin("worker"); } catch (e) { console.error(e); }
+    }
+  }, [needsTestArea, user, demoMode, enterDemoLogin]);
+
   if (!upazila || !union) {
     return (
       <p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
@@ -262,212 +479,155 @@ function RegForm({
   }
 
   return (
-    <form className="space-y-4" onSubmit={submit}>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <BiField
-          label={
-            type === "birth"
-              ? L("শিশুর নাম", "Baby's name")
-              : L("মৃত ব্যক্তির নাম", "Deceased person's name")
-          }
-          value={name}
-          onChange={setName}
-          required
-        />
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs font-semibold">
-              {L("NID / জন্ম নিবন্ধন নং", "NID / birth registration no.")}
-            </Label>
-            <Input
-              autoComplete="off"
-              inputMode="numeric"
-              maxLength={17}
-              required
-              value={nid}
-              onChange={(event) => setNid(event.target.value.replace(/\D/g, ""))}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs font-semibold">{L("লিঙ্গ", "Gender")}</Label>
-            <Select value={gender} onValueChange={(value) => setGender(value as RegCase["gender"])}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="male">{L("পুরুষ", "Male")}</SelectItem>
-                <SelectItem value="female">{L("মহিলা", "Female")}</SelectItem>
-                <SelectItem value="other">{L("অন্যান্য", "Other")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <form className="w-full max-w-full space-y-1 p-2 sm:p-3 rounded-2xl border border-emerald-100 bg-white shadow-sm" onSubmit={submit}>
+      <div className="border-b border-emerald-100 pb-1.5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className={`${type === "birth" ? "text-base" : "text-lg"} font-bold text-emerald-950`}>
+            {type === "birth" ? "জন্ম নিবন্ধনের আবেদন" : "মৃত্যু নিবন্ধনের আবেদন"}
+          </h2>
+          <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={onCancel}>
+            <Home className="mr-1.5 h-4 w-4" />{L("হোম পেজে ফিরে যান", "Home")}
+          </Button>
         </div>
-        <BiField
-          label={L("পিতার নাম", "Father's name")}
-          value={father}
-          onChange={setFather}
-          required
-        />
-        <BiField
-          label={L("মাতার নাম", "Mother's name")}
-          value={mother}
-          onChange={setMother}
-          required
-        />
-        <div className="space-y-1">
-          <Label className="text-xs font-semibold">
-            {L("সক্রিয় মোবাইল নম্বর", "Active mobile number")}
-          </Label>
-          <Input
-            autoComplete="tel"
-            inputMode="tel"
-            maxLength={11}
-            placeholder="01XXXXXXXXX"
-            required
-            value={mobile}
-            onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs font-semibold">{L("জন্ম তারিখ", "Date of birth")}</Label>
-          <Input
-            type="date"
-            required
-            value={dob}
-            onChange={(event) => setDob(event.target.value)}
-          />
-        </div>
-        {type === "birth" ? (
-          <div className="space-y-1">
-            <Label className="text-xs font-semibold">
-              {L("কত তম সন্তান", "Child order / number")}
-            </Label>
-            <Input
-              type="number"
-              min={1}
-              max={20}
-              required
-              value={order}
-              onChange={(event) => setOrder(event.target.value)}
-            />
-          </div>
-        ) : (
-          <>
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold">{L("মৃত্যুর তারিখ", "Date of death")}</Label>
-              <Input
-                type="date"
-                required
-                value={dod}
-                onChange={(event) => setDod(event.target.value)}
-              />
-            </div>
-            <BiField
-              label={L("মৃত্যুর কারণ", "Cause of death")}
-              value={cause}
-              onChange={setCause}
-              required
-            />
-          </>
-        )}
-        <div className="space-y-1">
-          <Label className="text-xs font-semibold">{L("গ্রামের নাম", "Village name")}</Label>
-          <Select value={villageId} onValueChange={setVillageId}>
-            <SelectTrigger aria-label={L("গ্রাম নির্বাচন", "Select village")}>
-              <SelectValue placeholder={L("শুধু গ্রাম বেছে নিন", "Select village only")} />
-            </SelectTrigger>
-            <SelectContent>
-              {union.villages.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
-                  {item.bn} / {item.en}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <p className={`${type === "birth" ? "text-xs" : "text-sm"} text-slate-500`}>
+          {type === "birth" ? "Birth Registration Application" : "Death Registration Application"}
+        </p>
       </div>
 
-      {village && (
-        <div className="grid gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs font-medium text-emerald-950 sm:grid-cols-2">
-          <p>
-            ডাকঘর: {village.poBn} · ওয়ার্ড {village.ward} · {union.bn} · {upazila.bn} ·{" "}
-            {upazila.districtBn} · {upazila.divisionBn} · বাংলাদেশ
-          </p>
-          <p>
-            Post Office: {village.poEn} · Ward {village.ward} · {union.en} · {upazila.en} ·{" "}
-            {upazila.districtEn} · {upazila.divisionEn} · Bangladesh
-          </p>
+      {type === "birth" ? (
+        <div className="grid items-start gap-3 lg:grid-cols-2 lg:gap-4">
+          <div className="space-y-1">
+            <FormRow labelBn="জন্মতারিখ" labelEn="Date of Birth" required compact>
+              <Input className="h-11 text-base md:text-base" type="date" required value={dob} onChange={(event) => setDob(event.target.value)} />
+            </FormRow>
+            <FormRow labelBn="লিঙ্গ" labelEn="Gender" required compact>
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="লিঙ্গ / Gender">
+                {([
+                  ["female", "নারী", "Female"],
+                  ["male", "পুরুষ", "Male"],
+                  ["other", "তৃতীয় লিঙ্গ", "Other"],
+                ] as const).map(([value, labelBn, labelEn]) => (
+                  <label key={value} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 hover:border-emerald-400">
+                    <input className="h-4 w-4 shrink-0 accent-emerald-600" type="radio" name="gender-birth" value={value} checked={gender === value} onChange={() => setGender(value)} required />
+                    <span><span className="block text-sm font-semibold text-slate-800">{labelBn}</span><span className="block text-xs text-slate-500">{labelEn}</span></span>
+                  </label>
+                ))}
+              </div>
+            </FormRow>
+            <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required compact>
+              <Input className="h-11 text-base font-bold md:text-base" type="number" min={1} max={20} required value={order} onChange={(event) => setOrder(event.target.value)} />
+            </FormRow>
+            <BiField label="শিশুর নাম" labelEn="Child's Name" value={name} onChange={setName} required compact />
+            <BiField label="পিতার নাম" labelEn="Father's Name" value={father} onChange={setFather} required compact />
+            <BiField label="মাতার নাম" labelEn="Mother's Name" value={mother} onChange={setMother} required compact />
+            <FormRow labelBn="পিতা ও মাতার জন্ম নিবন্ধন নং" labelEn="Parent's Birth Registration Numbers" compact>
+              <div className="grid grid-cols-2 gap-1.5">
+                <Input className="h-10 px-2 text-sm md:text-sm placeholder:text-xs" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="পিতার BRN" aria-label="পিতার জন্ম নিবন্ধন নম্বর / Father's BRN" aria-invalid={fatherBrn.length > 0 && fatherBrn.length !== 17} value={fatherBrn} onChange={(event) => setFatherBrn(event.target.value.replace(/\D/g, "").slice(0, 17))} />
+                <Input className="h-10 px-2 text-sm md:text-sm placeholder:text-xs" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="মাতার BRN" aria-label="মাতার জন্ম নিবন্ধন নম্বর / Mother's BRN" aria-invalid={motherBrn.length > 0 && motherBrn.length !== 17} value={motherBrn} onChange={(event) => setMotherBrn(event.target.value.replace(/\D/g, "").slice(0, 17))} />
+              </div>
+            </FormRow>
+            {attachmentFields}
+          </div>
+
+          <div className="space-y-1">
+            <FormRow labelBn="সক্রিয় মোবাইল নম্বর" labelEn="Active Mobile Number" required compact>
+              <Input className="h-11 text-base md:text-base placeholder:text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))} />
+            </FormRow>
+            <BiTextAreaField labelBn="জন্মস্থানের ঠিকানা" labelEn="Place of Birth Address" value={birthPlace} onChange={(next) => { setBirthPlace(next); if (samePermanent) setPermanent(next); if (samePresent) setPresent(next); }} required compact />
+            <BiTextAreaField
+              labelBn="স্থায়ী ঠিকানা"
+              labelEn="Permanent Address"
+              value={permanent}
+              onChange={(next) => { setPermanent(next); setSamePermanent(false); }}
+              required
+              compact
+              labelAccessory={<Checkbox aria-label="স্থায়ী ঠিকানা জন্মস্থানের মতো" title="জন্মস্থানের ঠিকানার মতো" checked={samePermanent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePermanent(enabled); if (enabled) setPermanent(birthPlace); }} className="mt-0.5 h-4 w-4" />}
+            />
+            <BiTextAreaField
+              labelBn="বর্তমান ঠিকানা"
+              labelEn="Present Address"
+              value={present}
+              onChange={(next) => { setPresent(next); setSamePresent(false); }}
+              required
+              compact
+              labelAccessory={<Checkbox aria-label="বর্তমান ঠিকানা জন্মস্থানের মতো" title="জন্মস্থানের ঠিকানার মতো" checked={samePresent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePresent(enabled); if (enabled) setPresent(birthPlace); }} className="mt-0.5 h-4 w-4" />}
+            />
+            <FormRow labelBn="আবেদনকারীর তথ্য" labelEn="Applicant Details" required compact>
+              <div className="grid gap-2">
+                <Input className="h-10 text-sm md:text-sm" autoComplete="name" maxLength={100} placeholder="আবেদনকারীর নাম" aria-label="আবেদনকারীর নাম" required value={applicantNameBn} onChange={(event) => setApplicantNameBn(event.target.value)} />
+                <Input className="h-10 text-sm md:text-sm" maxLength={100} placeholder="আবেদনকারীর সাথে সম্পর্ক" aria-label="আবেদনকারীর সাথে সম্পর্ক" required value={applicantRelationshipBn} onChange={(event) => setApplicantRelationshipBn(event.target.value)} />
+              </div>
+            </FormRow>
+          </div>
+        </div>
+      ) : (
+        <div className="grid items-start gap-2 lg:grid-cols-2 lg:gap-3">
+          <div className="space-y-1">
+            <FormRow labelBn="মৃত্যুর তারিখ" labelEn="Date of Death" required compact><Input className="h-11 text-base" type="date" required value={dod} onChange={(event) => setDod(event.target.value)} /></FormRow>
+            <FormRow labelBn="লিঙ্গ" labelEn="Gender" required compact>
+              <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="লিঙ্গ / Gender">
+                {([
+                  ["female", "নারী", "Female"],
+                  ["male", "পুরুষ", "Male"],
+                  ["other", "তৃতীয় লিঙ্গ", "Other"],
+                ] as const).map(([value, labelBn, labelEn]) => (
+                  <label key={value} className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-2 py-1.5 hover:border-emerald-400">
+                    <input className="h-4 w-4 shrink-0 accent-emerald-600" type="radio" name="gender-death" value={value} checked={gender === value} onChange={() => setGender(value)} required />
+                    <span><span className="block text-sm font-semibold text-slate-800">{labelBn}</span><span className="block text-xs text-slate-500">{labelEn}</span></span>
+                  </label>
+                ))}
+              </div>
+            </FormRow>
+            <BiField label="মৃত্যুর কারণ" labelEn="Cause of Death" value={cause} onChange={setCause} required compact />
+            <FormRow labelBn="জন্ম তারিখ" labelEn="Date of Birth" required compact><Input className="h-11 text-base" type="date" required value={dob} onChange={(event) => setDob(event.target.value)} /></FormRow>
+            <BiField label="মৃত ব্যক্তির নাম" labelEn="Deceased Name" value={name} onChange={setName} required compact />
+            <BiField label="পিতার নাম" labelEn="Father's Name" value={father} onChange={setFather} required compact />
+            <BiField label="মাতার নাম" labelEn="Mother's Name" value={mother} onChange={setMother} required compact />
+            <BiField label="স্বামী/স্ত্রীর নাম" labelEn="Spouse's Name" value={spouseName} onChange={setSpouseName} compact />
+            <FormRow labelBn="জাতীয় পরিচয়পত্র নং" labelEn="National ID No." required compact><Input className="h-11 text-base" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="১০, ১৩ বা ১৭ অঙ্ক / 10, 13 or 17 digits" required value={nid} onChange={(event) => setNid(event.target.value.replace(/\D/g, "").slice(0, 17))} /></FormRow>
+            {attachmentFields}
+          </div>
+          <div className="space-y-1">
+            <FormRow labelBn="মোবাইল নম্বর" labelEn="Mobile Number" required compact><Input className="h-11 text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormRow>
+            <BiTextAreaField labelBn="মৃত্যুর স্থান / ঠিকানা" labelEn="Place of Death / Address" value={birthPlace} onChange={(next) => { setBirthPlace(next); if (samePermanent) setPermanent(next); if (samePresent) setPresent(next); }} required compact />
+            <BiTextAreaField labelBn="স্থায়ী ঠিকানা" labelEn="Permanent Address" value={permanent} onChange={(next) => { setPermanent(next); setSamePermanent(false); }} required compact labelAccessory={<Checkbox aria-label="স্থায়ী ঠিকানা মৃত্যুর স্থানের মতো" checked={samePermanent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePermanent(enabled); if (enabled) setPermanent(birthPlace); }} className="mt-0.5 h-4 w-4" />} />
+            <BiTextAreaField labelBn="বর্তমান ঠিকানা" labelEn="Present Address" value={present} onChange={(next) => { setPresent(next); setSamePresent(false); }} required compact labelAccessory={<Checkbox aria-label="বর্তমান ঠিকানা মৃত্যুর স্থানের মতো" checked={samePresent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePresent(enabled); if (enabled) setPresent(birthPlace); }} className="mt-0.5 h-4 w-4" />} />
+            <FormRow labelBn="আবেদনকারীর তথ্য" labelEn="Applicant Details" required compact><div className="grid gap-2"><Input className="h-10 text-sm" placeholder="আবেদনকারীর নাম" required value={applicantNameBn} onChange={(event) => setApplicantNameBn(event.target.value)} /><Input className="h-10 text-sm" placeholder="আবেদনকারীর সাথে সম্পর্ক" required value={applicantRelationshipBn} onChange={(event) => setApplicantRelationshipBn(event.target.value)} /></div></FormRow>
+          </div>
         </div>
       )}
-
-      <fieldset className="space-y-2">
-        <legend className="text-xs font-semibold text-slate-700">
-          {L("ছবি সংযুক্তি · প্রতিটি সর্বোচ্চ ১৫০ KB", "Photo attachments · maximum 150 KB each")}
-        </legend>
-        <div className="grid gap-2 sm:grid-cols-3">
-          {attachments.map((file, index) => (
-            <label
-              key={index}
-              className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-emerald-300 bg-white px-3 py-2 text-xs hover:bg-emerald-50"
-            >
-              <FileImage className="h-4 w-4 shrink-0 text-emerald-700" />
-              <span className="min-w-0 flex-1 truncate">
-                {compressing === index
-                  ? L("সংকুচিত হচ্ছে…", "Compressing…")
-                  : file
-                    ? `${file.name} · ${Math.ceil(file.size / 1024)} KB`
-                    : (oldFiles[index]?.name ??
-                      L(`ছবি ${index + 1} বাছুন`, `Choose image ${index + 1}`))}
-              </span>
-              {file && (
-                <button
-                  type="button"
-                  className="font-bold text-red-700"
-                  aria-label={L("ছবি সরান", "Remove image")}
-                  onClick={(event) => {
-                    event.preventDefault();
-                    setAttachments((current) =>
-                      current.map((item, position) => (position === index ? null : item)),
-                    );
-                    setFilesChanged(true);
-                  }}
-                >
-                  ×
-                </button>
-              )}
-              <input
-                accept="image/*"
-                className="sr-only"
-                disabled={compressing !== null}
-                type="file"
-                onChange={(event) => void chooseImage(index, event.target.files?.[0])}
-              />
-            </label>
-          ))}
-        </div>
-        {entry && oldFiles.length > 0 && !filesChanged && (
-          <p className="text-[11px] text-slate-500">
-            {L(
-              "সংরক্ষিত ছবি অপরিবর্তিত থাকবে; নতুন ছবি দিলে সংযুক্তি প্রতিস্থাপিত হবে।",
-              "Saved photos remain unless new photos are selected; selecting new photos replaces the attachments.",
-            )}
-          </p>
-        )}
-      </fieldset>
 
       {error && (
         <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
           {error}
         </p>
       )}
-      <div className="flex justify-end">
-        <Button type="submit" disabled={saving || compressing !== null || !villageId}>
-          {saving
-            ? L("সংরক্ষণ হচ্ছে…", "Saving…")
-            : entry
-              ? L("সংশোধন সংরক্ষণ", "Save correction")
-              : L("নিবন্ধন এন্ট্রি জমা দিন", "Submit registration entry")}
+      <div className="sticky bottom-0 z-10 -mx-2 flex flex-wrap gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2 shadow-[0_-6px_16px_-14px_rgba(15,23,42,0.6)]">
+        {type === "death" && (
+        <p className="text-xs font-medium text-emerald-900">
+          {L("আবেদনটি যাচাইয়ের জন্য জমা হবে", "This application will be submitted for review")}
+        </p>
+        )}
+        <div className="ml-auto flex flex-wrap justify-end gap-1.5">
+        <Button
+          type="submit"
+          className="bg-emerald-600 text-white hover:bg-emerald-700"
+          disabled={saving || compressing !== null}
+        >
+          {saving ? L("সংরক্ষণ হচ্ছে…", "Saving…") : L("সংরক্ষণ করুন", "Save")}
         </Button>
+        <Button
+          type={entry ? "submit" : "button"}
+          className="bg-amber-500 text-white hover:bg-amber-600"
+          disabled={saving || (!entry && !onEdit)}
+          onClick={entry ? undefined : onEdit}
+        >
+          {L("সংশোধন করুন", "Edit / Modify")}
+        </Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
+          {L("বন্ধ করুন", "Close")}
+        </Button>
+        </div>
       </div>
     </form>
   );
@@ -559,7 +719,7 @@ function EpiAttendanceForm({ onSaved }: { onSaved: () => void }) {
           {error}
         </p>
       )}
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
         <Button type="submit" disabled={saving}>
           {saving ? L("সংরক্ষণ হচ্ছে…", "Saving…") : L("উপস্থিতি সংরক্ষণ", "Record attendance")}
         </Button>
@@ -655,13 +815,13 @@ export function WorkerDashboard() {
     const linkedCase = visit.registration_case_id
       ? state.cases.find((item) => item.id === visit.registration_case_id)
       : undefined;
-    return !linkedCase || linkedCase.status !== "completed";
+    return !linkedCase || (linkedCase.status !== "completed" && linkedCase.status !== "rejected");
   });
 
   const urgency = useMemo(() => {
     const counts = { green: 0, yellow: 0, red: 0, expired: 0 };
     for (const entry of workerCases) {
-      if (entry.status === "completed") continue;
+      if (entry.status === "completed" || entry.status === "rejected") continue;
       const deadline = getCaseDeadline(entry);
       if (!deadline) continue;
       if (deadline.elapsedDays <= 30) counts.green++;
@@ -943,7 +1103,7 @@ export function WorkerDashboard() {
                 tone: "border-teal-200 bg-teal-50 text-teal-950",
               },
             ].map((list) => {
-              const awaiting = list.rows.filter((entry) => entry.status !== "completed").length;
+              const awaiting = list.rows.filter((entry) => entry.status !== "completed" && entry.status !== "rejected").length;
               return (
                 <button
                   key={list.type}
@@ -976,7 +1136,7 @@ export function WorkerDashboard() {
               </span>
               <span className="ml-auto">
                 {L("অপেক্ষমাণ", "Pending")}:{" "}
-                <b>{n(workerCases.filter((entry) => entry.status !== "completed").length)}</b>
+                <b>{n(workerCases.filter((entry) => entry.status !== "completed" && entry.status !== "rejected").length)}</b>
               </span>
             </div>
           </div>
@@ -1008,8 +1168,10 @@ export function WorkerDashboard() {
                 key={`${dialog.type}-${dialog.entry?.id ?? "new"}`}
                 type={dialog.type}
                 entry={dialog.entry}
+                onCancel={() => setDialog(null)}
+                onEdit={() => setDialog({ kind: "entries", type: dialog.type })}
                 onSaved={() => {
-                  setDialog(null);
+                  setDialog({ kind: "entries", type: dialog.type });
                   void loadVisits();
                 }}
               />
@@ -1062,12 +1224,16 @@ export function WorkerDashboard() {
                           className={`rounded-full px-2 py-1 text-[10px] font-bold ${
                             entry.status === "completed"
                               ? "bg-emerald-100 text-emerald-900"
+                              : entry.status === "rejected"
+                                ? "bg-red-100 text-red-900"
                               : "bg-amber-100 text-amber-900"
                           }`}
                         >
                           {entry.status === "completed"
                             ? L("নিবন্ধন সম্পন্ন", "Registration complete")
-                            : L("পেন্ডিং", "Pending")}
+                            : entry.status === "rejected"
+                              ? L("বাতিল", "Rejected")
+                              : L("পেন্ডিং", "Pending")}
                         </span>
                         <span className="text-[10px] text-slate-500">{date(entry.createdAt)}</span>
                         {officerNotes.length > 0 && (
@@ -1091,7 +1257,7 @@ export function WorkerDashboard() {
                             {L("অভিভাবককে SMS পাঠানো হয়েছে", "SMS sent to parent")}
                           </span>
                         )}
-                        {entry.status !== "completed" && (
+                        {entry.status !== "completed" && entry.status !== "rejected" && (
                           <Button
                             size="sm"
                             variant="outline"

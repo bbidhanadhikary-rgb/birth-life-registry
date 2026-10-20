@@ -26,7 +26,7 @@ const roleDashboards = {
   ),
   super: lazy(() =>
     import("@/components/dashboards/Super").then((m) => ({
-      default: () => <m.SuperDashboard mode="users" />,
+      default: () => <m.SuperDashboard />,
     })),
   ),
 };
@@ -53,7 +53,8 @@ function DashboardSection() {
 }
 
 function DashboardSectionContent({ section }: { section: string }) {
-  const { user, state, L, selectedUpazilaId } = useApp();
+  const { user, state, L } = useApp();
+  const selectedUpazilaId: string | undefined = undefined;
   const [unionId, setUnionId] = useState("all");
   if (!user) return null;
 

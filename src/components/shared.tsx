@@ -9,6 +9,7 @@ export function StatusBadge({ s }: { s: Status }) {
     pending: ["bg-warning text-warning-foreground", L("অপেক্ষমাণ", "Pending")],
     progress: ["bg-info text-info-foreground", L("চলমান", "In Progress")],
     completed: ["bg-success text-success-foreground", L("সম্পন্ন", "Completed")],
+    rejected: ["bg-destructive text-destructive-foreground", L("বাতিল", "Rejected")],
   }[s];
   return <Badge className={`${m[0]} border-0`}>{m[1]}</Badge>;
 }
@@ -37,8 +38,15 @@ export function PageTitle({ title, sub, actions }: { title: string; sub?: string
 export function useCaseHelpers() {
   const { L, n, findVillage } = useApp();
   const address = (c: RegCase) => {
-    const f = findVillage(c.villageId); if (!f) return "";
-    return L(`${f.v.bn}, ${f.un.bn}, ${f.up.bn}, ${f.up.districtBn}`, `${f.v.en}, ${f.un.en}, ${f.up.en}, ${f.up.districtEn}`);
+    const f = findVillage(c.villageId);
+    if (f) return L(`${f.v.bn}, ${f.un.bn}, ${f.up.bn}, ${f.up.districtBn}`, `${f.v.en}, ${f.un.en}, ${f.up.en}, ${f.up.districtEn}`);
+    const bn = [c.details?.presentAddress?.bn, c.details?.birthPlace?.bn ?? c.details?.deathPlace?.bn]
+      .filter(Boolean)
+      .join(" · ");
+    const en = [c.details?.presentAddress?.en, c.details?.birthPlace?.en ?? c.details?.deathPlace?.en]
+      .filter(Boolean)
+      .join(" · ");
+    return L(bn, en);
   };
   const date = (t: number) => n(new Date(t).toLocaleDateString(L("bn-BD", "en-GB")));
   const rows = (cases: RegCase[]) => [
