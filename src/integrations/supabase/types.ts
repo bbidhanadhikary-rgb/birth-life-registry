@@ -586,6 +586,19 @@ export type Database = {
           total_count: number
         }[]
       }
+      monthly_ward_case_type_counts: {
+        Args: never
+        Returns: {
+          birth_completed_count: number
+          birth_pending_count: number
+          birth_progress_count: number
+          birth_total_count: number
+          death_completed_count: number
+          death_pending_count: number
+          death_progress_count: number
+          death_total_count: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

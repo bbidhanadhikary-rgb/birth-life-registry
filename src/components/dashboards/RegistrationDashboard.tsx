@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, useCaseHelpers } from "@/components/shared";
 import { downloadCSV, printPDF } from "@/lib/report";
 import { MonthlyProgressCard } from "@/components/dashboards/MonthlyProgressCard";
+import { UnionStatisticsPanel } from "@/components/dashboards/UnionStatisticsPanel";
 
 type DashboardRole = Role | "public";
 type ActionFilter = "birth" | "death" | "pending" | "progress" | "completed" | "urgent";
@@ -337,6 +338,8 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
     progress: number;
     completed: number;
     total: number;
+    birth: { pending: number; progress: number; completed: number; total: number };
+    death: { pending: number; progress: number; completed: number; total: number };
   } | null>(null);
   const [feedbackCategory, setFeedbackCategory] = useState<"complaint" | "suggestion">("suggestion");
   const [feedbackSubject, setFeedbackSubject] = useState("");
@@ -402,37 +405,71 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
   }, [roleScopedCases, user]);
   const currentMonth = monthKey(Date.now());
   const monthCases = filteredCases.filter((item) => monthKey(item.createdAt) === currentMonth);
-  const localMonthlyCounts = {
-    pending: monthCases.filter((item) => item.status === "pending").length,
-    progress: monthCases.filter((item) => item.status === "progress").length,
-    completed: monthCases.filter((item) => item.status === "completed").length,
-  };
   useEffect(() => {
     if (demoMode || !user || (user.role !== "worker" && user.role !== "police")) {
       setWardMonthlyCounts(null);
       return;
     }
     let active = true;
-    void supabase.rpc("monthly_ward_case_counts").then(({ data, error }) => {
+    void supabase.rpc("monthly_ward_case_type_counts").then(({ data, error }) => {
       if (!active) return;
       const row = data?.[0];
-      setWardMonthlyCounts(error || !row ? null : {
-        pending: Number(row.pending_count),
-        progress: Number(row.progress_count),
-        completed: Number(row.completed_count),
-        total: Number(row.total_count),
+      if (error) {
+        console.error("Failed to load role-scoped monthly case counts", error);
+        toast.error(L("এলাকাভিত্তিক মাসিক পরিসংখ্যান লোড করা যায়নি", "Could not load area-scoped monthly statistics"));
+        setWardMonthlyCounts(null);
+        return;
+      }
+      if (!row) {
+        setWardMonthlyCounts(null);
+        return;
+      }
+      const birth = {
+        pending: Number(row.birth_pending_count),
+        progress: Number(row.birth_progress_count),
+        completed: Number(row.birth_completed_count),
+        total: Number(row.birth_total_count),
+      };
+      const death = {
+        pending: Number(row.death_pending_count),
+        progress: Number(row.death_progress_count),
+        completed: Number(row.death_completed_count),
+        total: Number(row.death_total_count),
+      };
+      setWardMonthlyCounts({
+        pending: birth.pending + death.pending,
+        progress: birth.progress + death.progress,
+        completed: birth.completed + death.completed,
+        total: birth.total + death.total,
+        birth,
+        death,
       });
-    }, () => {
-      if (active) setWardMonthlyCounts(null);
+    }, (error: unknown) => {
+      if (!active) return;
+      console.error("Failed to load role-scoped monthly case counts", error);
+      toast.error(L("এলাকাভিত্তিক মাসিক পরিসংখ্যান লোড করা যায়নি", "Could not load area-scoped monthly statistics"));
+      setWardMonthlyCounts(null);
     });
     return () => {
       active = false;
     };
-  }, [demoMode, user]);
+  }, [L, demoMode, user]);
   const hasWardAggregate = !demoMode && (user?.role === "worker" || user?.role === "police");
+  const metricCaseType =
+    roleConfig === "worker" ? "birth" : roleConfig === "police" ? "death" : null;
+  const roleMonthlyCounts = metricCaseType
+    ? wardMonthlyCounts?.[metricCaseType]
+    : undefined;
+  const localMetricMonthCases = metricCaseType
+    ? monthCases.filter((item) => item.type === metricCaseType)
+    : monthCases;
   const monthlyCounts = hasWardAggregate
-    ? wardMonthlyCounts ?? { pending: 0, progress: 0, completed: 0, total: 0 }
-    : localMonthlyCounts;
+    ? roleMonthlyCounts ?? { pending: 0, progress: 0, completed: 0, total: 0 }
+    : {
+        pending: localMetricMonthCases.filter((item) => item.status === "pending").length,
+        progress: localMetricMonthCases.filter((item) => item.status === "progress").length,
+        completed: localMetricMonthCases.filter((item) => item.status === "completed").length,
+      };
   const assignedUpazila = user && state.upazilas.find((item) => item.id === user.upazilaId);
   const assignedUnion = assignedUpazila?.unions.find((item) => item.id === user?.unionId);
   const assignedWardCount = assignedUnion
@@ -450,17 +487,19 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
       ? (assignedUpazila?.unions.length ?? 1) * (TARGET.birth + TARGET.death)
       : roleConfig === "admin" && user?.role === "admin"
         ? TARGET.birth + TARGET.death
-        : (roleConfig === "worker" || roleConfig === "police") && user?.role === roleConfig
-          ? Math.ceil((TARGET.birth + TARGET.death) / assignedWardCount)
+        : roleConfig === "worker" && user?.role === "worker"
+          ? Math.ceil(TARGET.birth / assignedWardCount)
+          : roleConfig === "police" && user?.role === "police"
+            ? Math.ceil(TARGET.death / assignedWardCount)
           : roleConfig === "uno"
             ? Math.max(1, selectedUnionCount) * (TARGET.birth + TARGET.death)
             : roleConfig === "worker" || roleConfig === "police"
-              ? Math.ceil((TARGET.birth + TARGET.death) / 9)
+              ? Math.ceil((roleConfig === "worker" ? TARGET.birth : TARGET.death) / 9)
               : Math.max(1, selectedUnionCount) * (TARGET.birth + TARGET.death),
   );
   const monthlyReceived = hasWardAggregate
-    ? wardMonthlyCounts?.total ?? 0
-    : monthCases.length;
+    ? roleMonthlyCounts?.total ?? 0
+    : localMetricMonthCases.length;
   const openCases = filteredCases.filter((item) => item.status !== "completed" && item.status !== "rejected");
   const urgency = useMemo(() => {
     const counts = { green: 0, yellow: 0, red: 0, expired: 0, review: 0 };
@@ -681,6 +720,16 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
             }
           />
         </div>
+
+        {roleConfig === "admin" && assignedUpazila && assignedUnion && (
+          <UnionStatisticsPanel
+            upazila={assignedUpazila}
+            cases={roleScopedCases}
+            unions={[assignedUnion]}
+            selectedUnionId={assignedUnion.id}
+            showUnionFilter={false}
+          />
+        )}
 
         <section aria-labelledby="quick-actions-heading">
           <div className="mb-1">

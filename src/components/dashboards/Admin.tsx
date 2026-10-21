@@ -7,6 +7,7 @@ import { downloadCSV, printPDF } from "@/lib/report";
 import { TARGET, type Status } from "@/lib/types";
 import { PageTitle, Stat, monthCount, redFlags, useCaseHelpers } from "../shared";
 import { CaseReview } from "./CaseReview";
+import { UnionStatisticsPanel } from "./UnionStatisticsPanel";
 
 export function AdminDashboard() {
   const { L, n, user, state } = useApp();
@@ -34,6 +35,13 @@ export function AdminDashboard() {
           </div>
         ))}
       </div>
+      <UnionStatisticsPanel
+        upazila={up}
+        cases={cases}
+        unions={[un]}
+        selectedUnionId={un.id}
+        showUnionFilter={false}
+      />
       {flags.length > 0 && (
         <div className="mb-6 rounded-xl border border-destructive/50 bg-destructive/10 p-4">
           <div className="flex items-center gap-2 font-semibold text-destructive"><AlertTriangle className="h-4 w-4" />{L("১৫ দিন ধরে কোনো এন্ট্রি নেই", "No entries for 15 days")}</div>
