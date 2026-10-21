@@ -21,13 +21,13 @@ function MonitoringRoute() {
     <DashboardGate>
       {canMonitor ? (
         <>
-          <div className="mx-auto max-w-7xl px-3 pt-4 sm:px-6">
+          <div className="mx-auto w-full max-w-none px-4 pt-4 sm:px-6 lg:px-8">
             <ModuleNavigation />
           </div>
           <NationalDashboard />
         </>
       ) : (
-        <main className="mx-auto max-w-7xl px-3 py-6 sm:px-6">
+        <main className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
           <ModuleNavigation />
           <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
             {L(

@@ -9,7 +9,7 @@ export function EntryFormPage({ type }: { type: "birth" | "death" }) {
 
   if (user?.role !== "worker") {
     return (
-      <div className="mx-auto max-w-7xl px-3 py-6 sm:px-6">
+      <div className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
         <ModuleNavigation />
         <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
           <h1 className="font-semibold">
@@ -27,7 +27,7 @@ export function EntryFormPage({ type }: { type: "birth" | "death" }) {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-3 py-3 sm:px-5">
+    <div className="mx-auto w-full max-w-none px-4 py-3 sm:px-6 lg:px-8">
       <ModuleNavigation />
       <div className={type === "birth" ? "w-full max-w-full space-y-1" : "space-y-3"}>
         <RegForm

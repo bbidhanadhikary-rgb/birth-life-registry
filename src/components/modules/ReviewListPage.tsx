@@ -69,7 +69,7 @@ export function ReviewListPage() {
   );
 
   return (
-    <main className="mx-auto max-w-7xl px-3 py-4 sm:px-6">
+    <main className="mx-auto w-full max-w-none px-4 py-4 sm:px-6 lg:px-8">
       <ModuleNavigation />
       <header className="mb-5">
         <p className="text-sm font-semibold text-emerald-800">

@@ -624,7 +624,7 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
 
   return (
     <section className="flex min-h-[calc(100svh-6.6rem)] flex-col bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-2 px-3 py-1.5 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-2 sm:px-6 sm:py-2">
+      <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-2 px-4 py-1.5 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-2 sm:px-6 sm:py-2 lg:px-8">
         <div
           className="grid shrink-0 grid-cols-2 gap-1.5 sm:grid-cols-3 sm:gap-2 xl:grid-cols-5"
           aria-label={L("এলাকা বাছাই", "Location filters")}

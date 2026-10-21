@@ -242,7 +242,7 @@ export function NationalDashboard() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-3 px-3 py-3 sm:px-5">
+    <div className="mx-auto w-full max-w-none space-y-3 px-4 py-3 sm:px-6 lg:px-8">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-teal-800 dark:text-teal-300">

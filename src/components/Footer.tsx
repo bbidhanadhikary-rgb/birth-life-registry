@@ -8,7 +8,7 @@ export function Footer({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <footer className="h-16 w-full shrink-0 border-t border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-[0_-8px_24px_-20px_rgba(15,23,42,0.4)]">
-        <div className="mx-auto flex h-full max-w-7xl flex-col items-center justify-center gap-1 px-2 text-[10px] leading-tight max-[360px]:text-[9px] sm:flex-row sm:justify-between sm:gap-3 sm:px-6 sm:text-xs">
+        <div className="mx-auto flex h-full w-full max-w-none flex-col items-center justify-center gap-1 px-4 text-[10px] leading-tight max-[360px]:text-[9px] sm:flex-row sm:justify-between sm:gap-3 sm:px-6 sm:text-xs lg:px-8">
           <p className="flex shrink-0 items-center gap-1.5 whitespace-nowrap font-display font-semibold">
             <Landmark className="h-3.5 w-3.5 shrink-0 text-emerald-100" aria-hidden="true" />
             <span>{L("ই-নিবন্ধন ট্র্যাকার", "E-Registration Tracker")}</span>
@@ -44,7 +44,7 @@ export function Footer({ compact = false }: { compact?: boolean }) {
 
   return (
     <footer className="border-t border-slate-800 bg-slate-950 text-slate-100">
-      <div className="mx-auto grid max-w-7xl gap-7 px-4 py-8 sm:px-6 md:grid-cols-[1.2fr_1fr_1fr]">
+      <div className="mx-auto grid w-full max-w-none gap-7 px-4 py-8 sm:px-6 md:grid-cols-[1.2fr_1fr_1fr] lg:px-8">
         <div>
           <div className="flex items-center gap-2 font-display font-semibold">
             <Landmark className="h-5 w-5 text-teal-300" aria-hidden="true" />
@@ -111,7 +111,7 @@ export function Footer({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
       <div className="border-t border-slate-800">
-        <div className="mx-auto max-w-7xl px-4 py-3 text-xs text-slate-400 sm:px-6">
+        <div className="mx-auto w-full max-w-none px-4 py-3 text-xs text-slate-400 sm:px-6 lg:px-8">
           © {new Date().getFullYear()}{" "}
           {L(
             "ই-নিবন্ধন ট্র্যাকার · জাতীয় নিবন্ধন ব্যবস্থা",

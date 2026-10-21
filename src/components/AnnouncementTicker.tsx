@@ -26,7 +26,7 @@ export function AnnouncementTicker() {
       role="region"
       aria-label={L("সরকারি ঘোষণা", "Official announcement")}
     >
-      <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-2 sm:px-6">
+      <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-2 sm:px-6 lg:px-8">
         <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-white/15 px-2 py-1 text-xs font-semibold text-white">
           <Megaphone className="h-4 w-4" aria-hidden="true" />
           <span>{L("সরকারি বিজ্ঞপ্তি", "Official notice")}</span>

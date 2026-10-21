@@ -28,9 +28,9 @@ export function Header() {
   ] as const;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-sm">
       <nav aria-label={L("ড্যাশবোর্ড নির্বাচন", "Dashboard switcher")} className="bg-emerald-900/90">
-        <div className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-3 py-1.5 sm:px-6">
+        <div className="mx-auto flex w-full max-w-none gap-1 overflow-x-auto px-4 py-1.5 sm:px-6 lg:px-8">
           {tabs.map(([role, bn, en]) => (
             <Link
               key={en}
@@ -51,7 +51,7 @@ export function Header() {
           <WifiOff className="h-3 w-3" /> {L("অফলাইন — তথ্য ডিভাইসে জমা থাকবে, অনলাইনে এলে স্বয়ংক্রিয়ভাবে সিঙ্ক হবে", "Offline — entries are cached and will auto-sync")}
         </div>
       )}
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-2 px-3 sm:px-6">
+      <div className="mx-auto flex h-16 w-full max-w-none items-center gap-2 px-4 sm:px-6 lg:px-8">
         <Link to="/" className="mr-auto flex items-center gap-2">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-800 text-white"><Landmark className="h-5 w-5" /></span>
           <span className="leading-tight">

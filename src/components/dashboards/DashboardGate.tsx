@@ -18,7 +18,7 @@ export function DashboardGate({
   if (!authReady) {
     return (
       <div
-        className="mx-auto max-w-7xl space-y-4 px-3 py-8 sm:px-6"
+        className="mx-auto w-full max-w-none space-y-4 px-4 py-8 sm:px-6 lg:px-8"
         role="status"
         aria-live="polite"
       >
@@ -56,11 +56,11 @@ export function DashboardGate({
 
   if (user.role === "worker" && workerLayout) {
     return (
-      <div className="h-[calc(100svh-6.6rem)] min-h-0 overflow-hidden px-2 py-1 sm:px-4 sm:py-2">
+      <div className="h-[calc(100svh-6.6rem)] min-h-0 overflow-hidden px-4 py-1 sm:px-6 sm:py-2 lg:px-8">
         {children}
       </div>
     );
   }
 
-  return <div className="mx-auto max-w-7xl px-3 py-6 sm:px-6">{children}</div>;
+  return <div className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">{children}</div>;
 }
