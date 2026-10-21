@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   ArrowUpRight,
   Baby,
@@ -30,7 +31,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Footer } from "@/components/Footer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
-import { BANGLADESH_ADMINISTRATIVE_AREAS, filterCasesByAdministrativeArea, getAdministrativeWards, sameAdministrativeName } from "@/lib/geography";
 import { TARGET, type RegCase, type Role } from "@/lib/types";
 import { scopedCases, useApp } from "@/lib/store";
 import { RegForm } from "@/components/dashboards/Worker";
@@ -40,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, useCaseHelpers } from "@/components/shared";
 import { downloadCSV, printPDF } from "@/lib/report";
+import { MonthlyProgressCard } from "@/components/dashboards/MonthlyProgressCard";
 
 type DashboardRole = Role | "public";
 type ActionFilter = "birth" | "death" | "pending" | "progress" | "completed" | "urgent";
@@ -186,10 +187,10 @@ function monthKey(timestamp: number) {
 }
 
 const publicActions: RoleAction[] = [
-  { id: "dashboard", titleBn: "ড্যাশবোর্ড", titleEn: "Dashboard", descriptionBn: "জাতীয় ও স্থানীয় অগ্রগতি দেখুন", descriptionEn: "View national and local progress", Icon: MapPinned },
-  { id: "reports", titleBn: "এলাকাভিত্তিক প্রতিবেদন", titleEn: "Regional reports", descriptionBn: "প্রশাসনিক এলাকার সারসংক্ষেপ", descriptionEn: "Administrative area summaries", Icon: ClipboardCheck },
+  { id: "reports", titleBn: "এলাকাভিত্তিক প্রতিবেদন", titleEn: "Area-wise report", descriptionBn: "প্রশাসনিক এলাকার সারসংক্ষেপ", descriptionEn: "Administrative area summaries", Icon: MapPinned },
   { id: "deadlines", titleBn: "সময়সীমা পর্যবেক্ষণ", titleEn: "Deadline monitoring", descriptionBn: "৩৬৫ দিনের সম্মতি ও সতর্কতা", descriptionEn: "365-day compliance and alerts", Icon: CalendarCheck2, filter: "urgent" },
-  { id: "security", titleBn: "নিরাপদ প্রবেশ", titleEn: "Secure access", descriptionBn: "ভূমিকা-ভিত্তিক লগইন ও সেশন ব্যবস্থাপনা", descriptionEn: "Role-based sign-in and session management", Icon: ShieldCheck },
+  { id: "national-summary", titleBn: "জাতীয় পরিসংখ্যান ও অগ্রগতির সারসংক্ষেপ", titleEn: "National statistics and progress summary", descriptionBn: "জাতীয় নিবন্ধন অগ্রগতি ও বিশ্লেষণ", descriptionEn: "National registration progress and analytics", Icon: ChartNoAxesCombined },
+  { id: "announcements", titleBn: "জরুরি ঘোষণা ও নোটিশ বোর্ড", titleEn: "Emergency announcements and notice board", descriptionBn: "সর্বশেষ সরকারি ঘোষণা ও নোটিশ দেখুন", descriptionEn: "View the latest official announcements and notices", Icon: MessageSquareWarning },
 ];
 
 const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district">, RoleAction[]> = {
@@ -239,15 +240,94 @@ const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district"
   ],
 };
 
+function QuickAccessCard({
+  item,
+  publicDashboard,
+  onActivate,
+}: {
+  item: { id: string; title: string; description: string; Icon: RoleAction["Icon"] };
+  publicDashboard: boolean;
+  onActivate: () => void;
+}) {
+  const className = publicDashboard
+    ? "group flex min-h-20 flex-row items-center gap-2.5 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-600/60 hover:bg-emerald-50/70 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 sm:min-h-22 sm:gap-3"
+    : "role-action-card group flex min-h-[3.5rem] cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-left shadow-sm transition-all hover:scale-[1.02] hover:border-teal-600/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 max-[360px]:min-h-12 max-[360px]:gap-1.5 max-[360px]:px-2 sm:min-h-[3.75rem] sm:gap-3 sm:px-4 max-sm:flex-col max-sm:justify-center max-sm:px-1 max-sm:py-1 max-sm:text-center";
+  const content = (
+    <>
+      <span
+        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+          publicDashboard
+            ? "bg-gradient-to-br from-emerald-700 to-teal-800 text-white shadow-md shadow-emerald-900/20 group-hover:from-emerald-600 group-hover:to-teal-700"
+            : "bg-[#102a43] text-teal-200 transition group-hover:bg-teal-800 max-sm:hidden"
+        }`}
+      >
+        <item.Icon className={publicDashboard ? "h-5 w-5" : "h-4 w-4"} aria-hidden="true" />
+      </span>
+      <span className={`min-w-0 ${publicDashboard ? "flex flex-1 flex-col gap-0.5" : "flex-1 max-sm:w-full"}`}>
+        <span
+          className={`flex items-start gap-1 font-bold ${
+            publicDashboard
+              ? "text-sm leading-snug text-[#102a43] sm:text-base"
+              : "text-xs text-[#102a43] sm:text-sm max-sm:justify-center max-sm:text-[10px]"
+          }`}
+        >
+          <span className={publicDashboard ? "whitespace-normal" : "truncate"}>{item.title}</span>
+          <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" aria-hidden="true" />
+        </span>
+        <span
+          className={`block ${
+            publicDashboard
+              ? "text-xs leading-relaxed text-slate-600 sm:text-sm"
+              : "mt-0.5 truncate text-[10px] text-slate-500 max-[360px]:hidden sm:text-xs max-sm:hidden"
+          }`}
+        >
+          {item.description}
+        </span>
+      </span>
+    </>
+  );
+
+  if (publicDashboard) {
+    switch (item.id) {
+      case "reports":
+        return (
+          <Link to="/dashboard/$section" params={{ section: "unions" }} className={className}>
+            {content}
+          </Link>
+        );
+      case "deadlines":
+        return (
+          <Link to="/dashboard/$section" params={{ section: "compliance" }} className={className}>
+            {content}
+          </Link>
+        );
+      case "national-summary":
+        return (
+          <Link to="/monitoring" className={className}>
+            {content}
+          </Link>
+        );
+      case "announcements":
+        return (
+          <Link to="/announcements" className={className}>
+            {content}
+          </Link>
+        );
+    }
+    return null;
+  }
+
+  return (
+    <button type="button" onClick={onActivate} className={className}>
+      {content}
+    </button>
+  );
+}
+
 export function RegistrationDashboard({ role = "public" }: { role?: DashboardRole }) {
   const { state, L, n, user, demoMode, patchCase } = useApp();
   const { rows } = useCaseHelpers();
   const [editEntry, setEditEntry] = useState<RegCase | null>(null);
-  const [division, setDivision] = useState("all");
-  const [district, setDistrict] = useState("all");
-  const [upazila, setUpazila] = useState("all");
-  const [union, setUnion] = useState("all");
-  const [ward, setWard] = useState("all");
   const [activeCard, setActiveCard] = useState<{ kind: "metric" | "action"; id: string } | null>(
     null,
   );
@@ -300,60 +380,6 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
       description: L(descriptionBn, descriptionEn),
     }),
   );
-  const divisions = useMemo(
-    () => BANGLADESH_ADMINISTRATIVE_AREAS.filter((area) => area.level === "division"),
-    [],
-  );
-  const districts = useMemo(() => {
-    return BANGLADESH_ADMINISTRATIVE_AREAS.filter(
-      (area) => area.level === "district" && (division === "all" || area.divisionId === division),
-    );
-  }, [division]);
-  const selectedDistrict = districts.find((area) => area.id === district);
-  const matchingUpazilas = useMemo(() => {
-    const districtsInScope = new Set(districts.map((area) => area.id));
-    return BANGLADESH_ADMINISTRATIVE_AREAS.filter(
-      (area) =>
-        (area.level === "upazila" || area.level === "city_corporation") &&
-        districtsInScope.has(area.districtId ?? "") &&
-        (!selectedDistrict || area.districtId === selectedDistrict.id),
-    );
-  }, [districts, selectedDistrict]);
-  const selectedUpazila = matchingUpazilas.find((area) => area.id === upazila);
-  const selectedCityCorporation = selectedUpazila?.level === "city_corporation";
-  const unions = useMemo(
-    () =>
-      BANGLADESH_ADMINISTRATIVE_AREAS.filter(
-        (area) =>
-          (area.level === "union" || area.level === "municipality") &&
-          !selectedCityCorporation &&
-          area.parentId === selectedUpazila?.id,
-      ),
-    [selectedCityCorporation, selectedUpazila],
-  );
-  const selectedUnion = unions.find((area) => area.id === union);
-  const wards = useMemo(
-    () => {
-      if (selectedCityCorporation && selectedUpazila) {
-        return getAdministrativeWards(selectedUpazila.id);
-      }
-      if (selectedUnion) return getAdministrativeWards(selectedUnion.id);
-      return Array.from({ length: 9 }, (_, index) => ({
-        id: `ward-${index + 1}`,
-        level: "ward" as const,
-        bn: `ওয়ার্ড ${index + 1}`,
-        en: `Ward ${index + 1}`,
-        parentId: null,
-        divisionId: "",
-        districtId: null,
-        municipalityId: null,
-        upazilaId: null,
-        unionId: null,
-        wardNumber: index + 1,
-      }));
-    },
-    [selectedCityCorporation, selectedUnion, selectedUpazila],
-  );
   const roleScopedCases = useMemo(
     () => {
       if (!user) return state.cases;
@@ -370,17 +396,10 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
     [demoMode, state, user],
   );
   const filteredCases = useMemo(() => {
-    const areaCases = filterCasesByAdministrativeArea(roleScopedCases, state.upazilas, {
-      division,
-      district,
-      upazila,
-      union,
-      ward,
-    });
     return user && (user.role === "worker" || user.role === "police")
-      ? areaCases.filter((item) => item.ward === user.ward)
-      : areaCases;
-  }, [roleScopedCases, state.upazilas, division, district, upazila, union, ward, user]);
+      ? roleScopedCases.filter((item) => item.ward === user.ward)
+      : roleScopedCases;
+  }, [roleScopedCases, user]);
   const currentMonth = monthKey(Date.now());
   const monthCases = filteredCases.filter((item) => monthKey(item.createdAt) === currentMonth);
   const localMonthlyCounts = {
@@ -411,23 +430,20 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
     };
   }, [demoMode, user]);
   const hasWardAggregate = !demoMode && (user?.role === "worker" || user?.role === "police");
-  const hasAreaFilter = division !== "all" || district !== "all" || upazila !== "all" || union !== "all" || ward !== "all";
-  const monthlyCounts = hasWardAggregate && !hasAreaFilter
+  const monthlyCounts = hasWardAggregate
     ? wardMonthlyCounts ?? { pending: 0, progress: 0, completed: 0, total: 0 }
     : localMonthlyCounts;
-  const matchingRegisteredUpazilas = state.upazilas.filter((registered) =>
-    matchingUpazilas.some(
-      (area) => sameAdministrativeName(registered.en, area.en) || sameAdministrativeName(registered.bn, area.bn),
-    ),
-  );
   const assignedUpazila = user && state.upazilas.find((item) => item.id === user.upazilaId);
   const assignedUnion = assignedUpazila?.unions.find((item) => item.id === user?.unionId);
   const assignedWardCount = assignedUnion
     ? new Set(assignedUnion.villages.map((village) => village.ward)).size || 9
     : 9;
-  const selectedUnionCount = selectedUnion
-    ? 1
-    : matchingRegisteredUpazilas.reduce((count, item) => count + item.unions.length, 0);
+  const scopedUpazilas = state.upazilas.filter((item) => {
+    if (!user || user.role === "super") return true;
+    if (user.role === "district") return item.districtEn === user.districtId;
+    return item.id === user.upazilaId;
+  });
+  const selectedUnionCount = scopedUpazilas.reduce((count, item) => count + item.unions.length, 0);
   const monthlyTarget = Math.max(
     1,
     roleConfig === "uno" && user?.role === "uno"
@@ -442,17 +458,9 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
               ? Math.ceil((TARGET.birth + TARGET.death) / 9)
               : Math.max(1, selectedUnionCount) * (TARGET.birth + TARGET.death),
   );
-  const monthlyReceived = hasWardAggregate && !hasAreaFilter
+  const monthlyReceived = hasWardAggregate
     ? wardMonthlyCounts?.total ?? 0
     : monthCases.length;
-  const donutTotal = Math.max(monthlyTarget, monthlyReceived, 1);
-  const donutCircumference = 2 * Math.PI * 88;
-  const donutSegments = [
-    { id: "completed", value: monthlyCounts.completed, color: "#10b981" },
-    { id: "pending", value: monthlyCounts.pending, color: "#3b82f6" },
-    { id: "progress", value: monthlyCounts.progress, color: "#f59e0b" },
-  ];
-  const monthlyCompletion = Math.min(100, Math.round((monthlyCounts.completed / monthlyTarget) * 100));
   const openCases = filteredCases.filter((item) => item.status !== "completed" && item.status !== "rejected");
   const urgency = useMemo(() => {
     const counts = { green: 0, yellow: 0, red: 0, expired: 0, review: 0 };
@@ -504,16 +512,19 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
             filteredCases.length) *
             100,
         );
-  const selectedAreas = [
-    division !== "all" && divisions.find((item) => item.id === division)?.bn,
-    selectedDistrict?.bn,
-    upazila !== "all" && selectedUpazila?.bn,
-    union !== "all" && selectedUnion?.bn,
-    ward !== "all" && wards.find((item) => item.id === ward)?.bn,
-  ].filter(Boolean);
-  const scopeLabel = selectedAreas.length
-    ? selectedAreas.join(" · ")
-    : L("জাতীয় পর্যায়", "National scope");
+  const scopeUpazila = state.upazilas.find((item) => item.id === user?.upazilaId);
+  const scopeUnion = scopeUpazila?.unions.find((item) => item.id === user?.unionId);
+  const scopeLabel = !user || user.role === "super"
+    ? L("জাতীয় পর্যায়", "National scope")
+    : user.role === "district"
+      ? `${scopeUpazila?.districtBn ?? user.districtId} ${L("জেলা", "District")}`
+      : [
+          scopeUpazila && L(scopeUpazila.bn, scopeUpazila.en),
+          scopeUnion && L(scopeUnion.bn, scopeUnion.en),
+          (user.role === "worker" || user.role === "police") && user.ward
+            ? L(`ওয়ার্ড ${user.ward}`, `Ward ${user.ward}`)
+            : null,
+        ].filter(Boolean).join(" · ");
 
   const isEntryCard = activeCard?.id === "birth-entry" || activeCard?.id === "death-entry";
   const formType: "birth" | "death" | null =
@@ -639,146 +650,6 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
   return (
     <section className="flex min-h-[calc(100svh-var(--app-header-height,9rem))] flex-col bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
       <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-2 px-4 py-1.5 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-2 sm:px-6 sm:py-2 lg:px-8">
-        <div
-          className="grid shrink-0 grid-cols-2 gap-1.5 sm:grid-cols-3 sm:gap-2 xl:grid-cols-5"
-          aria-label={L("এলাকা বাছাই", "Location filters")}
-        >
-          <Select
-            value={division}
-            onValueChange={(value) => {
-              setDivision(value);
-              setDistrict("all");
-              setUpazila("all");
-              setUnion("all");
-              setWard("all");
-            }}
-          >
-            <SelectTrigger
-              className="h-10 min-w-0 border-emerald-200 bg-white/90 px-3 text-sm font-bold sm:h-11 sm:text-base"
-              aria-label={L("বিভাগ নির্বাচন", "Select division")}
-            >
-              <SelectValue placeholder={L("বিভাগ", "Division")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem className="text-sm font-semibold sm:text-base" value="all">{L("সব বিভাগ", "All divisions")}</SelectItem>
-              {divisions.map((item) => (
-                <SelectItem className="text-sm sm:text-base" key={item.id} value={item.id}>
-                  {L(item.bn, item.en)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={district}
-            onValueChange={(value) => {
-              setDistrict(value);
-              setUpazila("all");
-              setUnion("all");
-              setWard("all");
-            }}
-          >
-            <SelectTrigger
-              className="h-10 min-w-0 border-emerald-200 bg-white/90 px-3 text-sm font-bold sm:h-11 sm:text-base"
-              aria-label={L("জেলা নির্বাচন", "Select district")}
-            >
-              <SelectValue placeholder={L("জেলা", "District")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem className="text-sm font-semibold sm:text-base" value="all">{L("সব জেলা", "All districts")}</SelectItem>
-              {districts.map((item) => (
-                <SelectItem className="text-sm sm:text-base" key={item.id} value={item.id}>
-                  {L(item.bn, item.en)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={upazila}
-            onValueChange={(value) => {
-              setUpazila(value);
-              setUnion("all");
-              setWard("all");
-            }}
-          >
-            <SelectTrigger
-              className="h-10 min-w-0 border-emerald-200 bg-white/90 px-3 text-sm font-bold sm:h-11 sm:text-base"
-              aria-label={L("উপজেলা / সিটি কর্পোরেশন নির্বাচন", "Select upazila / city corporation")}
-            >
-              <SelectValue placeholder={L("উপজেলা / সিটি কর্পোরেশন", "Upazila / City Corporation")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem className="text-sm font-semibold sm:text-base" value="all">{L("সব উপজেলা / সিটি কর্পোরেশন", "All upazilas / city corporations")}</SelectItem>
-              {matchingUpazilas.map((item) => (
-                <SelectItem className="text-sm sm:text-base" key={item.id} value={item.id}>
-                  {L(item.bn, item.en)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={union}
-            onValueChange={(value) => {
-              setUnion(value);
-              setWard("all");
-            }}
-            disabled={!selectedUpazila || selectedCityCorporation}
-          >
-            <SelectTrigger
-              className="h-10 min-w-0 border-emerald-200 bg-white/90 px-3 text-sm font-bold sm:h-11 sm:text-base"
-              aria-label={L("ইউনিয়ন / পৌরসভা নির্বাচন", "Select union / municipality")}
-            >
-              <SelectValue placeholder={L("ইউনিয়ন / পৌরসভা", "Union / Municipality")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem className="text-sm font-semibold sm:text-base" value="all">
-                {selectedCityCorporation
-                  ? L("সিটি কর্পোরেশনে প্রযোজ্য নয়", "Not applicable to city corporations")
-                  : L("সব ইউনিয়ন / পৌরসভা", "All unions / municipalities")}
-              </SelectItem>
-              {unions.map((item) => (
-                <SelectItem className="text-sm sm:text-base" key={item.id} value={item.id}>
-                  {L(item.bn, item.en)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={ward} onValueChange={setWard} disabled={wards.length === 0}>
-            <SelectTrigger
-              className="h-10 min-w-0 border-emerald-200 bg-white/90 px-3 text-sm font-bold sm:h-11 sm:text-base"
-              aria-label={L("ওয়ার্ড নির্বাচন", "Select ward")}
-            >
-              <SelectValue placeholder={L("ওয়ার্ড", "Ward")} />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem className="text-sm font-semibold sm:text-base" value="all">{L("সব ওয়ার্ড", "All wards")}</SelectItem>
-              {wards.map((item) => (
-                <SelectItem className="text-sm sm:text-base" key={item.id} value={item.id}>
-                  {L(item.bn, item.en)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <section
-          className="flex shrink-0 flex-wrap items-center gap-2 text-sm sm:gap-3 sm:text-base"
-          aria-label={L("নিবন্ধন জরুরিতা", "Registration urgency")}
-        >
-          <span className="mr-1 font-bold text-slate-700">{L("জরুরিতা", "Urgency")} ·</span>
-          <span className="rounded-full bg-emerald-100 px-3 py-1.5 font-bold text-emerald-800">
-            {L("০–৯০ দিন: সবুজ", "0–90 days: green")} · {n(urgency.green)}
-          </span>
-          <span className="rounded-full bg-amber-100 px-3 py-1.5 font-bold text-amber-800">
-            {L("৯১–১৮০ দিন: হলুদ", "91–180 days: yellow")} · {n(urgency.yellow)}
-          </span>
-          <span className="rounded-full bg-red-100 px-3 py-1.5 font-bold text-red-800">
-            {L("১৮১–৩৬৫ দিন: লাল এলার্ট", "181–365 days: red alert")} · {n(urgency.red)}
-          </span>
-          {urgency.expired > 0 && (
-            <span className="rounded-full bg-slate-200 px-3 py-1.5 font-bold text-slate-700">
-              {L("সময়সীমা পেরিয়েছে", "Past deadline")} · {n(urgency.expired)}
-            </span>
-          )}
-        </section>
         <div className="grid flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:gap-4">
           <div className="flex min-h-0 flex-col justify-center">
             <span className="mb-2 inline-flex w-fit items-center gap-2 rounded-full border border-teal-700/15 bg-white px-3 py-1 text-xs font-semibold text-teal-800 shadow-[0_0_18px_-8px_rgba(13,148,136,0.55)] max-[360px]:mb-1">
@@ -799,122 +670,39 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
             </p>
           </div>
 
-          <section
-            className="flex min-h-[19rem] w-full flex-col rounded-2xl border border-emerald-100 bg-white p-3 shadow-md sm:min-h-[20rem] sm:p-4"
-            aria-label={L("চলতি মাসের কাজের অগ্রগতি", "Current month work progress")}
-          >
-            <h2 className="mb-2 text-center text-base font-bold text-emerald-900 sm:text-left sm:text-lg">
-              {L("চলতি মাসের কাজের অগ্রগতি (১০০%)", "Current month work progress (100%)")}
-            </h2>
-            <div className="grid flex-1 items-center gap-2 sm:grid-cols-[minmax(11rem,0.9fr)_minmax(0,1.1fr)] sm:gap-4">
-              <div className="relative mx-auto h-44 w-44 shrink-0">
-              <svg viewBox="0 0 220 220" className="h-full w-full -rotate-90" role="img" aria-label={`${n(monthlyCompletion)}% ${L("মাসিক লক্ষ্যমাত্রা সম্পন্ন", "of monthly target completed")}`}>
-                <defs>
-                  <linearGradient id="monthly-progress-track" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.38" />
-                    <stop offset="35%" stopColor="#3b82f6" stopOpacity="0.38" />
-                    <stop offset="68%" stopColor="#f59e0b" stopOpacity="0.38" />
-                    <stop offset="100%" stopColor="#a855f7" stopOpacity="0.38" />
-                  </linearGradient>
-                </defs>
-                <circle cx="110" cy="110" r="88" fill="none" stroke="url(#monthly-progress-track)" strokeWidth="18" />
-                {donutSegments.map((segment, index) => {
-                  const length = (segment.value / donutTotal) * donutCircumference;
-                  const offset = donutSegments
-                    .slice(0, index)
-                    .reduce((total, previous) => total + (previous.value / donutTotal) * donutCircumference, 0);
-                  return segment.value > 0 ? (
-                    <circle
-                      key={segment.id}
-                      cx="110"
-                      cy="110"
-                      r="88"
-                      fill="none"
-                      stroke={segment.color}
-                      strokeWidth="18"
-                      strokeDasharray={`${length} ${donutCircumference - length}`}
-                      strokeDashoffset={-offset}
-                      className="transition-all duration-500"
-                    />
-                  ) : null;
-                })}
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-extrabold leading-none text-slate-800">{n(monthlyCompletion)}%</span>
-                <span className="mt-0.5 text-xs font-semibold text-slate-500">{L("লক্ষ্যমাত্রা", "Monthly target")}</span>
-              </div>
-            </div>
-              <div className="grid w-full gap-2 text-xs font-bold text-slate-700">
-              {[
-                { id: "pending", label: L("জমা হয়েছে", "Submitted"), value: monthlyCounts.pending, background: "bg-blue-50", border: "border-blue-200", color: "bg-blue-500", text: "text-blue-700" },
-                { id: "completed", label: L("নিবন্ধন সম্পন্ন", "Completed"), value: monthlyCounts.completed, background: "bg-emerald-50", border: "border-emerald-200", color: "bg-emerald-500", text: "text-emerald-700" },
-                { id: "progress", label: L("প্রক্রিয়াধীন", "In progress"), value: monthlyCounts.progress, background: "bg-amber-50", border: "border-amber-200", color: "bg-amber-400", text: "text-amber-700" },
-              ].map((item) => (
-                <div key={item.id} className={`flex min-w-0 items-center justify-between gap-3 rounded-xl border p-2.5 ${item.background} ${item.border}`}>
-                  <span className="flex min-w-0 items-center gap-2 font-normal text-slate-600">
-                    <span className={`block h-2.5 w-2.5 shrink-0 rounded-full ${item.color}`} />
-                    <span>{item.label}</span>
-                  </span>
-                  <span className={`shrink-0 text-sm font-extrabold ${item.text}`}>{n(((item.value / monthlyTarget) * 100).toFixed(1))}%</span>
-                </div>
-              ))}
-            </div>
-            </div>
-            <div className="mt-3 flex w-full flex-wrap justify-between gap-x-4 gap-y-1 border-t border-slate-200 px-2 pt-2 text-xs font-semibold text-slate-600 sm:text-sm">
-              <span>{L("মাসিক সম্পন্ন", "Completed this month")}: {n(monthlyCounts.completed)} / {n(monthlyTarget)}</span>
-              <span>{L("মোট প্রাপ্ত আবেদন", "Total applications received")}: {n(monthlyReceived)}</span>
-            </div>
-            {hasWardAggregate && !wardMonthlyCounts && (
-              <p className="mt-2 text-center text-[10px] text-amber-700">
-                {L("ওয়ার্ডের সামগ্রিক তথ্য লোড করা যায়নি", "Ward aggregate could not be loaded")}
-              </p>
-            )}
-          </section>
+          <MonthlyProgressCard
+            counts={monthlyCounts}
+            received={monthlyReceived}
+            target={monthlyTarget}
+            warning={
+              hasWardAggregate && !wardMonthlyCounts
+                ? L("ওয়ার্ডের সামগ্রিক তথ্য লোড করা যায়নি", "Ward aggregate could not be loaded")
+                : undefined
+            }
+          />
         </div>
 
         <section aria-labelledby="quick-actions-heading">
-          <div className="mb-1 flex items-center justify-between">
+          <div className="mb-1">
             <h2
               id="quick-actions-heading"
               className="font-display text-sm font-bold text-[#102a43] sm:text-base"
             >
               {L("দ্রুত প্রবেশ", "Quick actions")}
             </h2>
-            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400 sm:text-xs">
-              {L("নিরাপদ সরকারি প্ল্যাটফর্ম", "Secure government platform")}
-            </span>
           </div>
           <div
-            className={`grid gap-1.5 sm:gap-3 ${
-              roleConfig === "public" ? "grid-cols-2 lg:grid-cols-4" : "role-action-grid grid-cols-4"
+            className={`grid gap-2 sm:gap-3 ${
+              roleConfig === "public" ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" : "role-action-grid grid-cols-4"
             }`}
           >
             {actions.map(({ id, title, description, Icon }) => (
-              <button
-                type="button"
+              <QuickAccessCard
                 key={id}
-                onClick={() => openCaseDialog("action", id)}
-                className={`group flex min-h-[3.5rem] cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-left shadow-sm transition-all hover:scale-[1.02] hover:border-teal-600/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 max-[360px]:min-h-12 max-[360px]:gap-1.5 max-[360px]:px-2 sm:min-h-[3.75rem] sm:gap-3 sm:px-4 ${roleConfig !== "public" ? "role-action-card max-sm:min-h-12 max-sm:flex-col max-sm:justify-center max-sm:px-1 max-sm:py-1 max-sm:text-center" : ""}`}
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#102a43] text-teal-200 transition group-hover:bg-teal-800 max-[360px]:h-7 max-[360px]:w-7 max-sm:hidden">
-                  <Icon
-                    className="h-4 w-4 max-[360px]:h-3.5 max-[360px]:w-3.5"
-                    aria-hidden="true"
-                  />
-                </span>
-                <span className={`min-w-0 flex-1 ${roleConfig !== "public" ? "max-sm:w-full" : ""}`}>
-                  <span className={`flex items-center gap-1 text-xs font-bold text-[#102a43] sm:text-sm ${roleConfig !== "public" ? "max-sm:justify-center max-sm:text-[10px]" : ""}`}>
-                    <span className="truncate">{title}</span>
-                    <ArrowUpRight
-                      className="h-3.5 w-3.5 shrink-0 text-teal-700"
-                      aria-hidden="true"
-                    />
-                  </span>
-                  <span className={`mt-0.5 block truncate text-[10px] text-slate-500 max-[360px]:hidden sm:text-xs ${roleConfig !== "public" ? "max-sm:hidden" : ""}`}>
-                    {description}
-                  </span>
-                </span>
-              </button>
+                item={{ id, title, description, Icon }}
+                publicDashboard={roleConfig === "public"}
+                onActivate={() => openCaseDialog("action", id)}
+              />
             ))}
           </div>
         </section>
@@ -1040,7 +828,7 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
                       "নির্বাচিত এলাকায় প্রশাসনিক ইউনিট",
                       "Administrative units in the selected area",
                     )}
-                    : {n(matchingUpazilas.length)} {L("উপজেলা", "upazilas")} · {n(unions.length)}{" "}
+                    : {n(scopedUpazilas.length)} {L("উপজেলা", "upazilas")} · {n(selectedUnionCount)}{" "}
                     {L("ইউনিয়ন/পৌরসভা", "unions/municipalities")}
                   </p>
                 ) : null}

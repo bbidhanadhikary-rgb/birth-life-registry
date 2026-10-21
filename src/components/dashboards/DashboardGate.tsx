@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { LoginDialog } from "@/components/Header";
@@ -8,12 +8,22 @@ import { useApp } from "@/lib/store";
 export function DashboardGate({
   children,
   workerLayout = true,
+  developmentPreviewRole,
 }: {
   children: ReactNode;
   workerLayout?: boolean;
+  developmentPreviewRole?: "worker" | "police" | "admin" | "uno";
 }) {
-  const { user, L, authReady, mfa } = useApp();
+  const { user, L, authReady, mfa, enterDemoLogin } = useApp();
   const [loginOpen, setLoginOpen] = useState(false);
+  const startingDevelopmentPreview =
+    import.meta.env.DEV && authReady && !user && Boolean(developmentPreviewRole);
+
+  useEffect(() => {
+    if (startingDevelopmentPreview && developmentPreviewRole) {
+      enterDemoLogin(developmentPreviewRole);
+    }
+  }, [developmentPreviewRole, enterDemoLogin, startingDevelopmentPreview]);
 
   if (!authReady) {
     return (
@@ -38,6 +48,13 @@ export function DashboardGate({
   }
   if (user && mfa !== "ok") return <MfaGate />;
   if (!user) {
+    if (startingDevelopmentPreview) {
+      return (
+        <div className="mx-auto w-full max-w-none px-4 py-8 text-center text-muted-foreground" role="status">
+          {L("স্থানীয় ডেমো ড্যাশবোর্ড প্রস্তুত হচ্ছে…", "Preparing local demo dashboard…")}
+        </div>
+      );
+    }
     return (
       <div className="mx-auto max-w-md px-4 py-20 text-center">
         <p className="mb-4 text-muted-foreground">

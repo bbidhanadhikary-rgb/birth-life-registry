@@ -7,6 +7,12 @@ import { DashboardGate } from "@/components/dashboards/DashboardGate";
 import { CompliancePanel } from "@/components/dashboards/CompliancePanel";
 import { UnionStatisticsPanel } from "@/components/dashboards/UnionStatisticsPanel";
 import { PageTitle, StatusBadge, useCaseHelpers } from "@/components/shared";
+import {
+  BANGLADESH_ADMINISTRATIVE_AREAS,
+  filterCasesByAdministrativeArea,
+  getAdministrativeWards,
+  sameAdministrativeName,
+} from "@/lib/geography";
 import { scopedCases, useApp } from "@/lib/store";
 import type { RegCase, Role, Upazila } from "@/lib/types";
 
@@ -46,16 +52,22 @@ export const Route = createFileRoute("/dashboard/$section")({
 function DashboardSection() {
   const { section } = Route.useParams();
   return (
-    <DashboardGate>
+    <DashboardGate developmentPreviewRole="uno">
       <DashboardSectionContent section={section} />
     </DashboardGate>
   );
 }
 
 function DashboardSectionContent({ section }: { section: string }) {
-  const { user, state, L } = useApp();
-  const selectedUpazilaId: string | undefined = undefined;
+  const { user, state, L, selectedUpazilaId, setSelectedUpazilaId } = useApp();
   const [unionId, setUnionId] = useState("all");
+  const [areaFilters, setAreaFilters] = useState({
+    division: "all",
+    district: "all",
+    upazila: "all",
+    union: "all",
+    ward: "all",
+  });
   if (!user) return null;
 
   const allowedSections: Section[] =
@@ -78,6 +90,111 @@ function DashboardSectionContent({ section }: { section: string }) {
   }
 
   const cases = scopedCases(state, user);
+  const registeredUpazilas =
+    user.role === "super"
+      ? state.upazilas
+      : user.role === "district"
+        ? state.upazilas.filter((up) => up.districtEn === user.districtId)
+        : state.upazilas.filter((up) => up.id === user.upazilaId);
+  const geographicUpazilas = BANGLADESH_ADMINISTRATIVE_AREAS.filter(
+    (area) =>
+      (area.level === "upazila" || area.level === "city_corporation") &&
+      (user.role === "super" ||
+        registeredUpazilas.some(
+          (registered) =>
+            sameAdministrativeName(registered.en, area.en) ||
+            sameAdministrativeName(registered.bn, area.bn),
+        )),
+  );
+  const availableDivisionIds = new Set(geographicUpazilas.map((area) => area.divisionId));
+  const divisionOptions = BANGLADESH_ADMINISTRATIVE_AREAS.filter(
+    (area) => area.level === "division" && availableDivisionIds.has(area.id),
+  );
+  const availableDistrictIds = new Set(geographicUpazilas.map((area) => area.districtId));
+  const districtOptions = BANGLADESH_ADMINISTRATIVE_AREAS.filter(
+    (area) =>
+      area.level === "district" &&
+      availableDistrictIds.has(area.id) &&
+      (area.divisionId === areaFilters.division || areaFilters.division === "all"),
+  );
+  const matchingGeographicUpazilas = geographicUpazilas.filter(
+    (area) =>
+      (area.divisionId === areaFilters.division || areaFilters.division === "all") &&
+      (area.districtId === areaFilters.district || areaFilters.district === "all"),
+  );
+  const selectedGeographicUpazila = geographicUpazilas.find(
+    (area) => area.id === areaFilters.upazila,
+  );
+  const selectedGeographicUnion = BANGLADESH_ADMINISTRATIVE_AREAS.find(
+    (area) =>
+      area.id === areaFilters.union &&
+      (area.level === "union" || area.level === "municipality"),
+  );
+  const assignedUnion = registeredUpazilas
+    .flatMap((upazila) => upazila.unions)
+    .find((union) => union.id === user.unionId);
+  const unionOptions = selectedGeographicUpazila
+    ? BANGLADESH_ADMINISTRATIVE_AREAS.filter(
+        (area) =>
+          (area.level === "union" || area.level === "municipality") &&
+          area.parentId === selectedGeographicUpazila.id &&
+          (user.role !== "admin" ||
+            (assignedUnion &&
+              (sameAdministrativeName(area.en, assignedUnion.en) ||
+                sameAdministrativeName(area.bn, assignedUnion.bn)))),
+      )
+    : [];
+  const wardOptions =
+    selectedGeographicUnion
+      ? getAdministrativeWards(selectedGeographicUnion.id)
+      : selectedGeographicUpazila?.level === "city_corporation"
+        ? getAdministrativeWards(selectedGeographicUpazila.id)
+        : Array.from({ length: 9 }, (_, index) => ({
+            id: `ward-${index + 1}`,
+            bn: `ওয়ার্ড ${index + 1}`,
+            en: `Ward ${index + 1}`,
+          }));
+  const matchingRegisteredUpazilas = registeredUpazilas.filter((registered) =>
+    matchingGeographicUpazilas.some(
+      (area) =>
+        sameAdministrativeName(registered.en, area.en) ||
+        sameAdministrativeName(registered.bn, area.bn),
+    ),
+  );
+  const reportUnions = matchingRegisteredUpazilas.flatMap((upazila) =>
+    upazila.unions.filter((union) => user.role !== "admin" || union.id === user.unionId),
+  );
+  const selectedRegisteredUnion = selectedGeographicUnion
+    ? reportUnions.find(
+        (union) =>
+          sameAdministrativeName(union.en, selectedGeographicUnion.en) ||
+          sameAdministrativeName(union.bn, selectedGeographicUnion.bn),
+      )
+    : undefined;
+  const reportAreaLabel =
+    selectedGeographicUpazila?.bn ??
+    (areaFilters.district !== "all"
+      ? districtOptions.find((area) => area.id === areaFilters.district)?.bn
+      : areaFilters.division !== "all"
+        ? divisionOptions.find((area) => area.id === areaFilters.division)?.bn
+        : undefined);
+  const reportAreaLabelEn =
+    selectedGeographicUpazila?.en ??
+    (areaFilters.district !== "all"
+      ? districtOptions.find((area) => area.id === areaFilters.district)?.en
+      : areaFilters.division !== "all"
+        ? divisionOptions.find((area) => area.id === areaFilters.division)?.en
+        : undefined);
+  const reportUpazila = matchingRegisteredUpazilas.length
+    ? {
+        ...matchingRegisteredUpazilas[0],
+        id: "area-report",
+        bn: reportAreaLabel ?? L("জাতীয় পর্যায়", "National"),
+        en: reportAreaLabelEn ?? L("জাতীয় পর্যায়", "National"),
+        unions: reportUnions,
+      }
+    : undefined;
+  const areaCases = filterCasesByAdministrativeArea(cases, registeredUpazilas, areaFilters);
   const districtUpazilas =
     user.role === "district"
       ? state.upazilas.filter((up) => up.districtEn === user.districtId)
@@ -106,7 +223,7 @@ function DashboardSectionContent({ section }: { section: string }) {
   const upazilaCases =
     user.role === "super" && upazila ? cases.filter((c) => c.upazilaId === upazila.id) : cases;
   const sectionTitle: Record<Section, string> = {
-    unions: L("ইউনিয়নভিত্তিক পরিসংখ্যান", "Union statistics"),
+    unions: L("এলাকাভিত্তিক প্রতিবেদন", "Area-wise report"),
     compliance: L("৩৬৫ দিনের নিবন্ধন পর্যবেক্ষণ", "365-day compliance monitoring"),
     alerts: L("সময়সীমার সতর্কতা", "Deadline alerts"),
     records: L("জন্ম ও মৃত্যু নিবন্ধন রেকর্ড", "Birth & death registration records"),
@@ -139,14 +256,82 @@ function DashboardSectionContent({ section }: { section: string }) {
             }
           : {})}
       />
-      {section === "unions" && upazila && (
-        <UnionStatisticsPanel
-          upazila={upazila}
-          cases={upazilaCases}
-          unions={areas}
-          selectedUnionId={unionId}
-          onUnionChange={setUnionId}
-        />
+      {section === "unions" && (
+        <div className="space-y-4">
+          <section
+            className="grid gap-3 rounded-xl border border-emerald-100 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:grid-cols-2 lg:grid-cols-5"
+            aria-label={L("এলাকাভিত্তিক প্রতিবেদনের ভৌগোলিক ফিল্টার", "Area-wise report geographic filters")}
+          >
+            <AreaFilterSelect
+              label={L("বিভাগ", "Division")}
+              value={areaFilters.division}
+              allLabel={L("সব বিভাগ", "All divisions")}
+              options={divisionOptions}
+              onChange={(division) =>
+                setAreaFilters({
+                  division,
+                  district: "all",
+                  upazila: "all",
+                  union: "all",
+                  ward: "all",
+                })
+              }
+            />
+            <AreaFilterSelect
+              label={L("জেলা", "District")}
+              value={areaFilters.district}
+              allLabel={L("সব জেলা", "All districts")}
+              options={districtOptions}
+              onChange={(district) =>
+                setAreaFilters({ ...areaFilters, district, upazila: "all", union: "all", ward: "all" })
+              }
+            />
+            <AreaFilterSelect
+              label={L("উপজেলা / সিটি কর্পোরেশন", "Upazila / City Corporation")}
+              value={areaFilters.upazila}
+              allLabel={L("সব উপজেলা / সিটি কর্পোরেশন", "All upazilas / city corporations")}
+              options={matchingGeographicUpazilas}
+              onChange={(selectedId) => {
+                setAreaFilters({ ...areaFilters, upazila: selectedId, union: "all", ward: "all" });
+                const selected = geographicUpazilas.find((area) => area.id === selectedId);
+                const registered = selected && registeredUpazilas.find(
+                  (item) =>
+                    sameAdministrativeName(item.en, selected.en) ||
+                    sameAdministrativeName(item.bn, selected.bn),
+                );
+                setSelectedUpazilaId(registered?.id);
+              }}
+            />
+            <AreaFilterSelect
+              label={L("ইউনিয়ন / পৌরসভা", "Union / Municipality")}
+              value={areaFilters.union}
+              allLabel={L("সব ইউনিয়ন / পৌরসভা", "All unions / municipalities")}
+              options={unionOptions}
+              disabled={!selectedGeographicUpazila || selectedGeographicUpazila.level === "city_corporation"}
+              onChange={(union) => setAreaFilters({ ...areaFilters, union, ward: "all" })}
+            />
+            <AreaFilterSelect
+              label={L("ওয়ার্ড", "Ward")}
+              value={areaFilters.ward}
+              allLabel={L("সব ওয়ার্ড", "All wards")}
+              options={wardOptions}
+              onChange={(ward) => setAreaFilters({ ...areaFilters, ward })}
+            />
+          </section>
+          {reportUpazila ? (
+            <UnionStatisticsPanel
+              upazila={reportUpazila}
+              cases={areaCases}
+              unions={reportUnions}
+              selectedUnionId={selectedRegisteredUnion?.id ?? "all"}
+              showUnionFilter={false}
+            />
+          ) : (
+            <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-muted-foreground">
+              {L("নির্বাচিত এলাকায় কোনো নিবন্ধিত উপজেলা পাওয়া যায়নি।", "No registered upazila was found in this selection.")}
+            </p>
+          )}
+        </div>
       )}
       {(section === "compliance" || section === "alerts") && upazila && (
         <CompliancePanel
@@ -162,6 +347,43 @@ function DashboardSectionContent({ section }: { section: string }) {
         (user.role === "super" ? <SuperRecords cases={cases} /> : <RoleRecords role={user.role} />)}
       {section === "users" && user.role === "super" && <RoleManagement />}
     </>
+  );
+}
+
+function AreaFilterSelect({
+  allLabel,
+  disabled = false,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  allLabel: string;
+  disabled?: boolean;
+  label: string;
+  onChange: (value: string) => void;
+  options: { id: string; bn: string; en: string }[];
+  value: string;
+}) {
+  const { L } = useApp();
+
+  return (
+    <label className="min-w-0 space-y-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+      {label}
+      <select
+        className="h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-base font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="all">{allLabel}</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {L(option.bn, option.en)}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

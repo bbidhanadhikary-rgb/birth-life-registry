@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { RegistrationDashboard } from "@/components/dashboards/RegistrationDashboard";
@@ -22,17 +22,21 @@ export const Route = createFileRoute("/dashboard")({
 });
 
 function Dashboard() {
-  const { user, L, authReady, mfa, demoLoginAvailable, enterDemoLogin } = useApp();
+  const { user, L, authReady, mfa, enterDemoLogin } = useApp();
   const [open, setOpen] = useState(false);
+  const isSectionRoute = useRouterState({
+    select: (routerState) => routerState.location.pathname.startsWith("/dashboard/"),
+  });
 
   useEffect(() => {
-    if (authReady && demoLoginAvailable && !user) enterDemoLogin("worker");
-  }, [authReady, demoLoginAvailable, enterDemoLogin, user]);
+    if (authReady && import.meta.env.DEV && !user) enterDemoLogin("uno");
+  }, [authReady, enterDemoLogin, user]);
 
-  if (!authReady || (demoLoginAvailable && !user)) {
+  if (!authReady || (import.meta.env.DEV && !user)) {
     return <div className="py-20 text-center text-muted-foreground">…</div>;
   }
   if (user && mfa !== "ok") return <MfaGate />;
+  if (isSectionRoute) return <Outlet />;
   if (!user) {
     return (
       <div className="mx-auto max-w-md py-20 text-center">

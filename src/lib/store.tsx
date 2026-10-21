@@ -123,7 +123,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const previewUser = demo.users.find((candidate) => candidate.id === demoUserIds[role]);
     if (!previewUser) throw new Error(`The seeded ${role} account is missing`);
     const upazila = demo.upazilas.find((area) => area.id === previewUser.upazilaId);
-    const union = upazila?.unions.find((area) => area.id === previewUser.unionId);
+    const union =
+      upazila?.unions.find((area) => area.id === previewUser.unionId) ??
+      (role === "uno" ? upazila?.unions[0] : undefined);
     const village = union?.villages[0];
     if (!upazila || !village || (role !== "uno" && !union)) {
       throw new Error(`The seeded ${role} account's area is incomplete`);

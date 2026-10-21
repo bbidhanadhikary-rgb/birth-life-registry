@@ -18,11 +18,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { getCaseDeadline } from "@/lib/compliance";
 import { roleLabel, scopedCases, useApp } from "@/lib/store";
 import { TARGET, type Role, type Upazila } from "@/lib/types";
+import { MonthlyProgressCard } from "@/components/dashboards/MonthlyProgressCard";
 
-type AreaFilters = { division: string; district: string; upazila: string; union: string; ward: string };
 type DashboardSection = "unions" | "compliance" | "alerts" | "records" | "users";
-
-const emptyFilters: AreaFilters = { division: "", district: "", upazila: "", union: "", ward: "" };
 
 function monthKey(timestamp: number) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -38,12 +36,9 @@ export function NationalDashboard() {
     L,
     n,
     saveAnnouncement,
-    selectedUpazilaId,
-    setSelectedUpazilaId,
     state,
     user,
   } = useApp();
-  const [filters, setFilters] = useState<AreaFilters>(emptyFilters);
   const [noticeBn, setNoticeBn] = useState("");
   const [noticeEn, setNoticeEn] = useState("");
   const [noticeActive, setNoticeActive] = useState(true);
@@ -58,23 +53,6 @@ export function NationalDashboard() {
     return state.upazilas.filter((upazila) => upazila.id === user.upazilaId);
   }, [state.upazilas, user]);
 
-  useEffect(() => {
-    if (!user || filters.upazila) return;
-    const preferred =
-      selectableUpazilas.find((upazila) => upazila.id === selectedUpazilaId) ??
-      (user.role === "super" || user.role === "district" ? undefined : selectableUpazilas[0]);
-    if (preferred) {
-      setFilters((current) => ({
-        division: preferred.divisionEn,
-        district: preferred.districtEn,
-        upazila: preferred.id,
-        union: "",
-        ward: "",
-      }));
-    }
-  }, [filters.upazila, selectedUpazilaId, selectableUpazilas, user]);
-
-  const selectedUpazila = selectableUpazilas.find((item) => item.id === filters.upazila);
   const selectedNotice = announcements.find((item) => item.upazilaId === user?.upazilaId);
 
   useEffect(() => {
@@ -83,51 +61,8 @@ export function NationalDashboard() {
     setNoticeActive(selectedNotice?.active ?? true);
   }, [selectedNotice]);
 
-  const divisionOptions = useMemo(
-    () => [...new Set(selectableUpazilas.map((upazila) => upazila.divisionEn))].sort(),
-    [selectableUpazilas],
-  );
-  const districtOptions = useMemo(
-    () =>
-      [
-        ...new Set(
-          selectableUpazilas
-            .filter((upazila) => !filters.division || upazila.divisionEn === filters.division)
-            .map((upazila) => upazila.districtEn),
-        ),
-      ].sort(),
-    [filters.division, selectableUpazilas],
-  );
-  const upazilaOptions = useMemo(
-    () =>
-      selectableUpazilas.filter(
-        (upazila) =>
-          (!filters.division || upazila.divisionEn === filters.division) &&
-          (!filters.district || upazila.districtEn === filters.district),
-      ),
-    [filters.district, filters.division, selectableUpazilas],
-  );
-  const unionOptions =
-    selectedUpazila?.unions.filter(
-      (union) =>
-        !user || !["worker", "police", "admin"].includes(user.role) || union.id === user.unionId,
-    ) ?? [];
-  const wardOptions = Array.from({ length: 9 }, (_, index) => ({
-    value: String(index + 1),
-    label: L(`ওয়ার্ড ${index + 1}`, `Ward ${index + 1}`),
-  }));
-
   const cases = useMemo(() => (user ? scopedCases(state, user) : []), [state, user]);
-  const visibleCases = useMemo(() => {
-    const allowedIds = new Set(upazilaOptions.map((upazila) => upazila.id));
-    return cases.filter(
-      (item) =>
-        allowedIds.has(item.upazilaId) &&
-        (!filters.upazila || item.upazilaId === filters.upazila) &&
-        (!filters.union || item.unionId === filters.union) &&
-        (!filters.ward || item.ward === Number(filters.ward)),
-    );
-  }, [cases, filters.union, filters.upazila, filters.ward, upazilaOptions]);
+  const visibleCases = cases;
   const outstanding = visibleCases.filter((item) => item.status !== "completed" && item.status !== "rejected");
   const deadlines = useMemo(
     () =>
@@ -149,26 +84,28 @@ export function NationalDashboard() {
     ? Math.round((complianceCount / visibleCases.length) * 100)
     : 0;
 
-  const effectiveUnions = selectedUpazila
-    ? unionOptions.filter((union) => !filters.union || union.id === filters.union).length
-    : upazilaOptions.reduce(
-        (count, upazila) =>
-          count +
-          upazila.unions.filter(
-            (union) =>
-              !user ||
-              !["worker", "police", "admin"].includes(user.role) ||
-              union.id === user.unionId,
-          ).length,
-        0,
-      );
+  const effectiveUnions = selectableUpazilas.reduce(
+    (count, upazila) =>
+      count +
+      upazila.unions.filter(
+        (union) =>
+          !user || !["worker", "police", "admin"].includes(user.role) || union.id === user.unionId,
+      ).length,
+    0,
+  );
+  const currentMonthCases = visibleCases.filter(
+    (item) => monthKey(item.createdAt) === monthKey(Date.now()),
+  );
+  const monthlyCounts = {
+    pending: currentMonthCases.filter((item) => item.status === "pending").length,
+    progress: currentMonthCases.filter((item) => item.status === "progress").length,
+    completed: currentMonthCases.filter((item) => item.status === "completed").length,
+  };
   const completedThisMonth = visibleCases.filter(
     (item) => item.completedAt && monthKey(item.completedAt) === monthKey(Date.now()),
   ).length;
   const monthlyTarget = Math.ceil(
-    effectiveUnions *
-      (TARGET.birth + TARGET.death) *
-      (filters.ward ? 1 / wardOptions.length : 1),
+    effectiveUnions * (TARGET.birth + TARGET.death),
   );
   const targetPercent = monthlyTarget
     ? Math.min(100, Math.round((completedThisMonth / monthlyTarget) * 100))
@@ -180,7 +117,7 @@ export function NationalDashboard() {
       const upazila = state.upazilas.find((area) => area.id === item.upazilaId);
       if (!upazila) continue;
       const union = upazila.unions.find((area) => area.id === item.unionId);
-      const useUnion = Boolean(filters.upazila);
+      const useUnion = selectableUpazilas.length === 1;
       const key = useUnion ? item.unionId : upazila.id;
       const label = useUnion
         ? union
@@ -200,10 +137,10 @@ export function NationalDashboard() {
       }))
       .sort((a, b) => b.percent - a.percent || b.total - a.total)
       .slice(0, 5);
-  }, [filters.upazila, L, state.upazilas, visibleCases]);
+  }, [L, selectableUpazilas.length, state.upazilas, visibleCases]);
 
   const sections: { section: DashboardSection; title: string; Icon: typeof MapPinned }[] = [
-    { section: "unions", title: L("এলাকাভিত্তিক প্রতিবেদন", "Regional reports"), Icon: MapPinned },
+    { section: "unions", title: L("এলাকাভিত্তিক প্রতিবেদন", "Area-wise report"), Icon: MapPinned },
     {
       section: "compliance",
       title: L("৩৬৫ দিনের পর্যবেক্ষণ", "365-day monitor"),
@@ -239,10 +176,6 @@ export function NationalDashboard() {
   const availableSections = user ? roleSections[user.role] : [];
   const links = sections.filter((entry) => availableSections.includes(entry.section));
 
-  const updateFilters = (next: AreaFilters) => {
-    setFilters(next);
-    if (next.upazila) setSelectedUpazilaId(next.upazila);
-  };
   const saveNotice = async () => {
     if (!user || user.role !== "uno") return;
     setSavingNotice(true);
@@ -268,64 +201,11 @@ export function NationalDashboard() {
         </span>
       </div>
 
-      <section
-        className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:grid-cols-2 lg:grid-cols-5"
-        aria-label={L("ভৌগোলিক ফিল্টার", "Geographic filters")}
-      >
-        <GeographySelect
-          label={L("বিভাগ", "Division")}
-          value={filters.division}
-          options={divisionOptions.map((value) => ({
-            value,
-            label:
-              selectableUpazilas.find((upazila) => upazila.divisionEn === value)?.divisionBn ??
-              value,
-          }))}
-          allLabel={L("সব বিভাগ", "All divisions")}
-          onChange={(division) => updateFilters({ division, district: "", upazila: "", union: "", ward: "" })}
-        />
-        <GeographySelect
-          label={L("জেলা", "District")}
-          value={filters.district}
-          options={districtOptions.map((value) => ({
-            value,
-            label:
-              selectableUpazilas.find((upazila) => upazila.districtEn === value)?.districtBn ??
-              value,
-          }))}
-          allLabel={L("সব জেলা", "All districts")}
-          onChange={(district) => updateFilters({ ...filters, district, upazila: "", union: "", ward: "" })}
-        />
-        <GeographySelect
-          label={L("উপজেলা", "Upazila")}
-          value={filters.upazila}
-          options={upazilaOptions.map((upazila) => ({
-            value: upazila.id,
-            label: L(upazila.bn, upazila.en),
-          }))}
-          allLabel={L("সব উপজেলা", "All Upazilas")}
-          onChange={(upazila) => updateFilters({ ...filters, upazila, union: "", ward: "" })}
-        />
-        <GeographySelect
-          label={L("ইউনিয়ন / পৌরসভা", "Union / Municipality")}
-          value={filters.union}
-          options={unionOptions.map((union) => ({
-            value: union.id,
-            label: L(union.bn, union.en),
-          }))}
-          allLabel={L("সব ইউনিয়ন / পৌরসভা", "All unions / municipalities")}
-          disabled={!selectedUpazila}
-          onChange={(union) => updateFilters({ ...filters, union, ward: "" })}
-        />
-        <GeographySelect
-          label={L("ওয়ার্ড", "Ward")}
-          value={filters.ward}
-          options={wardOptions}
-          allLabel={L("সব ওয়ার্ড", "All wards")}
-          onChange={(ward) => updateFilters({ ...filters, ward })}
-        />
-      </section>
-
+      <MonthlyProgressCard
+        counts={monthlyCounts}
+        received={currentMonthCases.length}
+        target={monthlyTarget}
+      />
       <section
         className="grid grid-cols-2 gap-2 xl:grid-cols-4"
         aria-label={L("মূল সূচক", "Key indicators")}
@@ -564,41 +444,6 @@ export function NationalDashboard() {
         </details>
       )}
     </div>
-  );
-}
-
-function GeographySelect({
-  allLabel,
-  disabled = false,
-  label,
-  onChange,
-  options,
-  value,
-}: {
-  allLabel: string;
-  disabled?: boolean;
-  label: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-  value: string;
-}) {
-  return (
-    <label className="min-w-0 space-y-1 text-sm font-bold text-slate-700 dark:text-slate-200">
-      {label}
-      <select
-        className="h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-base font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-teal-700 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">{allLabel}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }
 

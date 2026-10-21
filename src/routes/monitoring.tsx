@@ -18,7 +18,7 @@ function MonitoringRoute() {
   const { L, user } = useApp();
   const canMonitor = user && ["uno", "district", "super"].includes(user.role);
   return (
-    <DashboardGate>
+    <DashboardGate developmentPreviewRole="uno">
       {canMonitor ? (
         <>
           <div className="mx-auto w-full max-w-none px-4 pt-4 sm:px-6 lg:px-8">

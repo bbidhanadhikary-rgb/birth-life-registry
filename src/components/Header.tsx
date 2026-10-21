@@ -45,7 +45,7 @@ export function Header() {
     ["health_worker", "স্বাস্থ্যকর্মী", "Health Worker"],
     ["village_police", "গ্রাম পুলিশ", "Village Police"],
     ["up_official", "ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer"],
-    ["uno", "উপজেলা নির্বাহী অফিসার (ইউএনও)", "Upazila Nirbahi Officer (UNO)"],
+    ["uno", "উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Monitoring Panel"],
   ] as const;
 
   return (
@@ -72,24 +72,24 @@ export function Header() {
           <WifiOff className="h-3 w-3" /> {L("অফলাইন — তথ্য ডিভাইসে জমা থাকবে, অনলাইনে এলে স্বয়ংক্রিয়ভাবে সিঙ্ক হবে", "Offline — entries are cached and will auto-sync")}
         </div>
       )}
-      <div className="mx-auto flex h-16 w-full max-w-none items-center gap-2 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 w-full max-w-none items-center gap-1 px-2 sm:gap-2 sm:px-6 lg:px-8">
         <Link to="/" className="mr-auto flex items-center gap-2">
           <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-800 text-white"><Landmark className="h-5 w-5" /></span>
           <span className="leading-tight">
-            <span className="block font-display text-base font-bold">{L("ই-নিবন্ধন ট্র্যাকার", "E-Registration Tracker")}</span>
-            <span className="hidden text-xs text-emerald-50 sm:block">{L("জন্ম ও মৃত্যু নিবন্ধন · উপজেলা", "Birth & Death · Upazila")}</span>
+            <span className="block whitespace-nowrap font-display text-lg font-bold max-[400px]:text-base">{L("ই-নিবন্ধন ট্র্যাকার", "E-Registration Tracker")}</span>
+            <span className="hidden text-sm text-emerald-50 sm:block">{L("জন্ম ও মৃত্যু নিবন্ধন · উপজেলা", "Birth & Death · Upazila")}</span>
           </span>
         </Link>
-        <Button variant="ghost" size="sm" className="text-white hover:bg-emerald-700 hover:text-white" onClick={toggleLang} aria-label="Language">
-          <Languages className="h-4 w-4" /><span className="ml-1">{lang === "bn" ? "EN" : "বাং"}</span>
+        <Button variant="ghost" size="sm" className="h-11 shrink-0 bg-white/10 px-3 text-base font-semibold text-white transition hover:bg-amber-300/25 hover:text-amber-50 max-[400px]:h-9 max-[400px]:px-2 max-[400px]:text-sm sm:px-4" onClick={toggleLang} aria-label="Language">
+          <Languages className="h-6 w-6 max-[400px]:h-5 max-[400px]:w-5" /><span className="ml-1">{lang === "bn" ? "EN" : "বাং"}</span>
         </Button>
-        <Button variant="ghost" size="icon" className="text-white hover:bg-emerald-700 hover:text-white" onClick={toggleTheme} aria-label="Theme">{dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</Button>
-        <Button variant="ghost" size="icon" className="text-white hover:bg-emerald-700 hover:text-white" onClick={() => setDlg("manual")} aria-label="Manual"><BookOpen className="h-4 w-4" /></Button>
-        <Button variant="ghost" size="icon" className="text-white hover:bg-emerald-700 hover:text-white" onClick={() => setDlg("support")} aria-label="Support"><Headphones className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 bg-white/10 text-white transition hover:bg-sky-300/25 hover:text-sky-50 max-[400px]:h-9 max-[400px]:w-9" onClick={toggleTheme} aria-label="Theme">{dark ? <Sun className="h-6 w-6 max-[400px]:h-5 max-[400px]:w-5" /> : <Moon className="h-6 w-6 max-[400px]:h-5 max-[400px]:w-5" />}</Button>
+        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 bg-white/10 text-white transition hover:bg-violet-300/25 hover:text-violet-50 max-[400px]:h-9 max-[400px]:w-9" onClick={() => setDlg("manual")} aria-label="Manual"><BookOpen className="h-6 w-6 max-[400px]:h-5 max-[400px]:w-5" /></Button>
+        <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0 bg-white/10 text-white transition hover:bg-cyan-300/25 hover:text-cyan-50 max-[400px]:h-9 max-[400px]:w-9" onClick={() => setDlg("support")} aria-label="Support"><Headphones className="h-6 w-6 max-[400px]:h-5 max-[400px]:w-5" /></Button>
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="max-w-40 truncate border-white/40 bg-emerald-700/40 text-white hover:bg-emerald-700 hover:text-white">{L(user.name.bn, user.name.en)}</Button>
+              <Button variant="outline" size="sm" className="h-11 max-w-40 shrink-0 truncate border-white/50 bg-emerald-800/60 px-3 text-sm font-semibold text-white hover:bg-emerald-900 hover:text-white sm:px-4">{L(user.name.bn, user.name.en)}</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>
@@ -109,7 +109,7 @@ export function Header() {
             {L("লোকাল টেস্ট মোড", "Local test mode")}
           </span>
         ) : (
-          <Button size="sm" className="bg-emerald-800 text-white hover:bg-emerald-900" onClick={() => setDlg("login")}><LogIn className="mr-1 h-4 w-4" /><span className="max-[360px]:sr-only">{L("লগইন", "Login")}</span></Button>
+          <Button size="sm" className="h-11 shrink-0 bg-emerald-900 px-4 text-base font-bold text-white shadow-md shadow-emerald-950/20 hover:bg-emerald-950 max-[400px]:h-9 max-[400px]:px-2 max-[400px]:text-sm" onClick={() => setDlg("login")}><LogIn className="mr-2 h-6 w-6 max-[400px]:mr-0 max-[400px]:h-5 max-[400px]:w-5" /><span className="max-[360px]:sr-only">{L("লগইন", "Login")}</span></Button>
         )}
       </div>
       <AnnouncementTicker />

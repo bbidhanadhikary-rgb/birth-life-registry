@@ -8,7 +8,7 @@ export function Footer({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <footer className="h-16 w-full shrink-0 border-t border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-[0_-8px_24px_-20px_rgba(15,23,42,0.4)]">
-        <div className="mx-auto flex h-full w-full max-w-none flex-col items-center justify-center gap-1 px-4 text-[10px] leading-tight max-[360px]:text-[9px] sm:flex-row sm:justify-between sm:gap-3 sm:px-6 sm:text-xs lg:px-8">
+        <div className="mx-auto flex h-full w-full max-w-none flex-col items-center justify-center gap-1 px-4 text-xs leading-tight max-[360px]:text-[10px] sm:flex-row sm:justify-between sm:gap-3 sm:px-6 sm:text-sm lg:px-8">
           <p className="flex shrink-0 items-center gap-1.5 whitespace-nowrap font-display font-semibold">
             <Landmark className="h-3.5 w-3.5 shrink-0 text-emerald-100" aria-hidden="true" />
             <span>{L("ই-নিবন্ধন ট্র্যাকার", "E-Registration Tracker")}</span>
@@ -46,11 +46,11 @@ export function Footer({ compact = false }: { compact?: boolean }) {
     <footer className="border-t border-slate-800 bg-slate-950 text-slate-100">
       <div className="mx-auto grid w-full max-w-none gap-7 px-4 py-8 sm:px-6 md:grid-cols-[1.2fr_1fr_1fr] lg:px-8">
         <div>
-          <div className="flex items-center gap-2 font-display font-semibold">
-            <Landmark className="h-5 w-5 text-teal-300" aria-hidden="true" />
+          <div className="flex items-center gap-2 font-display text-lg font-semibold">
+            <Landmark className="h-6 w-6 text-teal-300" aria-hidden="true" />
             {L("ই-নিবন্ধন ট্র্যাকার", "E-Nibondhon Tracker")}
           </div>
-          <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-300">
+          <p className="mt-2 max-w-sm text-base leading-relaxed text-slate-300">
             {L(
               "জন্ম ও মৃত্যু নিবন্ধনে ৩৬৫ দিনের আইনি সময়সীমা মেনে জাতীয় অগ্রগতি পর্যবেক্ষণ করুন।",
               "Monitor nationwide progress under the 365-day birth and death registration mandate.",
@@ -59,8 +59,8 @@ export function Footer({ compact = false }: { compact?: boolean }) {
         </div>
 
         <nav aria-label={L("দ্রুত লিংক", "Quick links")}>
-          <h2 className="font-semibold">{L("দ্রুত লিংক", "Quick links")}</h2>
-          <ul className="mt-2 space-y-2 text-sm text-slate-300">
+          <h2 className="text-lg font-semibold">{L("দ্রুত লিংক", "Quick links")}</h2>
+          <ul className="mt-2 space-y-2 text-base text-slate-300">
             <li>
               <Link
                 to="/"
@@ -81,20 +81,20 @@ export function Footer({ compact = false }: { compact?: boolean }) {
         </nav>
 
         <div>
-          <h2 className="font-semibold">{L("সহায়তা যোগাযোগ", "Support contact")}</h2>
-          <p className="mt-1 text-sm text-slate-300">
+          <h2 className="text-lg font-semibold">{L("সহায়তা যোগাযোগ", "Support contact")}</h2>
+          <p className="mt-1 text-base text-slate-300">
             {L(
               "জাতীয় নিবন্ধন আইসিটি / প্রশাসনিক সহায়তা",
               "National registration ICT / Administrative support",
             )}
           </p>
-          <ul className="mt-2 space-y-2 text-sm">
+          <ul className="mt-2 space-y-2 text-base">
             <li>
               <a
                 className="inline-flex min-h-8 items-center gap-2 text-slate-200 hover:text-white focus-visible:underline"
                 href="tel:+8801700000000"
               >
-                <Phone className="h-4 w-4 text-teal-300" aria-hidden="true" />
+                <Phone className="h-5 w-5 text-teal-300" aria-hidden="true" />
                 <span>+880 1700-000000</span>
               </a>
             </li>
@@ -103,7 +103,7 @@ export function Footer({ compact = false }: { compact?: boolean }) {
                 className="inline-flex min-h-8 items-center gap-2 break-all text-slate-200 hover:text-white focus-visible:underline"
                 href="mailto:ict@upazila.gov.bd"
               >
-                <Mail className="h-4 w-4 shrink-0 text-teal-300" aria-hidden="true" />
+                <Mail className="h-5 w-5 shrink-0 text-teal-300" aria-hidden="true" />
                 <span>ict@upazila.gov.bd</span>
               </a>
             </li>
@@ -111,7 +111,7 @@ export function Footer({ compact = false }: { compact?: boolean }) {
         </div>
       </div>
       <div className="border-t border-slate-800">
-        <div className="mx-auto w-full max-w-none px-4 py-3 text-xs text-slate-400 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-none px-4 py-3 text-sm text-slate-400 sm:px-6 lg:px-8">
           © {new Date().getFullYear()}{" "}
           {L(
             "ই-নিবন্ধন ট্র্যাকার · জাতীয় নিবন্ধন ব্যবস্থা",

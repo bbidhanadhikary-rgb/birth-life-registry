@@ -21,6 +21,7 @@ interface UnionStatisticsPanelProps {
   unions?: Union[];
   selectedUnionId?: string;
   onUnionChange?: (id: string) => void;
+  showUnionFilter?: boolean;
 }
 
 export function UnionStatisticsPanel({
@@ -29,6 +30,7 @@ export function UnionStatisticsPanel({
   unions = upazila.unions,
   selectedUnionId = "all",
   onUnionChange = () => {},
+  showUnionFilter = true,
 }: UnionStatisticsPanelProps) {
   const { L, n } = useApp();
   const visibleUnions = unions.filter(
@@ -58,35 +60,37 @@ export function UnionStatisticsPanel({
           `${upazila.en} Upazila · ${upazila.unions.length} unions/municipality · monthly targets: ${TARGET.birth} births and ${TARGET.death} deaths`,
         )}
       </p>
-      <div
-        className="mb-2 flex max-w-full touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-2"
-        role="group"
-        aria-label={L("ইউনিয়ন পরিসংখ্যান ফিল্টার", "Filter union statistics")}
-      >
-        <Button
-          type="button"
-          size="sm"
-          className="h-11 shrink-0"
-          variant={selectedUnionId === "all" ? "default" : "outline"}
-          aria-pressed={selectedUnionId === "all"}
-          onClick={() => onUnionChange("all")}
+      {showUnionFilter && (
+        <div
+          className="mb-2 flex max-w-full touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-2"
+          role="group"
+          aria-label={L("ইউনিয়ন পরিসংখ্যান ফিল্টার", "Filter union statistics")}
         >
-          {L("সব এলাকা", "All areas")}
-        </Button>
-        {unions.map((union) => (
           <Button
-            key={union.id}
             type="button"
             size="sm"
             className="h-11 shrink-0"
-            variant={selectedUnionId === union.id ? "default" : "outline"}
-            aria-pressed={selectedUnionId === union.id}
-            onClick={() => onUnionChange(union.id)}
+            variant={selectedUnionId === "all" ? "default" : "outline"}
+            aria-pressed={selectedUnionId === "all"}
+            onClick={() => onUnionChange("all")}
           >
-            {L(union.bn, union.en)}
+            {L("সব এলাকা", "All areas")}
           </Button>
-        ))}
-      </div>
+          {unions.map((union) => (
+            <Button
+              key={union.id}
+              type="button"
+              size="sm"
+              className="h-11 shrink-0"
+              variant={selectedUnionId === union.id ? "default" : "outline"}
+              aria-pressed={selectedUnionId === union.id}
+              onClick={() => onUnionChange(union.id)}
+            >
+              {L(union.bn, union.en)}
+            </Button>
+          ))}
+        </div>
+      )}
       <div className="overflow-x-auto overscroll-x-contain">
         <div className="h-80" style={{ minWidth: chartWidth }}>
           <ResponsiveContainer width="100%" height="100%">
