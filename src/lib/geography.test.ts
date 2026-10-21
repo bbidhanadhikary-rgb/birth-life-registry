@@ -106,6 +106,28 @@ describe("Bangladesh administrative geography", () => {
     ).toEqual(["c1", "c2", "c3", "c4", "c5"]);
   });
 
+  it("filters by a ward across an upazila without requiring a union selection", () => {
+    const seed = seedState();
+    const manirampur = BANGLADESH_ADMINISTRATIVE_AREAS.find(
+      (area) => area.level === "upazila" && area.en === "Manirampur",
+    )!;
+
+    expect(
+      filterCasesByAdministrativeArea(seed.cases, seed.upazilas, {
+        ...allFilters,
+        upazila: manirampur.id,
+        ward: "ward-1",
+      }).map((item) => item.id),
+    ).toEqual(["c1", "c2", "c3", "c4", "c5", "c6"]);
+    expect(
+      filterCasesByAdministrativeArea(seed.cases, seed.upazilas, {
+        ...allFilters,
+        upazila: manirampur.id,
+        ward: "ward-10",
+      }),
+    ).toEqual([]);
+  });
+
   it("supports Bangla/English aliases and supplies app-schema ward numbers", () => {
     expect(sameAdministrativeName("০১ নং রোহিতা", "রোহিতা")).toBe(true);
     expect(sameAdministrativeName("Manirampur Pourashava", "Manirampur")).toBe(true);

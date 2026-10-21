@@ -19,10 +19,10 @@ import { getCaseDeadline } from "@/lib/compliance";
 import { roleLabel, scopedCases, useApp } from "@/lib/store";
 import { TARGET, type Role, type Upazila } from "@/lib/types";
 
-type AreaFilters = { division: string; district: string; upazila: string; union: string };
+type AreaFilters = { division: string; district: string; upazila: string; union: string; ward: string };
 type DashboardSection = "unions" | "compliance" | "alerts" | "records" | "users";
 
-const emptyFilters: AreaFilters = { division: "", district: "", upazila: "", union: "" };
+const emptyFilters: AreaFilters = { division: "", district: "", upazila: "", union: "", ward: "" };
 
 function monthKey(timestamp: number) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -69,6 +69,7 @@ export function NationalDashboard() {
         district: preferred.districtEn,
         upazila: preferred.id,
         union: "",
+        ward: "",
       }));
     }
   }, [filters.upazila, selectedUpazilaId, selectableUpazilas, user]);
@@ -111,6 +112,10 @@ export function NationalDashboard() {
       (union) =>
         !user || !["worker", "police", "admin"].includes(user.role) || union.id === user.unionId,
     ) ?? [];
+  const wardOptions = Array.from({ length: 9 }, (_, index) => ({
+    value: String(index + 1),
+    label: L(`ওয়ার্ড ${index + 1}`, `Ward ${index + 1}`),
+  }));
 
   const cases = useMemo(() => (user ? scopedCases(state, user) : []), [state, user]);
   const visibleCases = useMemo(() => {
@@ -119,9 +124,10 @@ export function NationalDashboard() {
       (item) =>
         allowedIds.has(item.upazilaId) &&
         (!filters.upazila || item.upazilaId === filters.upazila) &&
-        (!filters.union || item.unionId === filters.union),
+        (!filters.union || item.unionId === filters.union) &&
+        (!filters.ward || item.ward === Number(filters.ward)),
     );
-  }, [cases, filters.union, filters.upazila, upazilaOptions]);
+  }, [cases, filters.union, filters.upazila, filters.ward, upazilaOptions]);
   const outstanding = visibleCases.filter((item) => item.status !== "completed" && item.status !== "rejected");
   const deadlines = useMemo(
     () =>
@@ -159,7 +165,11 @@ export function NationalDashboard() {
   const completedThisMonth = visibleCases.filter(
     (item) => item.completedAt && monthKey(item.completedAt) === monthKey(Date.now()),
   ).length;
-  const monthlyTarget = effectiveUnions * (TARGET.birth + TARGET.death);
+  const monthlyTarget = Math.ceil(
+    effectiveUnions *
+      (TARGET.birth + TARGET.death) *
+      (filters.ward ? 1 / wardOptions.length : 1),
+  );
   const targetPercent = monthlyTarget
     ? Math.min(100, Math.round((completedThisMonth / monthlyTarget) * 100))
     : 0;
@@ -259,7 +269,7 @@ export function NationalDashboard() {
       </div>
 
       <section
-        className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:grid-cols-2 lg:grid-cols-5"
         aria-label={L("ভৌগোলিক ফিল্টার", "Geographic filters")}
       >
         <GeographySelect
@@ -272,7 +282,7 @@ export function NationalDashboard() {
               value,
           }))}
           allLabel={L("সব বিভাগ", "All divisions")}
-          onChange={(division) => updateFilters({ division, district: "", upazila: "", union: "" })}
+          onChange={(division) => updateFilters({ division, district: "", upazila: "", union: "", ward: "" })}
         />
         <GeographySelect
           label={L("জেলা", "District")}
@@ -284,7 +294,7 @@ export function NationalDashboard() {
               value,
           }))}
           allLabel={L("সব জেলা", "All districts")}
-          onChange={(district) => updateFilters({ ...filters, district, upazila: "", union: "" })}
+          onChange={(district) => updateFilters({ ...filters, district, upazila: "", union: "", ward: "" })}
         />
         <GeographySelect
           label={L("উপজেলা", "Upazila")}
@@ -294,7 +304,7 @@ export function NationalDashboard() {
             label: L(upazila.bn, upazila.en),
           }))}
           allLabel={L("সব উপজেলা", "All Upazilas")}
-          onChange={(upazila) => updateFilters({ ...filters, upazila, union: "" })}
+          onChange={(upazila) => updateFilters({ ...filters, upazila, union: "", ward: "" })}
         />
         <GeographySelect
           label={L("ইউনিয়ন / পৌরসভা", "Union / Municipality")}
@@ -305,7 +315,14 @@ export function NationalDashboard() {
           }))}
           allLabel={L("সব ইউনিয়ন / পৌরসভা", "All unions / municipalities")}
           disabled={!selectedUpazila}
-          onChange={(union) => updateFilters({ ...filters, union })}
+          onChange={(union) => updateFilters({ ...filters, union, ward: "" })}
+        />
+        <GeographySelect
+          label={L("ওয়ার্ড", "Ward")}
+          value={filters.ward}
+          options={wardOptions}
+          allLabel={L("সব ওয়ার্ড", "All wards")}
+          onChange={(ward) => updateFilters({ ...filters, ward })}
         />
       </section>
 
@@ -342,7 +359,7 @@ export function NationalDashboard() {
             monthlyTarget
               ? L(
                   `${n(completedThisMonth)} / ${n(monthlyTarget)} নিবন্ধিত`,
-                  `${completedThisMonth} / ${monthlyTarget} completed`,
+                  `${n(completedThisMonth)} / ${n(monthlyTarget)} completed`,
                 )
               : L("এলাকা নির্বাচন করুন", "Select an area")
           }
@@ -566,10 +583,10 @@ function GeographySelect({
   value: string;
 }) {
   return (
-    <label className="min-w-0 space-y-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
+    <label className="min-w-0 space-y-1 text-sm font-bold text-slate-700 dark:text-slate-200">
       {label}
       <select
-        className="h-10 w-full rounded-md border border-slate-300 bg-white px-2 text-sm font-medium text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-teal-700 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+        className="h-11 w-full rounded-md border border-slate-300 bg-white px-2 text-base font-semibold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-teal-700 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}

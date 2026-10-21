@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BookOpen, Headphones, Languages, LogIn, LogOut, Moon, Sun, Landmark, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,27 @@ export function Header() {
   const { user, L, lang, toggleLang, dark, toggleTheme, logout, online, demoLoginAvailable } = useApp();
   const [dlg, setDlg] = useState<null | "login" | "manual" | "support">(null);
   const nav = useNavigate();
+  const headerRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const updateHeight = () => {
+      document.documentElement.style.setProperty(
+        "--app-header-height",
+        `${header.getBoundingClientRect().height}px`,
+      );
+    };
+    updateHeight();
+
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--app-header-height");
+    };
+  }, []);
 
   const tabs = [
     [undefined, "মেইন ড্যাশবোর্ড", "Main Dashboard"],
@@ -28,7 +49,7 @@ export function Header() {
   ] as const;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-sm">
+    <header ref={headerRef} className="fixed inset-x-0 top-0 z-50 border-b border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-sm">
       <nav aria-label={L("ড্যাশবোর্ড নির্বাচন", "Dashboard switcher")} className="bg-emerald-900/90">
         <div className="mx-auto flex w-full max-w-none gap-1 overflow-x-auto px-4 py-1.5 sm:px-6 lg:px-8">
           {tabs.map(([role, bn, en]) => (

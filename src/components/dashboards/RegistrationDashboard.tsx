@@ -333,12 +333,25 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
   );
   const selectedUnion = unions.find((area) => area.id === union);
   const wards = useMemo(
-    () =>
-      getAdministrativeWards(
-        selectedCityCorporation && selectedUpazila
-          ? selectedUpazila.id
-          : selectedUnion?.id ?? "",
-      ),
+    () => {
+      if (selectedCityCorporation && selectedUpazila) {
+        return getAdministrativeWards(selectedUpazila.id);
+      }
+      if (selectedUnion) return getAdministrativeWards(selectedUnion.id);
+      return Array.from({ length: 9 }, (_, index) => ({
+        id: `ward-${index + 1}`,
+        level: "ward" as const,
+        bn: `ওয়ার্ড ${index + 1}`,
+        en: `Ward ${index + 1}`,
+        parentId: null,
+        divisionId: "",
+        districtId: null,
+        municipalityId: null,
+        upazilaId: null,
+        unionId: null,
+        wardNumber: index + 1,
+      }));
+    },
     [selectedCityCorporation, selectedUnion, selectedUpazila],
   );
   const roleScopedCases = useMemo(
@@ -398,7 +411,8 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
     };
   }, [demoMode, user]);
   const hasWardAggregate = !demoMode && (user?.role === "worker" || user?.role === "police");
-  const monthlyCounts = hasWardAggregate
+  const hasAreaFilter = division !== "all" || district !== "all" || upazila !== "all" || union !== "all" || ward !== "all";
+  const monthlyCounts = hasWardAggregate && !hasAreaFilter
     ? wardMonthlyCounts ?? { pending: 0, progress: 0, completed: 0, total: 0 }
     : localMonthlyCounts;
   const matchingRegisteredUpazilas = state.upazilas.filter((registered) =>
@@ -428,7 +442,7 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
               ? Math.ceil((TARGET.birth + TARGET.death) / 9)
               : Math.max(1, selectedUnionCount) * (TARGET.birth + TARGET.death),
   );
-  const monthlyReceived = hasWardAggregate
+  const monthlyReceived = hasWardAggregate && !hasAreaFilter
     ? wardMonthlyCounts?.total ?? 0
     : monthCases.length;
   const donutTotal = Math.max(monthlyTarget, monthlyReceived, 1);
@@ -623,7 +637,7 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
   };
 
   return (
-    <section className="flex min-h-[calc(100svh-6.6rem)] flex-col bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
+    <section className="flex min-h-[calc(100svh-var(--app-header-height,9rem))] flex-col bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
       <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-2 px-4 py-1.5 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-2 sm:px-6 sm:py-2 lg:px-8">
         <div
           className="grid shrink-0 grid-cols-2 gap-1.5 sm:grid-cols-3 sm:gap-2 xl:grid-cols-5"
@@ -640,15 +654,15 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
             }}
           >
             <SelectTrigger
-              className="h-8 min-w-0 border-emerald-200 bg-white/90 px-2 text-[10px] sm:text-xs"
+              className="h-10 min-w-0 border-emerald-200 bg-white/90 px-3 text-sm font-bold sm:h-11 sm:text-base"
               aria-label={L("বিভাগ নির্বাচন", "Select division")}
             >
               <SelectValue placeholder={L("বিভাগ", "Division")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{L("সব বিভাগ", "All divisions")}</SelectItem>
+              <SelectItem className="text-sm font-semibold sm:text-base" value="all">{L("সব বিভাগ", "All divisions")}</SelectItem>
               {divisions.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
+                <SelectItem className="text-sm sm:text-base" key={item.id} value={item.id}>
                   {L(item.bn, item.en)}
                 </SelectItem>
               ))}
@@ -664,15 +678,15 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
             }}
           >
             <SelectTrigger
-              className="h-8 min-w-0 border-emerald-200 bg-white/90 px-2 text-[10px] sm:text-xs"
+              className="h-10 min-w-0 border-emerald-200 bg-white/90 px-3 text-sm font-bold sm:h-11 sm:text-base"
               aria-label={L("জেলা নির্বাচন", "Select district")}
             >
               <SelectValue placeholder={L("জেলা", "District")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{L("সব জেলা", "All districts")}</SelectItem>
+              <SelectItem className="text-sm font-semibold sm:text-base" value="all">{L("সব জেলা", "All districts")}</SelectItem>
               {districts.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
+                <SelectItem className="text-sm sm:text-base" key={item.id} value={item.id}>
                   {L(item.bn, item.en)}
                 </SelectItem>
               ))}
@@ -687,15 +701,15 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
             }}
           >
             <SelectTrigger
-              className="h-8 min-w-0 border-emerald-200 bg-white/90 px-2 text-[10px] sm:text-xs"
+              className="h-10 min-w-0 border-emerald-200 bg-white/90 px-3 text-sm font-bold sm:h-11 sm:text-base"
               aria-label={L("উপজেলা / সিটি কর্পোরেশন নির্বাচন", "Select upazila / city corporation")}
             >
               <SelectValue placeholder={L("উপজেলা / সিটি কর্পোরেশন", "Upazila / City Corporation")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{L("সব উপজেলা / সিটি কর্পোরেশন", "All upazilas / city corporations")}</SelectItem>
+              <SelectItem className="text-sm font-semibold sm:text-base" value="all">{L("সব উপজেলা / সিটি কর্পোরেশন", "All upazilas / city corporations")}</SelectItem>
               {matchingUpazilas.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
+                <SelectItem className="text-sm sm:text-base" key={item.id} value={item.id}>
                   {L(item.bn, item.en)}
                 </SelectItem>
               ))}
@@ -710,19 +724,19 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
             disabled={!selectedUpazila || selectedCityCorporation}
           >
             <SelectTrigger
-              className="h-8 min-w-0 border-emerald-200 bg-white/90 px-2 text-[10px] sm:text-xs"
+              className="h-10 min-w-0 border-emerald-200 bg-white/90 px-3 text-sm font-bold sm:h-11 sm:text-base"
               aria-label={L("ইউনিয়ন / পৌরসভা নির্বাচন", "Select union / municipality")}
             >
               <SelectValue placeholder={L("ইউনিয়ন / পৌরসভা", "Union / Municipality")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">
+              <SelectItem className="text-sm font-semibold sm:text-base" value="all">
                 {selectedCityCorporation
                   ? L("সিটি কর্পোরেশনে প্রযোজ্য নয়", "Not applicable to city corporations")
                   : L("সব ইউনিয়ন / পৌরসভা", "All unions / municipalities")}
               </SelectItem>
               {unions.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
+                <SelectItem className="text-sm sm:text-base" key={item.id} value={item.id}>
                   {L(item.bn, item.en)}
                 </SelectItem>
               ))}
@@ -730,15 +744,15 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
           </Select>
           <Select value={ward} onValueChange={setWard} disabled={wards.length === 0}>
             <SelectTrigger
-              className="h-8 min-w-0 border-emerald-200 bg-white/90 px-2 text-[10px] sm:text-xs"
+              className="h-10 min-w-0 border-emerald-200 bg-white/90 px-3 text-sm font-bold sm:h-11 sm:text-base"
               aria-label={L("ওয়ার্ড নির্বাচন", "Select ward")}
             >
               <SelectValue placeholder={L("ওয়ার্ড", "Ward")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{L("সব ওয়ার্ড", "All wards")}</SelectItem>
+              <SelectItem className="text-sm font-semibold sm:text-base" value="all">{L("সব ওয়ার্ড", "All wards")}</SelectItem>
               {wards.map((item) => (
-                <SelectItem key={item.id} value={item.id}>
+                <SelectItem className="text-sm sm:text-base" key={item.id} value={item.id}>
                   {L(item.bn, item.en)}
                 </SelectItem>
               ))}
@@ -746,21 +760,21 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
           </Select>
         </div>
         <section
-          className="flex shrink-0 flex-wrap items-center gap-1.5 text-[9px] sm:gap-2 sm:text-[10px]"
+          className="flex shrink-0 flex-wrap items-center gap-2 text-sm sm:gap-3 sm:text-base"
           aria-label={L("নিবন্ধন জরুরিতা", "Registration urgency")}
         >
-          <span className="mr-1 font-semibold text-slate-600">{L("জরুরিতা", "Urgency")} ·</span>
-          <span className="rounded-full bg-emerald-100 px-2 py-1 font-medium text-emerald-800">
+          <span className="mr-1 font-bold text-slate-700">{L("জরুরিতা", "Urgency")} ·</span>
+          <span className="rounded-full bg-emerald-100 px-3 py-1.5 font-bold text-emerald-800">
             {L("০–৯০ দিন: সবুজ", "0–90 days: green")} · {n(urgency.green)}
           </span>
-          <span className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-800">
+          <span className="rounded-full bg-amber-100 px-3 py-1.5 font-bold text-amber-800">
             {L("৯১–১৮০ দিন: হলুদ", "91–180 days: yellow")} · {n(urgency.yellow)}
           </span>
-          <span className="rounded-full bg-red-100 px-2 py-1 font-medium text-red-800">
+          <span className="rounded-full bg-red-100 px-3 py-1.5 font-bold text-red-800">
             {L("১৮১–৩৬৫ দিন: লাল এলার্ট", "181–365 days: red alert")} · {n(urgency.red)}
           </span>
           {urgency.expired > 0 && (
-            <span className="rounded-full bg-slate-200 px-2 py-1 font-medium text-slate-700">
+            <span className="rounded-full bg-slate-200 px-3 py-1.5 font-bold text-slate-700">
               {L("সময়সীমা পেরিয়েছে", "Past deadline")} · {n(urgency.expired)}
             </span>
           )}

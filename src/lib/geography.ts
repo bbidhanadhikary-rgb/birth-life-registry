@@ -277,12 +277,25 @@ export function filterCasesByAdministrativeArea<
       area.id === filters.union && (area.level === "union" || area.level === "municipality"),
   );
   const selectedWardOptions = getAdministrativeWards(selectedUnion?.id ?? "");
-  const selectedWard =
-    filters.ward && filters.ward !== "all"
-      ? selectedWardOptions.find((area) => area.id === filters.ward)
-      : undefined;
-  if (filters.ward !== undefined && filters.ward !== "all" && !selectedWard) return [];
-  if (!selectedUnion) return cases.filter((item) => upazilaIds.has(item.upazilaId));
+  const selectedWardNumber = (() => {
+    if (!filters.ward || filters.ward === "all") return undefined;
+    const selectedWard = selectedWardOptions.find((area) => area.id === filters.ward);
+    if (selectedWard) return selectedWard.wardNumber ?? undefined;
+    if (!selectedUnion) {
+      const genericWard = /^ward-(\d+)$/.exec(filters.ward);
+      const wardNumber = genericWard ? Number(genericWard[1]) : Number.NaN;
+      if (Number.isInteger(wardNumber) && wardNumber >= 1 && wardNumber <= 9) return wardNumber;
+    }
+    return null;
+  })();
+  if (selectedWardNumber === null) return [];
+  if (!selectedUnion) {
+    return cases.filter(
+      (item) =>
+        upazilaIds.has(item.upazilaId) &&
+        (selectedWardNumber === undefined || item.ward === selectedWardNumber),
+    );
+  }
   const sameNameUnions = BANGLADESH_ADMINISTRATIVE_AREAS.filter(
     (area) =>
       area.level === selectedUnion.level &&
@@ -314,7 +327,7 @@ export function filterCasesByAdministrativeArea<
     (item) =>
       upazilaIds.has(item.upazilaId) &&
       unionIds.has(item.unionId) &&
-      (!selectedWard || item.ward === selectedWard.wardNumber),
+      (selectedWardNumber === undefined || item.ward === selectedWardNumber),
   );
 }
 
