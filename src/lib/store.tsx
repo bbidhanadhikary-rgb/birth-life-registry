@@ -10,6 +10,13 @@ type Lang = "bn" | "en";
 export type Mfa = "ok" | "enroll" | "challenge";
 type EpiVisit = Database["public"]["Tables"]["epi_visits"]["Row"];
 type NewEpiVisit = Pick<EpiVisit, "child_name_bn" | "child_name_en" | "parent_mobile" | "village_id">;
+type UpazilaAnnouncement = {
+  upazilaId: string;
+  noticeBn: string;
+  noticeEn: string;
+  active: boolean;
+  updatedAt: number;
+};
 const localDemoLoginAvailable =
   import.meta.env.DEV &&
   (!import.meta.env["VITE_SUPABASE_URL"] || !import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"]);
@@ -29,6 +36,10 @@ type CaseCorrection = Pick<RegCase, "type" | "name" | "father" | "mother" | "nid
 
 interface Ctx {
   state: AppState; user: User | null; authReady: boolean; mfa: Mfa; online: boolean; demoMode: boolean; demoLoginAvailable: boolean;
+  announcements: UpazilaAnnouncement[];
+  selectedUpazilaId: string | undefined;
+  setSelectedUpazilaId: (id: string | undefined) => void;
+  saveAnnouncement: (upazilaId: string, noticeBn: string, noticeEn: string, active: boolean) => Promise<boolean>;
   epiVisits: EpiVisit[]; enterDemoLogin: (role: "worker" | "police" | "admin" | "uno") => void; addEpiVisit: (visit: NewEpiVisit) => Promise<string | null>;
   lang: Lang; toggleLang: () => void; L: (bn: string, en: string) => string; n: (v: number | string) => string;
   dark: boolean; toggleTheme: () => void;
@@ -88,6 +99,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [mfa, setMfa] = useState<Mfa>("ok");
   const [demoMode, setDemoMode] = useState(false);
   const [epiVisits, setEpiVisits] = useState<EpiVisit[]>([]);
+  const [announcements, setAnnouncements] = useState<UpazilaAnnouncement[]>([]);
+  const [selectedUpazilaId, setSelectedUpazilaId] = useState<string>();
   const [online, setOnline] = useState(true);
   const [lang, setLang] = useState<Lang>("bn");
   const [dark, setDark] = useState(false);
@@ -141,13 +154,22 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const loadData = useCallback(async () => {
     if (demoMode) return;
-    const [ups, profs, roles, cases, remarks] = await Promise.all([
+    const [ups, profs, roles, cases, remarks, noticeRows] = await Promise.all([
       supabase.from("upazilas").select("*").order("created_at"),
       supabase.from("profiles").select("*"),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("cases").select("*").order("created_at", { ascending: false }).limit(2000),
       supabase.from("case_remarks").select("*").order("created_at"),
+      supabase.from("upazila_announcements").select("*"),
     ]);
+    if (noticeRows.error) toast.error(noticeRows.error.message);
+    setAnnouncements((noticeRows.data ?? []).map((notice) => ({
+      upazilaId: notice.upazila_id,
+      noticeBn: notice.notice_bn,
+      noticeEn: notice.notice_en,
+      active: notice.active,
+      updatedAt: Date.parse(notice.updated_at),
+    })));
     const upazilas: Upazila[] = (ups.data ?? []).map((u) => ({ id: u.id, bn: u.bn, en: u.en, districtBn: u.district_bn, districtEn: u.district_en,
       divisionBn: u.division_bn, divisionEn: u.division_en, unions: u.unions as unknown as Union[] }));
     const users: User[] = (profs.data ?? []).map((p) => ({ id: p.id, name: { bn: p.name_bn, en: p.name_en },
@@ -166,7 +188,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return;
     }
     const { data: { user: au } } = await supabase.auth.getUser();
-    if (!au) { setUser(null); setState(empty); setMfa("ok"); setAuthReady(true); return; }
+    if (!au) { setUser(null); setState(empty); setAnnouncements([]); setMfa("ok"); setAuthReady(true); return; }
     const [{ data: p }, { data: r }] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", au.id).maybeSingle(),
       supabase.from("user_roles").select("role").eq("user_id", au.id),
@@ -254,6 +276,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value: Ctx = {
     state: { ...state, cases: [...pending.filter((p) => p.created_by === user?.id).map((p) => ({ ...mapCase({ ...p, created_at: p.queued_at, files: [], files_purged: false, status: "pending", sms_sent: false }, []), synced: false })), ...state.cases] },
     user, authReady, mfa, online, lang, L, n, dark, demoMode, demoLoginAvailable: localDemoLoginAvailable, epiVisits,
+    announcements, selectedUpazilaId, setSelectedUpazilaId,
+    saveAnnouncement: async (upazilaId, noticeBn, noticeEn, active) => {
+      if (!user || user.role !== "uno" || user.upazilaId !== upazilaId) {
+        toast.error(L("শুধু নিজ উপজেলার ইউএনও বিজ্ঞপ্তি প্রকাশ করতে পারবেন", "Only the assigned Upazila UNO can publish this notice"));
+        return false;
+      }
+      if (noticeBn.length > 500 || noticeEn.length > 500 || (active && !noticeBn.trim() && !noticeEn.trim())) {
+        toast.error(L("বিজ্ঞপ্তি ৫০০ অক্ষরের মধ্যে এবং সক্রিয় থাকলে খালি হতে পারবে না", "Notices must be 500 characters or fewer and cannot be empty when active"));
+        return false;
+      }
+      if (demoMode) {
+        setAnnouncements((current) => [
+          ...current.filter((notice) => notice.upazilaId !== upazilaId),
+          { upazilaId, noticeBn: noticeBn.trim(), noticeEn: noticeEn.trim(), active, updatedAt: Date.now() },
+        ]);
+        return true;
+      }
+      const { error } = await supabase.from("upazila_announcements").upsert({
+        upazila_id: upazilaId,
+        notice_bn: noticeBn.trim(),
+        notice_en: noticeEn.trim(),
+        active,
+        updated_by: user.id,
+      }, { onConflict: "upazila_id" });
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
+      await loadData();
+      return true;
+    },
     enterDemoLogin,
     toggleLang: () => setLang((l) => (l === "bn" ? "en" : "bn")),
     toggleTheme: () => setDark((d) => !d),
@@ -263,16 +316,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setDemoMode(false);
         setUser(null);
         setState(empty);
+        setAnnouncements([]);
         setEpiVisits([]);
         setAuthReady(true);
         return;
       }
-      await supabase.auth.signOut(); setUser(null); setState(empty);
+      await supabase.auth.signOut(); setUser(null); setState(empty); setAnnouncements([]);
     },
     addCase: async (c) => {
       if (!user || user.role !== "worker") return L("শুধু স্বাস্থ্যকর্মী তথ্য দিতে পারবেন", "Only health workers can enter data");
       if (c.files.some((file) => !file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES)) {
-        return L("প্রতিটি ছবি ১৫০ KB-এর মধ্যে হতে হবে", "Each image must be 150 KB or smaller");
+        return L("প্রতিটি ছবি ৭৫০ KB-এর মধ্যে হতে হবে", "Each image must be 750 KB or smaller");
       }
       const id = crypto.randomUUID();
       if (demoMode) {
@@ -321,7 +375,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       const files = [];
       for (const f of c.files.slice(0, 3)) {
-        const safe = f.name.replace(/[^\w.\-]+/g, "_").slice(-80);
+        const safe = f.name.replace(/[^\w.-]+/g, "_").slice(-80);
         const path = `${user.upazilaId}/${user.unionId}/${id}/${Date.now()}-${safe}`;
         const { error } = await supabase.storage.from("case-files").upload(path, f, { contentType: f.type });
         if (error) return L("ফাইল আপলোড ব্যর্থ", "File upload failed") + `: ${error.message}`;
@@ -338,7 +392,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return false;
       }
       if (correction.files?.some((file) => !file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES)) {
-        toast.error(L("প্রতিটি ছবি ১৫০ KB-এর মধ্যে হতে হবে", "Each image must be 150 KB or smaller"));
+        toast.error(L("প্রতিটি ছবি ৭৫০ KB-এর মধ্যে হতে হবে", "Each image must be 750 KB or smaller"));
         return false;
       }
       const existing = state.cases.find((item) => item.id === id);
@@ -380,7 +434,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       const uploads: { name: string; size: number; path: string }[] = [];
       for (const file of (correction.files ?? []).slice(0, 3)) {
-        const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-80);
+        const safe = file.name.replace(/[^\w.-]+/g, "_").slice(-80);
         const path = `${user.upazilaId}/${user.unionId}/${id}/${Date.now()}-${crypto.randomUUID()}-${safe}`;
         const { error } = await supabase.storage.from("case-files").upload(path, file, { contentType: file.type });
         if (error) {

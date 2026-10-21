@@ -2,6 +2,8 @@ import type { RegCase } from "./types";
 
 export const STATUTORY_DEADLINE_DAYS = 365;
 export const NEAR_DEADLINE_DAYS = 30;
+export const SAFE_DEADLINE_DAYS = 90;
+export const WARNING_DEADLINE_DAYS = 180;
 const DAY_MS = 86400000;
 const LEGAL_TIME_ZONE = "Asia/Dhaka";
 const dateParts = new Intl.DateTimeFormat("en", {
@@ -19,6 +21,13 @@ export interface CaseDeadline {
   elapsedDays: number;
   daysRemaining: number;
   status: DeadlineStatus;
+}
+
+export function getDeadlineBand(elapsedDays: number): "safe" | "warning" | "near-deadline" | "overdue" {
+  if (elapsedDays <= SAFE_DEADLINE_DAYS) return "safe";
+  if (elapsedDays <= WARNING_DEADLINE_DAYS) return "warning";
+  if (elapsedDays <= STATUTORY_DEADLINE_DAYS) return "near-deadline";
+  return "overdue";
 }
 
 function parseDateOnly(value: string | undefined): number | null {

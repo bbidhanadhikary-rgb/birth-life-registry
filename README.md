@@ -28,7 +28,7 @@ Strict Business Logic & Technical Protections:
 6. Red Flags: If a Health Worker or Ward registers zero entries for 15 consecutive days, flag that section in Red on the UNO and Admin dashboards.
 Bilingual Ultra-Simple Input Forms (Side-by-Side Bangla/English):
 Fields must be displayed side-by-side (Bangla Box | English Box) to minimize effort for EPI/Health workers.
-1. Birth Registration Form: Child's Name, Father's Name, Mother's Name, Parent's NID, active mobile, Gender, DOB, Order of Child, 3 image attachments compressed to 150 KB or less each, and Smart Auto-Address (Worker enters "Village Name" only; Post Office, Ward, Union, Upazila, District, Division, and Country auto-populate instantly in both languages).
+1. Birth Registration Form: Child's Name, Father's Name, Mother's Name, Parent's NID, active mobile, Gender, DOB, Order of Child, 3 image attachments compressed to 750 KB or less each, and Smart Auto-Address (Worker enters "Village Name" only; Post Office, Ward, Union, Upazila, District, Division, and Country auto-populate instantly in both languages).
 2. Death Registration Form: Mirrors Birth Form layout but replaces Child's Name with "Deceased Person's Name", requires Deceased's NID, and adds "Date of Death" and "Cause of Death". Includes active mobile and 3 compressed image attachments.
 4 Dedicated User Dashboards & Scope-Limited Reports:
 1. EPI / Health Worker Dashboard: Single-screen responsive dashboard with modal entry/edit forms, own-case corrections before completion, local entry lists with officer alerts, EPI session attendance follow-up automatically matched to subsequent birth entries, 365-day urgency indicators, compressed photo uploads, simulated parent-SMS status, and CSV/PDF exports.
@@ -45,6 +45,14 @@ This project was built with [Lovable](https://lovable.dev).
 In local Vite development only, when Supabase URL/publishable-key settings are absent, the login dialog offers a **Direct Test Login · Health Worker** preview. It uses seeded in-memory data and does not create an authenticated Supabase session or persist changes. This preview is disabled in production builds; real sign-in continues to use the server-validated OTP/password flows.
 
 The public landing page's bilingual geographic filters provide five levels: division → district → upazila/city corporation → union/municipality → ward. The bundled upazila and local-area catalog is pinned to [iqbalhasandev/bangladesh-geo-json@28ba44c](https://github.com/iqbalhasandev/bangladesh-geo-json/tree/28ba44c344b72cfe4849f2dde75b98393c8316ae), whose union-level source is [SudipMHX/bd-apis](https://github.com/SudipMHX/bd-apis). It contains 8 divisions, 64 districts, 495 upazilas, 4,540 unions, and 328 pourashavas. Twelve city corporations and their ward-number ranges are overlaid in `src/lib/geography.ts`; the source catalog does not provide official city-corporation ward boundaries. Union/municipality ward numbers 1–9 follow the existing registration schema. Upstream MIT and ISC notices are in `src/lib/data/`.
+
+## Core application modules
+
+- `/dashboard` — role-based registration dashboard and module navigation.
+- `/birth-entry` and `/death-entry` — the existing registration forms, available to health workers.
+- `/review-list` — birth/death review tabs, searchable records, CSV export, printing, and administrative completion.
+- `/correction-log` — super-admin-only field-level audit history; database row-level security and MFA remain authoritative.
+- `/monitoring` — executive compliance monitoring and UNO notice publishing.
 
 ## Build with Lovable
 

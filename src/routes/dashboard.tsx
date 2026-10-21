@@ -5,6 +5,7 @@ import { RegistrationDashboard } from "@/components/dashboards/RegistrationDashb
 import { SuperDashboard } from "@/components/dashboards/Super";
 import { LoginDialog } from "@/components/Header";
 import { MfaGate } from "@/components/MfaGate";
+import { ModuleNavigation } from "@/components/modules/ModuleNavigation";
 import { useApp } from "@/lib/store";
 
 export const Route = createFileRoute("/dashboard")({
@@ -45,8 +46,8 @@ function Dashboard() {
   }
 
   if (user.role === "super") {
-    return <div className="mx-auto max-w-7xl px-3 py-6 sm:px-6"><SuperDashboard /></div>;
+    return <div className="mx-auto max-w-7xl px-3 py-6 sm:px-6"><ModuleNavigation /><SuperDashboard /></div>;
   }
 
-  return <RegistrationDashboard role={user.role} />;
+  return <><div className="mx-auto max-w-7xl px-3 pt-3 sm:px-6"><ModuleNavigation /></div><RegistrationDashboard role={user.role} /></>;
 }

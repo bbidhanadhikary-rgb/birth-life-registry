@@ -9,7 +9,15 @@ import type { RegCase, Status } from "@/lib/types";
 import { StatusBadge, useCaseHelpers } from "../shared";
 
 /** Case card for Admin (full control) and UNO (remarks only). Original worker inputs are never editable. */
-export function CaseReview({ c, mode }: { c: RegCase; mode: "admin" | "uno" }) {
+export function CaseReview({
+  c,
+  mode,
+  dedicatedCompletion = false,
+}: {
+  c: RegCase;
+  mode: "admin" | "uno";
+  dedicatedCompletion?: boolean;
+}) {
   const { L, n, patchCase, addRemark, state } = useApp();
   const { address, date } = useCaseHelpers();
   const [remark, setRemark] = useState(""); const [regNo, setRegNo] = useState(c.regNo ?? "");
@@ -66,11 +74,20 @@ export function CaseReview({ c, mode }: { c: RegCase; mode: "admin" | "uno" }) {
             <SelectContent>
               <SelectItem value="pending">{L("অপেক্ষমাণ", "Pending")}</SelectItem>
               <SelectItem value="progress">{L("চলমান", "In Progress")}</SelectItem>
-              <SelectItem value="completed">{L("সম্পন্ন", "Completed")}</SelectItem>
-              <SelectItem value="rejected">{L("বাতিল", "Rejected")}</SelectItem>
+              {(!dedicatedCompletion || c.status === "completed") && <SelectItem value="completed">{L("সম্পন্ন", "Completed")}</SelectItem>}
+              {(!dedicatedCompletion || c.status === "rejected") && <SelectItem value="rejected">{L("বাতিল", "Rejected")}</SelectItem>}
             </SelectContent>
           </Select>
-          <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("সরকারি নিবন্ধন নং (১৭ অঙ্ক)", "Govt. Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} />
+          {dedicatedCompletion && c.status !== "completed" && c.status !== "rejected" ? (
+            <>
+              <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("সরকারি নিবন্ধন নং (১৭ অঙ্ক)", "Govt. Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} />
+              <Button className="bg-emerald-800 text-white hover:bg-emerald-900" onClick={() => setStatus("completed")}>
+                {L("বিডিআরআইএস-এ সম্পন্ন হিসেবে চিহ্নিত করুন", "Mark as Completed (BDRIS Status Done)")}
+              </Button>
+            </>
+          ) : (
+            <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("সরকারি নিবন্ধন নং (১৭ অঙ্ক)", "Govt. Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} />
+          )}
           {!c.police && c.status !== "completed" && c.status !== "rejected" && (
             <Button variant="outline" onClick={async () => { if (!(await patchCase(c.id, { police: { epiCard: false, parentNid: false, collected: false }, status: "progress" }))) return; toast.success(L("গ্রাম পুলিশকে কাজ দেওয়া হয়েছে", "Task sent to Village Police")); }}>
               <ShieldCheck className="mr-1 h-4 w-4" />{L("গ্রাম পুলিশকে যাচাই দিন", "Send to Village Police")}

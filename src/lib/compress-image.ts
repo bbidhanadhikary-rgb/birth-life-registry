@@ -1,4 +1,4 @@
-export const MAX_IMAGE_BYTES = 150 * 1024;
+export const MAX_IMAGE_BYTES = 750 * 1024;
 
 function canvasBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -46,5 +46,5 @@ export async function compressImage(file: File): Promise<File> {
     bitmap.close();
   }
 
-  throw new Error("Image could not be compressed below 150 KB");
+  throw new Error("Image could not be compressed below 750 KB");
 }

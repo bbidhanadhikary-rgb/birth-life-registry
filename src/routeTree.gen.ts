@@ -10,8 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as BirthEntryRouteImport } from './routes/birth-entry'
+import { Route as CorrectionLogRouteImport } from './routes/correction-log'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DeathEntryRouteImport } from './routes/death-entry'
+import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ReviewListRouteImport } from './routes/review-list'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as DashboardSectionRouteImport } from './routes/dashboard.$section'
@@ -21,14 +26,39 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BirthEntryRoute = BirthEntryRouteImport.update({
+  id: '/birth-entry',
+  path: '/birth-entry',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CorrectionLogRoute = CorrectionLogRouteImport.update({
+  id: '/correction-log',
+  path: '/correction-log',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DeathEntryRoute = DeathEntryRouteImport.update({
+  id: '/death-entry',
+  path: '/death-entry',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MonitoringRoute = MonitoringRouteImport.update({
+  id: '/monitoring',
+  path: '/monitoring',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReviewListRoute = ReviewListRouteImport.update({
+  id: '/review-list',
+  path: '/review-list',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SecurityRoute = SecurityRouteImport.update({
@@ -49,16 +79,26 @@ const DashboardSectionRoute = DashboardSectionRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/birth-entry': typeof BirthEntryRoute
+  '/correction-log': typeof CorrectionLogRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/death-entry': typeof DeathEntryRoute
+  '/monitoring': typeof MonitoringRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/review-list': typeof ReviewListRoute
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
   '/dashboard/$section': typeof DashboardSectionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/birth-entry': typeof BirthEntryRoute
+  '/correction-log': typeof CorrectionLogRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/death-entry': typeof DeathEntryRoute
+  '/monitoring': typeof MonitoringRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/review-list': typeof ReviewListRoute
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
   '/dashboard/$section': typeof DashboardSectionRoute
@@ -66,8 +106,13 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/birth-entry': typeof BirthEntryRoute
+  '/correction-log': typeof CorrectionLogRoute
   '/dashboard': typeof DashboardRouteWithChildren
+  '/death-entry': typeof DeathEntryRoute
+  '/monitoring': typeof MonitoringRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/review-list': typeof ReviewListRoute
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
   '/dashboard/$section': typeof DashboardSectionRoute
@@ -76,24 +121,39 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/birth-entry'
+    | '/correction-log'
     | '/dashboard'
+    | '/death-entry'
+    | '/monitoring'
     | '/reset-password'
+    | '/review-list'
     | '/security'
     | '/setup'
     | '/dashboard/$section'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/birth-entry'
+    | '/correction-log'
     | '/dashboard'
+    | '/death-entry'
+    | '/monitoring'
     | '/reset-password'
+    | '/review-list'
     | '/security'
     | '/setup'
     | '/dashboard/$section'
   id:
     | '__root__'
     | '/'
+    | '/birth-entry'
+    | '/correction-log'
     | '/dashboard'
+    | '/death-entry'
+    | '/monitoring'
     | '/reset-password'
+    | '/review-list'
     | '/security'
     | '/setup'
     | '/dashboard/$section'
@@ -101,8 +161,13 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  BirthEntryRoute: typeof BirthEntryRoute
+  CorrectionLogRoute: typeof CorrectionLogRoute
   DashboardRoute: typeof DashboardRouteWithChildren
+  DeathEntryRoute: typeof DeathEntryRoute
+  MonitoringRoute: typeof MonitoringRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ReviewListRoute: typeof ReviewListRoute
   SecurityRoute: typeof SecurityRoute
   SetupRoute: typeof SetupRoute
 }
@@ -116,6 +181,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/birth-entry': {
+      id: '/birth-entry'
+      path: '/birth-entry'
+      fullPath: '/birth-entry'
+      preLoaderRoute: typeof BirthEntryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/correction-log': {
+      id: '/correction-log'
+      path: '/correction-log'
+      fullPath: '/correction-log'
+      preLoaderRoute: typeof CorrectionLogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -123,11 +202,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/death-entry': {
+      id: '/death-entry'
+      path: '/death-entry'
+      fullPath: '/death-entry'
+      preLoaderRoute: typeof DeathEntryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/monitoring': {
+      id: '/monitoring'
+      path: '/monitoring'
+      fullPath: '/monitoring'
+      preLoaderRoute: typeof MonitoringRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/review-list': {
+      id: '/review-list'
+      path: '/review-list'
+      fullPath: '/review-list'
+      preLoaderRoute: typeof ReviewListRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/security': {
@@ -168,8 +268,13 @@ const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  BirthEntryRoute: BirthEntryRoute,
+  CorrectionLogRoute: CorrectionLogRoute,
   DashboardRoute: DashboardRouteWithChildren,
+  DeathEntryRoute: DeathEntryRoute,
+  MonitoringRoute: MonitoringRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ReviewListRoute: ReviewListRoute,
   SecurityRoute: SecurityRoute,
   SetupRoute: SetupRoute,
 }

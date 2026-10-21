@@ -40,7 +40,7 @@ import { Footer } from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { compressImage } from "@/lib/compress-image";
-import { getCaseDeadline } from "@/lib/compliance";
+import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { downloadCSV, printPDF } from "@/lib/report";
 import { roleLabel, scopedCases, useApp } from "@/lib/store";
 import type { Bi, RegCase } from "@/lib/types";
@@ -273,7 +273,7 @@ export function RegForm({
   const attachmentFields = (
     <fieldset className={type === "birth" ? "space-y-1" : "space-y-2"}>
       <legend className="text-sm font-semibold text-slate-700">
-        {L("ছবি সংযুক্তি · প্রতিটি সর্বোচ্চ ১৫০ KB", "Photo attachments · maximum 150 KB each")}
+        {L("ছবি সংযুক্তি · প্রতিটি সর্বোচ্চ ৭৫০ KB", "Photo attachments · maximum 750 KB each")}
       </legend>
       <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
         {attachments.map((file, index) => (
@@ -824,9 +824,10 @@ export function WorkerDashboard() {
       if (entry.status === "completed" || entry.status === "rejected") continue;
       const deadline = getCaseDeadline(entry);
       if (!deadline) continue;
-      if (deadline.elapsedDays <= 30) counts.green++;
-      else if (deadline.elapsedDays <= 180) counts.yellow++;
-      else if (deadline.elapsedDays <= 365) counts.red++;
+      const band = getDeadlineBand(deadline.elapsedDays);
+      if (band === "safe") counts.green++;
+      else if (band === "warning") counts.yellow++;
+      else if (band === "near-deadline") counts.red++;
       else counts.expired++;
     }
     return counts;
@@ -912,13 +913,13 @@ export function WorkerDashboard() {
             <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
               {[
                 {
-                  label: L("০–৩০ দিন · নিরাপদ", "0–30 days · safe"),
+                  label: L("০–৯০ দিন · নিরাপদ", "0–90 days · safe"),
                   count: urgency.green,
                   tone: "border-emerald-200 bg-emerald-50 text-emerald-900",
                   dot: "bg-emerald-500",
                 },
                 {
-                  label: L("৩১–১৮০ দিন · চলমান", "31–180 days · running"),
+                  label: L("৯১–১৮০ দিন · সতর্কতা", "91–180 days · warning"),
                   count: urgency.yellow,
                   tone: "border-amber-200 bg-amber-50 text-amber-950",
                   dot: "bg-amber-400",

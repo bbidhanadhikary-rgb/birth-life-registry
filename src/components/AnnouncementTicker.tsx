@@ -2,11 +2,23 @@ import { Megaphone } from "lucide-react";
 import { useApp } from "@/lib/store";
 
 export function AnnouncementTicker() {
-  const { L } = useApp();
-  const text = L(
-    "জন্ম ও মৃত্যু নিবন্ধনে ৩৬৫ দিনের আইনি সময়সীমা মেনে চলুন · জাতীয় নিবন্ধন অগ্রগতি পর্যবেক্ষণ করুন",
-    "Observe the 365-day birth and death registration mandate · Monitor nationwide registration progress",
-  );
+  const { L, announcements, state, user } = useApp();
+  const notice = announcements.find(
+    (item) =>
+      item.active &&
+      (item.noticeBn.trim() || item.noticeEn.trim()) &&
+      item.upazilaId === user?.upazilaId,
+  ) ?? announcements.find((item) => item.active && (item.noticeBn.trim() || item.noticeEn.trim()));
+  const localizedNotice = notice ? L(notice.noticeBn, notice.noticeEn) : "";
+  const text = localizedNotice.trim()
+    ? localizedNotice
+    : notice
+      ? notice.noticeBn || notice.noticeEn
+      : L(
+        "জন্ম ও মৃত্যু নিবন্ধনে ৩৬৫ দিনের আইনি সময়সীমা মেনে চলুন · জাতীয় নিবন্ধন অগ্রগতি পর্যবেক্ষণ করুন",
+        "Observe the 365-day birth and death registration mandate · Monitor nationwide registration progress",
+      );
+  const noticeArea = notice && state.upazilas.find((area) => area.id === notice.upazilaId);
 
   return (
     <div
@@ -19,7 +31,9 @@ export function AnnouncementTicker() {
           <Megaphone className="h-4 w-4" aria-hidden="true" />
           <span>{L("সরকারি বিজ্ঞপ্তি", "Official notice")}</span>
         </span>
-        <span className="shrink-0 text-xs text-emerald-50">{L("সারা বাংলাদেশ", "Nationwide")}</span>
+        <span className="shrink-0 text-xs text-emerald-50">
+          {noticeArea ? L(noticeArea.bn, noticeArea.en) : L("সারা বাংলাদেশ", "Nationwide")}
+        </span>
         <div className="announcement-viewport min-w-0 flex-1 overflow-hidden" aria-live="polite">
           <div className="announcement-track whitespace-nowrap text-sm font-medium">
             <span>{text}</span>

@@ -29,7 +29,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Footer } from "@/components/Footer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getCaseDeadline } from "@/lib/compliance";
+import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { BANGLADESH_ADMINISTRATIVE_AREAS, filterCasesByAdministrativeArea, getAdministrativeWards, sameAdministrativeName } from "@/lib/geography";
 import { TARGET, type RegCase, type Role } from "@/lib/types";
 import { scopedCases, useApp } from "@/lib/store";
@@ -390,7 +390,7 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
         completed: Number(row.completed_count),
         total: Number(row.total_count),
       });
-    }).catch(() => {
+    }, () => {
       if (active) setWardMonthlyCounts(null);
     });
     return () => {
@@ -446,14 +446,12 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
       const deadline = getCaseDeadline(item);
       if (!deadline) {
         counts.review += 1;
-      } else if (deadline.elapsedDays <= 30) {
-        counts.green += 1;
-      } else if (deadline.elapsedDays <= 180) {
-        counts.yellow += 1;
-      } else if (deadline.elapsedDays <= 365) {
-        counts.red += 1;
       } else {
-        counts.expired += 1;
+        const band = getDeadlineBand(deadline.elapsedDays);
+        if (band === "safe") counts.green += 1;
+        else if (band === "warning") counts.yellow += 1;
+        else if (band === "near-deadline") counts.red += 1;
+        else counts.expired += 1;
       }
     }
     return counts;
@@ -589,8 +587,8 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
   );
   const renderUrgencySummary = () => {
     const buckets = [
-      { label: L("০–৩০ দিন", "0–30 days"), value: urgency.green, color: "bg-emerald-500" },
-      { label: L("৩১–১৮০ দিন", "31–180 days"), value: urgency.yellow, color: "bg-amber-400" },
+      { label: L("০–৯০ দিন", "0–90 days"), value: urgency.green, color: "bg-emerald-500" },
+      { label: L("৯১–১৮০ দিন", "91–180 days"), value: urgency.yellow, color: "bg-amber-400" },
       { label: L("১৮১–৩৬৫ দিন", "181–365 days"), value: urgency.red, color: "bg-red-500" },
       {
         label: L("সময়সীমা পেরিয়েছে", "Past deadline"),
@@ -753,10 +751,10 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
         >
           <span className="mr-1 font-semibold text-slate-600">{L("জরুরিতা", "Urgency")} ·</span>
           <span className="rounded-full bg-emerald-100 px-2 py-1 font-medium text-emerald-800">
-            {L("০–৩০ দিন: সবুজ", "0–30 days: green")} · {n(urgency.green)}
+            {L("০–৯০ দিন: সবুজ", "0–90 days: green")} · {n(urgency.green)}
           </span>
           <span className="rounded-full bg-amber-100 px-2 py-1 font-medium text-amber-800">
-            {L("৩১–১৮০ দিন: হলুদ", "31–180 days: yellow")} · {n(urgency.yellow)}
+            {L("৯১–১৮০ দিন: হলুদ", "91–180 days: yellow")} · {n(urgency.yellow)}
           </span>
           <span className="rounded-full bg-red-100 px-2 py-1 font-medium text-red-800">
             {L("১৮১–৩৬৫ দিন: লাল এলার্ট", "181–365 days: red alert")} · {n(urgency.red)}
@@ -970,7 +968,7 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
                   type={applicationListType}
                   cases={actionCases}
                   canReject={user?.role === "admin"}
-                  onNew={user?.role === "worker" ? () => openCaseDialog("action", `${applicationListType}-entry`) : undefined}
+                  {...(user?.role === "worker" ? { onNew: () => openCaseDialog("action", `${applicationListType}-entry`) } : {})}
                   onReject={rejectApplication}
                 />
               ) : activeCard?.id === "worker-report" ? (

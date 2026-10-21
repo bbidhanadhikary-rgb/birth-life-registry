@@ -5,7 +5,13 @@ import { LoginDialog } from "@/components/Header";
 import { MfaGate } from "@/components/MfaGate";
 import { useApp } from "@/lib/store";
 
-export function DashboardGate({ children }: { children: ReactNode }) {
+export function DashboardGate({
+  children,
+  workerLayout = true,
+}: {
+  children: ReactNode;
+  workerLayout?: boolean;
+}) {
   const { user, L, authReady, mfa } = useApp();
   const [loginOpen, setLoginOpen] = useState(false);
 
@@ -48,7 +54,7 @@ export function DashboardGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (user.role === "worker") {
+  if (user.role === "worker" && workerLayout) {
     return (
       <div className="h-[calc(100svh-6.6rem)] min-h-0 overflow-hidden px-2 py-1 sm:px-4 sm:py-2">
         {children}

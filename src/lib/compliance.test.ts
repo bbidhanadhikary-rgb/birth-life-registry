@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCaseDeadline } from "./compliance";
+import { getCaseDeadline, getDeadlineBand } from "./compliance";
 import type { RegCase } from "./types";
 
 const makeCase = (overrides: Partial<RegCase> = {}): RegCase => ({
@@ -66,5 +66,19 @@ describe("getCaseDeadline", () => {
     ).toBeNull();
     expect(getCaseDeadline(makeCase({ dob: "2025-02-30" }), Date.UTC(2025, 2, 1))).toBeNull();
     expect(getCaseDeadline(makeCase({ dob: "2025-01-02" }), Date.UTC(2025, 0, 1))).toBeNull();
+  });
+});
+
+describe("getDeadlineBand", () => {
+  it.each([
+    [0, "safe"],
+    [90, "safe"],
+    [91, "warning"],
+    [180, "warning"],
+    [181, "near-deadline"],
+    [365, "near-deadline"],
+    [366, "overdue"],
+  ] as const)("classifies day %i as %s", (elapsedDays, band) => {
+    expect(getDeadlineBand(elapsedDays)).toBe(band);
   });
 });
