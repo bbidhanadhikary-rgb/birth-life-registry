@@ -810,7 +810,7 @@ export function RegistrationDashboard({
   return (
     <section className="dashboard-content flex h-full min-h-0 flex-col overflow-y-auto bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
       <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-1 px-4 py-1 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-1.5 sm:px-6 sm:py-1.5 lg:px-8">
-        <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:gap-3">
+        <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
           <div className="flex min-h-0 flex-col justify-center">
             <span className="mb-1 inline-flex w-fit items-center gap-2 rounded-full border border-teal-700/15 bg-white px-3 py-1 text-xs font-semibold text-teal-800 shadow-[0_0_18px_-8px_rgba(13,148,136,0.55)] max-[360px]:mb-1">
               <span className="h-2 w-2 rounded-full bg-teal-500" aria-hidden="true" />
@@ -834,7 +834,7 @@ export function RegistrationDashboard({
             counts={monthlyCounts}
             received={monthlyReceived}
             targets={monthlyTargets}
-            compact
+            featured
             {...(hasWardAggregate && !wardMonthlyCounts
               ? {
                   warning: L(
