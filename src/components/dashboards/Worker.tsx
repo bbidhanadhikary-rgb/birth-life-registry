@@ -133,6 +133,12 @@ function normalizeBengaliDigits(value: string) {
   );
 }
 
+function childOrderLabel(order: number) {
+  const bengaliNumber = String(order).replace(/\d/g, (digit) => "০১২৩৪৫৬৭৮৯"[Number(digit)]);
+  const suffix = ["ম", "য়", "য়", "র্থ", "ম", "ষ্ঠ", "ম", "ম", "ম", "ম"][order - 1] ?? "তম";
+  return `${bengaliNumber}${suffix} সন্তান`;
+}
+
 function isValidIsoDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00.000Z`);
@@ -157,6 +163,7 @@ function FormRow({
   labelEn,
   required = false,
   compact = false,
+  inline = false,
   labelAccessory,
   children,
 }: {
@@ -164,21 +171,22 @@ function FormRow({
   labelEn: string;
   required?: boolean;
   compact?: boolean;
+  inline?: boolean;
   labelAccessory?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className={compact ? "grid min-w-0 gap-1 lg:grid-cols-[8rem_minmax(0,1fr)] lg:items-center lg:gap-2" : "grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-start sm:gap-4"}>
-      <div className={`flex items-start ${labelAccessory ? "gap-2" : ""} ${compact ? "lg:pt-0" : "pt-2"}`}>
+    <div className={inline ? "flex min-w-0 flex-row items-center gap-2" : compact ? "grid min-w-0 gap-1 lg:grid-cols-[8rem_minmax(0,1fr)] lg:items-center lg:gap-2" : "grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-start sm:gap-4"}>
+      <div className={`flex items-start ${inline ? "shrink-0" : ""} ${labelAccessory ? "gap-2" : ""} ${compact ? "lg:pt-0" : "pt-2"}`}>
         {labelAccessory}
-        <div className="min-w-0">
-          <p className={`${compact ? "text-base" : "text-sm"} font-bold text-slate-800`}>
+        <div className={inline ? "min-w-0 whitespace-nowrap" : "min-w-0"}>
+          <p className={`${inline ? "text-xs" : compact ? "text-base" : "text-sm"} font-bold text-slate-800`}>
             {labelBn}{required && <span className="text-red-600"> *</span>}
           </p>
-          <p className={`${compact ? "text-sm" : "text-[11px]"} text-slate-500`}>{labelEn}</p>
+          <p className={`${inline ? "text-[10px]" : compact ? "text-sm" : "text-[11px]"} text-slate-500`}>{labelEn}</p>
         </div>
       </div>
-      <div className="min-w-0">{children}</div>
+      <div className={inline ? "min-w-0 flex-1" : "min-w-0"}>{children}</div>
     </div>
   );
 }
@@ -243,6 +251,7 @@ function BiTextAreaField({
   onChange,
   required = false,
   compact = false,
+  comfortable = false,
   labelAccessory,
 }: {
   labelBn: string;
@@ -251,13 +260,14 @@ function BiTextAreaField({
   onChange: (next: Bi) => void;
   required?: boolean;
   compact?: boolean;
+  comfortable?: boolean;
   labelAccessory?: React.ReactNode;
 }) {
   return (
     <FormRow labelBn={labelBn} labelEn={labelEn} required={required} compact={compact} labelAccessory={labelAccessory}>
       <div className={compact ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2"}>
         <Textarea
-          className={compact ? "h-[4.5rem] min-h-[4.5rem] px-3 py-1.5 text-base md:text-base placeholder:text-base" : undefined}
+          className={comfortable ? "h-20 min-h-20 px-3 py-2 text-base md:text-base placeholder:text-base" : compact ? "h-[4.5rem] min-h-[4.5rem] px-3 py-1.5 text-base md:text-base placeholder:text-base" : undefined}
           aria-label={`${labelBn} — বাংলা`}
           maxLength={500}
           placeholder="বাংলায় লিখুন"
@@ -267,7 +277,7 @@ function BiTextAreaField({
           onChange={(event) => onChange({ ...value, bn: event.target.value })}
         />
         <Textarea
-          className={compact ? "h-[4.5rem] min-h-[4.5rem] px-3 py-1.5 text-base md:text-base placeholder:text-base" : undefined}
+          className={comfortable ? "h-20 min-h-20 px-3 py-2 text-base md:text-base placeholder:text-base" : compact ? "h-[4.5rem] min-h-[4.5rem] px-3 py-1.5 text-base md:text-base placeholder:text-base" : undefined}
           aria-label={`${labelEn} — English`}
           maxLength={500}
           placeholder="Enter in English (optional)"
@@ -971,21 +981,37 @@ export function RegForm({
       </div>
 
       {type === "birth" ? (
-        <div className="grid items-start gap-3 lg:grid-cols-2 lg:gap-4">
-          <div className="space-y-1">
-            <FormRow labelBn="জন্মতারিখ" labelEn="Date of Birth" required compact>
-              <Input
-                className="h-11 text-base md:text-base"
-                type="text"
-                inputMode="numeric"
-                maxLength={10}
-                placeholder="YYYY-MM-DD"
-                aria-label="জন্মতারিখ / Date of birth"
-                required
-                value={dob}
-                onChange={(event) => setDob(normalizeBengaliDigits(event.target.value))}
-              />
-            </FormRow>
+        <div className="grid min-w-0 items-start gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-4">
+          <div className="min-w-0 space-y-1">
+            <div className="grid min-w-0 grid-cols-2 gap-3">
+              <FormRow labelBn="জন্মতারিখ" labelEn="Date of Birth" required compact inline>
+                <Input
+                  className="h-11 min-w-0 px-1.5 text-xs"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="YYYY-MM-DD"
+                  aria-label="জন্মতারিখ / Date of birth"
+                  required
+                  value={dob}
+                  onChange={(event) => setDob(normalizeBengaliDigits(event.target.value))}
+                />
+              </FormRow>
+              <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required compact inline>
+                <Select value={order} onValueChange={setOrder} required>
+                  <SelectTrigger className="h-11 min-w-0 px-1.5 text-xs" aria-label="কত তম সন্তান / Child order">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 20 }, (_, index) => index + 1).map((childOrder) => (
+                      <SelectItem key={childOrder} value={String(childOrder)}>
+                        {childOrderLabel(childOrder)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormRow>
+            </div>
             <FormRow labelBn="লিঙ্গ" labelEn="Gender" required compact>
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="লিঙ্গ / Gender">
                 {([
@@ -1000,8 +1026,8 @@ export function RegForm({
                 ))}
               </div>
             </FormRow>
-            <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required compact>
-              <Input className="h-11 text-base font-bold md:text-base" type="number" min={1} max={20} required value={order} onChange={(event) => setOrder(event.target.value)} />
+            <FormRow labelBn="সক্রিয় মোবাইল নম্বর" labelEn="Active Mobile Number" required compact>
+              <Input className="h-11 text-base md:text-base placeholder:text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))} />
             </FormRow>
             <BiField label="শিশুর নাম" labelEn="Child's Name" value={name} onChange={setName} required compact />
             <BiField label="পিতার নাম" labelEn="Father's Name" value={father} onChange={setFather} required compact />
@@ -1013,14 +1039,10 @@ export function RegForm({
               </div>
             </FormRow>
             {attachmentFields}
-            {visitPhotoField}
           </div>
 
-          <div className="space-y-1">
-            <FormRow labelBn="সক্রিয় মোবাইল নম্বর" labelEn="Active Mobile Number" required compact>
-              <Input className="h-11 text-base md:text-base placeholder:text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))} />
-            </FormRow>
-            <BiTextAreaField labelBn="জন্মস্থানের ঠিকানা" labelEn="Place of Birth Address" value={birthPlace} onChange={(next) => { setBirthPlace(next); if (samePermanent) setPermanent(next); if (samePresent) setPresent(next); }} required compact />
+          <div className="min-w-0 space-y-1">
+            <BiTextAreaField labelBn="জন্মস্থানের ঠিকানা" labelEn="Place of Birth Address" value={birthPlace} onChange={(next) => { setBirthPlace(next); if (samePermanent) setPermanent(next); if (samePresent) setPresent(next); }} required compact comfortable />
             <BiTextAreaField
               labelBn="স্থায়ী ঠিকানা"
               labelEn="Permanent Address"
@@ -1028,6 +1050,7 @@ export function RegForm({
               onChange={(next) => { setPermanent(next); setSamePermanent(false); }}
               required
               compact
+              comfortable
               labelAccessory={<Checkbox aria-label="স্থায়ী ঠিকানা জন্মস্থানের মতো" title="জন্মস্থানের ঠিকানার মতো" checked={samePermanent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePermanent(enabled); if (enabled) setPermanent(birthPlace); }} className="mt-0.5 h-4 w-4" />}
             />
             <BiTextAreaField
@@ -1037,6 +1060,7 @@ export function RegForm({
               onChange={(next) => { setPresent(next); setSamePresent(false); }}
               required
               compact
+              comfortable
               labelAccessory={<Checkbox aria-label="বর্তমান ঠিকানা জন্মস্থানের মতো" title="জন্মস্থানের ঠিকানার মতো" checked={samePresent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePresent(enabled); if (enabled) setPresent(birthPlace); }} className="mt-0.5 h-4 w-4" />}
             />
             <FormRow labelBn="আবেদনকারীর তথ্য" labelEn="Applicant Details" required compact>
@@ -1045,6 +1069,7 @@ export function RegForm({
                 <Input className="h-10 text-sm md:text-sm" maxLength={100} placeholder="আবেদনকারীর সাথে সম্পর্ক" aria-label="আবেদনকারীর সাথে সম্পর্ক" required value={applicantRelationshipBn} onChange={(event) => setApplicantRelationshipBn(event.target.value)} />
               </div>
             </FormRow>
+            {visitPhotoField}
           </div>
         </div>
       ) : (
