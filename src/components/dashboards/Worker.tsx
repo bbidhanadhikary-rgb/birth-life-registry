@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   AlertTriangle,
   CalendarClock,
@@ -39,6 +40,7 @@ import { useCaseHelpers } from "@/components/shared";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { compressImage } from "@/lib/compress-image";
+import { checkCaseDuplicate } from "@/lib/case.functions";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { downloadCSV, printPDF } from "@/lib/report";
 import { roleLabel, scopedCases, useApp } from "@/lib/store";
@@ -80,7 +82,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isBi(value: unknown): value is Bi {
-  return isRecord(value) && typeof value.bn === "string" && typeof value.en === "string";
+  return (
+    isRecord(value) &&
+    typeof value["bn"] === "string" &&
+    typeof value["en"] === "string"
+  );
 }
 
 function readRegistrationDraft(key: string): Partial<RegistrationDraft> | undefined {
@@ -97,11 +103,19 @@ function readRegistrationDraft(key: string): Partial<RegistrationDraft> | undefi
     for (const field of ["applicantNameBn", "applicantRelationshipBn", "nid", "mobile", "dob", "dod", "order", "fatherBrn", "motherBrn"] as const) {
       if (typeof value[field] === "string") draft[field] = value[field];
     }
-    if (value.gender === "male" || value.gender === "female" || value.gender === "other") {
-      draft.gender = value.gender;
+    if (
+      value["gender"] === "male" ||
+      value["gender"] === "female" ||
+      value["gender"] === "other"
+    ) {
+      draft.gender = value["gender"];
     }
-    if (typeof value.samePermanent === "boolean") draft.samePermanent = value.samePermanent;
-    if (typeof value.samePresent === "boolean") draft.samePresent = value.samePresent;
+    if (typeof value["samePermanent"] === "boolean") {
+      draft.samePermanent = value["samePermanent"];
+    }
+    if (typeof value["samePresent"] === "boolean") {
+      draft.samePresent = value["samePresent"];
+    }
     return draft;
   } catch (cause) {
     console.error("Could not load registration draft", cause);
@@ -267,6 +281,7 @@ export function RegForm({
   onEdit?: () => void;
 }) {
   const { L, user, state, addCase, updateCase, demoMode, enterDemoLogin } = useApp();
+  const checkForDuplicate = useServerFn(checkCaseDuplicate);
   const upazila = user ? state.upazilas.find((area) => area.id === user.upazilaId) : undefined;
   const union = upazila?.unions.find((area) => area.id === user?.unionId);
   const draftKey = `birth-life-registry:entry-draft:${user?.id ?? "unassigned"}:${type}:${entry?.id ?? "new"}`;
@@ -329,10 +344,67 @@ export function RegForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const draftSaveErrorShown = useRef(false);
+  const [activeDraftKey, setActiveDraftKey] = useState(draftKey);
   const oldFiles = entry?.files ?? [];
   const oldVisitPhoto = oldFiles.find((file) => file.fieldVisit);
 
   useEffect(() => {
+    if (activeDraftKey === draftKey) return;
+    const draft = readRegistrationDraft(draftKey);
+    setName(draft?.name ?? entry?.name ?? emptyBi);
+    setFather(draft?.father ?? entry?.father ?? emptyBi);
+    setMother(draft?.mother ?? entry?.mother ?? emptyBi);
+    setSpouseName(draft?.spouseName ?? entry?.details?.spouseName ?? emptyBi);
+    setApplicantNameBn(
+      draft?.applicantNameBn ??
+        entry?.details?.applicantNameBn ??
+        entry?.details?.applicantName?.bn ??
+        "",
+    );
+    setApplicantRelationshipBn(
+      draft?.applicantRelationshipBn ??
+        entry?.details?.applicantRelationshipBn ??
+        entry?.details?.applicantRelationship?.bn ??
+        "",
+    );
+    setCause(draft?.cause ?? entry?.cause ?? emptyBi);
+    setNid(draft?.nid ?? entry?.nid ?? "");
+    setMobile(draft?.mobile ?? entry?.parentMobile ?? "");
+    setGender(draft?.gender ?? entry?.gender ?? "male");
+    setDob(draft?.dob ?? entry?.dob ?? "");
+    setDod(draft?.dod ?? entry?.dod ?? "");
+    setOrder(draft?.order ?? entry?.order ?? "1");
+    setFatherBrn(draft?.fatherBrn ?? entry?.details?.fatherBrn ?? "");
+    setMotherBrn(draft?.motherBrn ?? entry?.details?.motherBrn ?? "");
+    setBirthPlace(
+      draft?.birthPlace ??
+        (type === "death"
+          ? entry?.details?.deathPlace ?? entry?.details?.birthPlace ?? emptyBi
+          : entry?.details?.birthPlace ?? emptyBi),
+    );
+    setPresent(draft?.present ?? entry?.details?.presentAddress ?? emptyBi);
+    setPermanent(draft?.permanent ?? entry?.details?.permanentAddress ?? emptyBi);
+    setSamePermanent(
+      draft?.samePermanent ??
+        Boolean(
+          entry?.details?.birthPlace &&
+            entry.details.permanentAddress?.bn === entry.details.birthPlace.bn &&
+            entry.details.permanentAddress?.en === entry.details.birthPlace.en,
+        ),
+    );
+    setSamePresent(
+      draft?.samePresent ??
+        Boolean(
+          entry?.details?.birthPlace &&
+            entry.details.presentAddress?.bn === entry.details.birthPlace.bn &&
+            entry.details.presentAddress?.en === entry.details.birthPlace.en,
+        ),
+    );
+    setActiveDraftKey(draftKey);
+  }, [activeDraftKey, draftKey, entry, type]);
+
+  useEffect(() => {
+    if (activeDraftKey !== draftKey) return;
     const draft: RegistrationDraft = {
       name,
       father,
@@ -371,6 +443,7 @@ export function RegForm({
     }, 300);
     return () => window.clearTimeout(timeout);
   }, [
+    activeDraftKey,
     applicantNameBn,
     applicantRelationshipBn,
     birthPlace,
@@ -715,29 +788,28 @@ export function RegForm({
     setSaving(true);
     try {
       if (!demoMode && navigator.onLine) {
-        const { data: possibleDuplicates, error: duplicateQueryError } = await supabase
-          .from("cases")
-          .select("id, father_bn, mother_bn")
-          .eq("type", type)
-          .eq("dob", dob)
-          .eq("upazila_id", user.upazilaId)
-          .eq("union_id", user.unionId)
-          .eq("ward", user.ward ?? 1);
-        if (duplicateQueryError) {
+        let serverDuplicate: boolean;
+        try {
+          const result = await checkForDuplicate({
+            data: {
+              type,
+              dob,
+              fatherBn: father.bn,
+              motherBn: mother.bn,
+              ...(entry ? { excludeId: entry.id } : {}),
+            },
+          });
+          serverDuplicate = result.duplicate;
+        } catch (causeError) {
+          console.error("Duplicate case check failed", causeError);
           setError(
             L(
-              `ডুপ্লিকেট আবেদন যাচাই করা যায়নি: ${duplicateQueryError.message}`,
-              `Could not check for duplicate applications: ${duplicateQueryError.message}`,
+              "ডুপ্লিকেট আবেদন যাচাই করা যায়নি। সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+              "Could not check for duplicate applications. Check your connection and try again.",
             ),
           );
           return;
         }
-        const serverDuplicate = possibleDuplicates?.some(
-          (candidate) =>
-            candidate.id !== entry?.id &&
-            normalize(candidate.father_bn) === normalize(father.bn) &&
-            normalize(candidate.mother_bn) === normalize(mother.bn),
-        );
         if (serverDuplicate) {
           setError(
             L(
