@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { RegForm } from "@/components/dashboards/Worker";
@@ -13,6 +14,7 @@ export function EntryFormPage({
 }) {
   const { L, user, state } = useApp();
   const navigate = useNavigate();
+  const [formInstance, setFormInstance] = useState(0);
   const entry = applicationId
     ? scopedCases(state, user).find((item) => item.id === applicationId && item.type === type)
     : undefined;
@@ -62,14 +64,16 @@ export function EntryFormPage({
       <ModuleNavigation />
       <div className={type === "birth" ? "w-full max-w-full space-y-1" : "space-y-3"}>
         <RegForm
-          key={`${type}-${entry?.id ?? "new"}`}
+          key={`${type}-${entry?.id ?? "new"}-${formInstance}`}
           type={type}
           entry={entry}
-          onSaved={() =>
-            void (entry
-              ? navigate({ to: "/worker-applications/$type", params: { type } })
-              : navigate({ to: "/dashboard" }))
-          }
+          onSaved={() => {
+            setFormInstance((instance) => instance + 1);
+            void navigate({
+              to: type === "birth" ? "/birth-entry" : "/death-entry",
+              search: { applicationId: undefined },
+            });
+          }}
           onCancel={() => void navigate({ to: "/dashboard" })}
         />
       </div>

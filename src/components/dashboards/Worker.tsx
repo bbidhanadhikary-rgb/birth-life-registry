@@ -127,6 +127,18 @@ function normalizeDuplicateName(value: string) {
   return value.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
 }
 
+function normalizeBengaliDigits(value: string) {
+  return value.replace(/[০-৯]/g, (digit) =>
+    String("০১২৩৪৫৬৭৮৯".indexOf(digit)),
+  );
+}
+
+function isValidIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
 function captureCoordinates(): Promise<{ latitude: number; longitude: number }> {
   if (!navigator.geolocation) {
     return Promise.reject(new Error("এই ডিভাইসে GPS পাওয়া যায়নি"));
@@ -301,11 +313,13 @@ export function RegForm({
     savedDraft?.applicantRelationshipBn ?? entry?.details?.applicantRelationshipBn ?? entry?.details?.applicantRelationship?.bn ?? "",
   );
   const [cause, setCause] = useState<Bi>(savedDraft?.cause ?? entry?.cause ?? emptyBi);
-  const [nid, setNid] = useState(savedDraft?.nid ?? entry?.nid ?? "");
+  const [nid, setNid] = useState(
+    normalizeBengaliDigits(savedDraft?.nid ?? entry?.nid ?? ""),
+  );
   const [mobile, setMobile] = useState(savedDraft?.mobile ?? entry?.parentMobile ?? "");
   const [gender, setGender] = useState<RegCase["gender"]>(savedDraft?.gender ?? entry?.gender ?? "male");
-  const [dob, setDob] = useState(savedDraft?.dob ?? entry?.dob ?? "");
-  const [dod, setDod] = useState(savedDraft?.dod ?? entry?.dod ?? "");
+  const [dob, setDob] = useState(normalizeBengaliDigits(savedDraft?.dob ?? entry?.dob ?? ""));
+  const [dod, setDod] = useState(normalizeBengaliDigits(savedDraft?.dod ?? entry?.dod ?? ""));
   const [order, setOrder] = useState(savedDraft?.order ?? entry?.order ?? "1");
   const [fatherBrn, setFatherBrn] = useState(savedDraft?.fatherBrn ?? entry?.details?.fatherBrn ?? "");
   const [motherBrn, setMotherBrn] = useState(savedDraft?.motherBrn ?? entry?.details?.motherBrn ?? "");
@@ -344,8 +358,11 @@ export function RegForm({
   const [filesChanged, setFilesChanged] = useState(false);
   const [compressing, setCompressing] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [error, setError] = useState("");
   const draftSaveErrorShown = useRef(false);
+  const submissionSucceeded = useRef(false);
   const [activeDraftKey, setActiveDraftKey] = useState(draftKey);
   const oldFiles = entry?.files ?? [];
   const oldVisitPhoto = oldFiles.find((file) => file.fieldVisit);
@@ -370,11 +387,11 @@ export function RegForm({
         "",
     );
     setCause(draft?.cause ?? entry?.cause ?? emptyBi);
-    setNid(draft?.nid ?? entry?.nid ?? "");
+    setNid(normalizeBengaliDigits(draft?.nid ?? entry?.nid ?? ""));
     setMobile(draft?.mobile ?? entry?.parentMobile ?? "");
     setGender(draft?.gender ?? entry?.gender ?? "male");
-    setDob(draft?.dob ?? entry?.dob ?? "");
-    setDod(draft?.dod ?? entry?.dod ?? "");
+    setDob(normalizeBengaliDigits(draft?.dob ?? entry?.dob ?? ""));
+    setDod(normalizeBengaliDigits(draft?.dod ?? entry?.dod ?? ""));
     setOrder(draft?.order ?? entry?.order ?? "1");
     setFatherBrn(draft?.fatherBrn ?? entry?.details?.fatherBrn ?? "");
     setMotherBrn(draft?.motherBrn ?? entry?.details?.motherBrn ?? "");
@@ -406,7 +423,7 @@ export function RegForm({
   }, [activeDraftKey, draftKey, entry, type]);
 
   useEffect(() => {
-    if (activeDraftKey !== draftKey) return;
+    if (activeDraftKey !== draftKey || submissionSucceeded.current) return;
     const draft: RegistrationDraft = {
       name,
       father,
@@ -541,17 +558,17 @@ export function RegForm({
   };
 
   const attachmentFields = (
-    <fieldset className={type === "birth" ? "space-y-1" : "space-y-2"}>
+    <fieldset className="space-y-1">
       <legend className="text-sm font-semibold text-slate-700">
         {L("ছবি সংযুক্তি · প্রতিটি সর্বোচ্চ ৭৫০ KB", "Photo attachments · maximum 750 KB each")}
       </legend>
-      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+      <div className={`grid grid-cols-3 ${type === "birth" ? "gap-1.5 sm:gap-2" : "gap-1"}`}>
         {attachments.map((file, index) => (
           <label
             key={index}
-            className={`flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-emerald-300 bg-white hover:bg-emerald-50 ${type === "birth" ? "min-h-12 px-2 py-1.5 text-xs sm:text-sm" : "min-h-12 px-3 py-2 text-xs"}`}
+            className={`flex min-w-0 cursor-pointer items-center gap-1 rounded-lg border border-dashed border-emerald-300 bg-white hover:bg-emerald-50 ${type === "birth" ? "min-h-12 px-2 py-1.5 text-xs sm:text-sm" : "min-h-10 px-1.5 py-1 text-[11px]"}`}
           >
-            <FileImage className="h-4 w-4 shrink-0 text-emerald-700" />
+            <FileImage className={`${type === "birth" ? "h-4 w-4" : "h-3.5 w-3.5"} shrink-0 text-emerald-700`} />
             <span className="min-w-0 flex-1 truncate">
               {compressing === index
                 ? L("সংকুচিত হচ্ছে…", "Compressing…")
@@ -597,11 +614,11 @@ export function RegForm({
   );
 
   const visitPhotoField = (
-    <fieldset className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+    <fieldset className={`rounded-lg border border-emerald-200 bg-emerald-50/50 ${type === "birth" ? "space-y-2 p-3" : "space-y-1.5 p-2"}`}>
       <legend className="px-1 text-sm font-semibold text-emerald-950">
         {L("বাড়ি পরিদর্শন ও ছবি আপলোড", "House visit and photo upload")}
       </legend>
-      <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-1 text-sm font-medium text-slate-800">
+      <label className={`flex cursor-pointer items-center rounded-md px-1 font-medium text-slate-800 ${type === "birth" ? "min-h-11 gap-3 text-sm" : "min-h-9 gap-2 text-xs"}`}>
         <input
           type="checkbox"
           role="switch"
@@ -634,7 +651,7 @@ export function RegForm({
         />
         <span>{L("GPS লোকেশন যুক্ত করুন (ঐচ্ছিক)", "Add GPS location (optional)")}</span>
       </label>
-      <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-emerald-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-emerald-50">
+      <label className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-emerald-300 bg-white text-slate-700 hover:bg-emerald-50 ${type === "birth" ? "min-h-12 px-3 py-2 text-sm" : "min-h-10 px-2 py-1.5 text-xs"}`}>
         <FileImage className="h-4 w-4 shrink-0 text-emerald-700" />
         <span className="min-w-0 flex-1 truncate">
           {visitPhotoLoading
@@ -738,8 +755,8 @@ export function RegForm({
       return;
     }
     if (
-      !dob ||
-      (type === "death" && (!dod || !cause.bn.trim()))
+      !isValidIsoDate(dob) ||
+      (type === "death" && (!isValidIsoDate(dod) || !cause.bn.trim()))
     ) {
       setError(
         L(
@@ -778,12 +795,7 @@ export function RegForm({
         normalize(existing.mother.bn) === normalize(mother.bn),
     );
     if (duplicate) {
-      setError(
-        L(
-          "একই জন্মতারিখ ও পিতা-মাতার নামে একটি আবেদন আগে থেকেই রয়েছে। তথ্য যাচাই করে পুনরায় জমা দেবেন না।",
-          "A record with the same date of birth and parents already exists. Check the existing record before submitting again.",
-        ),
-      );
+      setDuplicateOpen(true);
       return;
     }
 
@@ -813,12 +825,7 @@ export function RegForm({
           return;
         }
         if (serverDuplicate) {
-          setError(
-            L(
-              "একই জন্মতারিখ ও পিতা-মাতার নামে একটি আবেদন আগে থেকেই রয়েছে। তথ্য যাচাই করে পুনরায় জমা দেবেন না।",
-              "A record with the same date of birth and parents already exists. Check the existing record before submitting again.",
-            ),
-          );
+          setDuplicateOpen(true);
           return;
         }
       }
@@ -914,7 +921,8 @@ export function RegForm({
       } catch (causeError) {
         console.error("Could not clear submitted registration draft", causeError);
       }
-      onSaved();
+      submissionSucceeded.current = true;
+      setSuccessOpen(true);
     } finally {
       setSaving(false);
     }
@@ -940,8 +948,15 @@ export function RegForm({
   }
 
   return (
-    <form className="w-full max-w-full space-y-1 p-2 sm:p-3 rounded-2xl border border-emerald-100 bg-white shadow-sm" onSubmit={submit}>
-      <div className="border-b border-emerald-100 pb-1.5">
+    <form
+      className={`w-full max-w-full rounded-2xl border border-emerald-100 bg-white p-2 shadow-sm sm:p-3 ${
+        type === "death"
+          ? "grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4"
+          : "space-y-1"
+      }`}
+      onSubmit={submit}
+    >
+      <div className={`border-b border-emerald-100 pb-1.5 ${type === "death" ? "md:col-span-full" : ""}`}>
         <div className="flex items-center justify-between gap-3">
           <h2 className={`${type === "birth" ? "text-base" : "text-lg"} font-bold text-emerald-950`}>
             {type === "birth" ? "জন্ম নিবন্ধনের আবেদন" : "মৃত্যু নিবন্ধনের আবেদন"}
@@ -959,7 +974,17 @@ export function RegForm({
         <div className="grid items-start gap-3 lg:grid-cols-2 lg:gap-4">
           <div className="space-y-1">
             <FormRow labelBn="জন্মতারিখ" labelEn="Date of Birth" required compact>
-              <Input className="h-11 text-base md:text-base" type="date" required value={dob} onChange={(event) => setDob(event.target.value)} />
+              <Input
+                className="h-11 text-base md:text-base"
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="YYYY-MM-DD"
+                aria-label="জন্মতারিখ / Date of birth"
+                required
+                value={dob}
+                onChange={(event) => setDob(normalizeBengaliDigits(event.target.value))}
+              />
             </FormRow>
             <FormRow labelBn="লিঙ্গ" labelEn="Gender" required compact>
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="লিঙ্গ / Gender">
@@ -1023,9 +1048,21 @@ export function RegForm({
           </div>
         </div>
       ) : (
-        <div className="grid items-start gap-2 lg:grid-cols-2 lg:gap-3">
-          <div className="space-y-1">
-            <FormRow labelBn="মৃত্যুর তারিখ" labelEn="Date of Death" required compact><Input className="h-11 text-base" type="date" required value={dod} onChange={(event) => setDod(event.target.value)} /></FormRow>
+        <>
+          <div className="min-w-0 space-y-1">
+            <FormRow labelBn="মৃত্যুর তারিখ" labelEn="Date of Death" required compact>
+              <Input
+                className="h-11 text-base"
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="YYYY-MM-DD"
+                aria-label="মৃত্যুর তারিখ / Date of death"
+                required
+                value={dod}
+                onChange={(event) => setDod(normalizeBengaliDigits(event.target.value))}
+              />
+            </FormRow>
             <FormRow labelBn="লিঙ্গ" labelEn="Gender" required compact>
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="লিঙ্গ / Gender">
                 {([
@@ -1041,31 +1078,56 @@ export function RegForm({
               </div>
             </FormRow>
             <BiField label="মৃত্যুর কারণ" labelEn="Cause of Death" value={cause} onChange={setCause} required compact />
-            <FormRow labelBn="জন্ম তারিখ" labelEn="Date of Birth" required compact><Input className="h-11 text-base" type="date" required value={dob} onChange={(event) => setDob(event.target.value)} /></FormRow>
+            <FormRow labelBn="জন্ম তারিখ" labelEn="Date of Birth" required compact>
+              <Input
+                className="h-11 text-base"
+                type="text"
+                inputMode="numeric"
+                maxLength={10}
+                placeholder="YYYY-MM-DD"
+                aria-label="জন্মতারিখ / Date of birth"
+                required
+                value={dob}
+                onChange={(event) => setDob(normalizeBengaliDigits(event.target.value))}
+              />
+            </FormRow>
             <BiField label="মৃত ব্যক্তির নাম" labelEn="Deceased Name" value={name} onChange={setName} required compact />
             <BiField label="পিতার নাম" labelEn="Father's Name" value={father} onChange={setFather} required compact />
             <BiField label="মাতার নাম" labelEn="Mother's Name" value={mother} onChange={setMother} required compact />
             <BiField label="স্বামী/স্ত্রীর নাম" labelEn="Spouse's Name" value={spouseName} onChange={setSpouseName} compact />
-            <FormRow labelBn="জাতীয় পরিচয়পত্র নং" labelEn="National ID No." required compact><Input className="h-11 text-base" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="১০, ১৩ বা ১৭ অঙ্ক / 10, 13 or 17 digits" required value={nid} onChange={(event) => setNid(event.target.value.replace(/\D/g, "").slice(0, 17))} /></FormRow>
-            {attachmentFields}
-            {visitPhotoField}
-          </div>
-          <div className="space-y-1">
+            <FormRow labelBn="জাতীয় পরিচয়পত্র নং" labelEn="National ID No." required compact>
+              <Input
+                className="h-11 text-base"
+                autoComplete="off"
+                inputMode="numeric"
+                maxLength={17}
+                placeholder="১০, ১৩ বা ১৭ অঙ্ক / 10, 13 or 17 digits"
+                required
+                value={nid}
+                onChange={(event) =>
+                  setNid(normalizeBengaliDigits(event.target.value).replace(/\D/g, "").slice(0, 17))
+                }
+              />
+            </FormRow>
             <FormRow labelBn="মোবাইল নম্বর" labelEn="Mobile Number" required compact><Input className="h-11 text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormRow>
+          </div>
+          <div className="min-w-0 space-y-1">
             <BiTextAreaField labelBn="মৃত্যুর স্থান / ঠিকানা" labelEn="Place of Death / Address" value={birthPlace} onChange={(next) => { setBirthPlace(next); if (samePermanent) setPermanent(next); if (samePresent) setPresent(next); }} required compact />
             <BiTextAreaField labelBn="স্থায়ী ঠিকানা" labelEn="Permanent Address" value={permanent} onChange={(next) => { setPermanent(next); setSamePermanent(false); }} required compact labelAccessory={<Checkbox aria-label="স্থায়ী ঠিকানা মৃত্যুর স্থানের মতো" checked={samePermanent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePermanent(enabled); if (enabled) setPermanent(birthPlace); }} className="mt-0.5 h-4 w-4" />} />
             <BiTextAreaField labelBn="বর্তমান ঠিকানা" labelEn="Present Address" value={present} onChange={(next) => { setPresent(next); setSamePresent(false); }} required compact labelAccessory={<Checkbox aria-label="বর্তমান ঠিকানা মৃত্যুর স্থানের মতো" checked={samePresent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePresent(enabled); if (enabled) setPresent(birthPlace); }} className="mt-0.5 h-4 w-4" />} />
-            <FormRow labelBn="আবেদনকারীর তথ্য" labelEn="Applicant Details" required compact><div className="grid gap-2"><Input className="h-10 text-sm" placeholder="আবেদনকারীর নাম" required value={applicantNameBn} onChange={(event) => setApplicantNameBn(event.target.value)} /><Input className="h-10 text-sm" placeholder="আবেদনকারীর সাথে সম্পর্ক" required value={applicantRelationshipBn} onChange={(event) => setApplicantRelationshipBn(event.target.value)} /></div></FormRow>
+            <FormRow labelBn="আবেদনকারীর তথ্য" labelEn="Applicant Details" required compact><div className="grid gap-2"><Input className="h-10 text-sm" placeholder="আবেদনকারীর নাম" required value={applicantNameBn} onChange={(event) => setApplicantNameBn(event.target.value)} /><Input className="h-10 text-sm" placeholder="আবেদনকারীর সাথে সম্পর্ক" required value={applicantRelationshipBn} onChange={(event) => setApplicantRelationshipBn(event.target.value)} /></div>            </FormRow>
+            {attachmentFields}
+            {visitPhotoField}
           </div>
-        </div>
+        </>
       )}
 
       {error && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
+        <p role="alert" className={`rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-red-800 ${type === "death" ? "md:col-span-full" : ""}`}>
           {error}
         </p>
       )}
-      <div className="sticky bottom-0 z-10 -mx-2 flex flex-wrap gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2 shadow-[0_-6px_16px_-14px_rgba(15,23,42,0.6)]">
+      <div className={`sticky bottom-0 z-10 -mx-2 flex flex-wrap gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-2 shadow-[0_-6px_16px_-14px_rgba(15,23,42,0.6)] ${type === "death" ? "md:col-span-full" : ""}`}>
         {type === "death" && (
         <p className="text-xs font-medium text-emerald-900">
           {L("আবেদনটি যাচাইয়ের জন্য জমা হবে", "This application will be submitted for review")}
@@ -1092,6 +1154,63 @@ export function RegForm({
         </Button>
         </div>
       </div>
+      <Dialog
+        open={successOpen}
+        onOpenChange={(open) => {
+          setSuccessOpen(open);
+          if (!open) onSaved();
+        }}
+      >
+        <DialogContent className="max-w-sm rounded-2xl border-emerald-200 p-6">
+          <DialogHeader>
+            <DialogTitle className="text-center text-xl font-bold text-emerald-900">
+              {L("তথ্য সফলভাবে সংরক্ষিত হয়েছে", "Data successfully saved")}
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {L(
+                "নতুন আবেদন শুরু করতে নিচের বোতামে চাপ দিন।",
+                "Select below to start a fresh application.",
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <Button
+            type="button"
+            className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
+            onClick={() => {
+              setSuccessOpen(false);
+              onSaved();
+            }}
+          >
+            {L("ওকে", "OK")}
+          </Button>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={duplicateOpen} onOpenChange={setDuplicateOpen}>
+        <DialogContent className="max-w-sm rounded-2xl border-amber-200 p-6">
+          <DialogHeader>
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+            </div>
+            <DialogTitle className="text-center text-lg font-bold text-amber-950">
+              {L("আবেদনটি আগে থেকেই রয়েছে", "Application already exists")}
+            </DialogTitle>
+            <DialogDescription className="text-center text-slate-700">
+              {L(
+                "সতর্কতা: এই জন্মতারিখ ও পিতা-মাতার নামে ইতিমধ্যে একটি আবেদন রয়েছে।",
+                "Warning: An application with this date of birth and parents' names already exists.",
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full border-amber-300 text-amber-900 hover:bg-amber-50"
+            onClick={() => setDuplicateOpen(false)}
+          >
+            {L("ঠিক আছে", "OK")}
+          </Button>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
@@ -1195,6 +1314,7 @@ export function WorkerDashboard() {
   const { L, n, user, state, refresh, demoMode, epiVisits } = useApp();
   const { address, date, rows } = useCaseHelpers();
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [formInstance, setFormInstance] = useState(0);
   const [visits, setVisits] = useState<EpiVisit[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(true);
   const mine = scopedCases(state, user);
@@ -1627,13 +1747,14 @@ export function WorkerDashboard() {
                 </DialogDescription>
               </DialogHeader>
               <RegForm
-                key={`${dialog.type}-${dialog.entry?.id ?? "new"}`}
+                key={`${dialog.type}-${dialog.entry?.id ?? "new"}-${formInstance}`}
                 type={dialog.type}
                 entry={dialog.entry}
                 onCancel={() => setDialog(null)}
                 onEdit={() => setDialog({ kind: "entries", type: dialog.type })}
                 onSaved={() => {
-                  setDialog({ kind: "entries", type: dialog.type });
+                  setDialog({ kind: "form", type: dialog.type });
+                  setFormInstance((instance) => instance + 1);
                   void loadVisits();
                 }}
               />
