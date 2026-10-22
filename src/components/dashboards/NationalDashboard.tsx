@@ -97,18 +97,25 @@ export function NationalDashboard() {
     (item) => monthKey(item.createdAt) === monthKey(Date.now()),
   );
   const monthlyCounts = {
-    pending: currentMonthCases.filter((item) => item.status === "pending").length,
-    progress: currentMonthCases.filter((item) => item.status === "progress").length,
-    completed: currentMonthCases.filter((item) => item.status === "completed").length,
+    birth: {
+      pending: currentMonthCases.filter((item) => item.type === "birth" && item.status === "pending").length,
+      progress: currentMonthCases.filter((item) => item.type === "birth" && item.status === "progress").length,
+      completed: currentMonthCases.filter((item) => item.type === "birth" && item.status === "completed").length,
+    },
+    death: {
+      pending: currentMonthCases.filter((item) => item.type === "death" && item.status === "pending").length,
+      progress: currentMonthCases.filter((item) => item.type === "death" && item.status === "progress").length,
+      completed: currentMonthCases.filter((item) => item.type === "death" && item.status === "completed").length,
+    },
   };
-  const completedThisMonth = visibleCases.filter(
-    (item) => item.completedAt && monthKey(item.completedAt) === monthKey(Date.now()),
-  ).length;
-  const monthlyTarget = Math.ceil(
-    effectiveUnions * (TARGET.birth + TARGET.death),
-  );
+  const completedThisMonth = monthlyCounts.birth.completed + monthlyCounts.death.completed;
+  const monthlyTargets = {
+    birth: Math.ceil(effectiveUnions * TARGET.birth),
+    death: Math.ceil(effectiveUnions * TARGET.death),
+  };
+  const monthlyTarget = monthlyTargets.birth + monthlyTargets.death;
   const targetPercent = monthlyTarget
-    ? Math.min(100, Math.round((completedThisMonth / monthlyTarget) * 100))
+    ? Math.round((completedThisMonth / monthlyTarget) * 100)
     : 0;
 
   const performance = useMemo(() => {
@@ -175,6 +182,7 @@ export function NationalDashboard() {
   };
   const availableSections = user ? roleSections[user.role] : [];
   const links = sections.filter((entry) => availableSections.includes(entry.section));
+  const quickLinks = links.filter((entry) => entry.section !== "users").slice(0, 4);
 
   const saveNotice = async () => {
     if (!user || user.role !== "uno") return;
@@ -185,8 +193,8 @@ export function NationalDashboard() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-none space-y-3 px-4 py-3 sm:px-6 lg:px-8">
-      <div className="flex flex-wrap items-end justify-between gap-2">
+    <div className="national-dashboard mx-auto flex h-full min-h-0 w-full max-w-none flex-1 flex-col gap-2 px-4 py-2 sm:px-6 lg:px-8">
+      <div className="flex shrink-0 flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-teal-800 dark:text-teal-300">
             {L("জাতীয় জন্ম ও মৃত্যু নিবন্ধন", "National Birth & Death Registration")}
@@ -204,10 +212,11 @@ export function NationalDashboard() {
       <MonthlyProgressCard
         counts={monthlyCounts}
         received={currentMonthCases.length}
-        target={monthlyTarget}
+        targets={monthlyTargets}
+        compact
       />
       <section
-        className="grid grid-cols-2 gap-2 xl:grid-cols-4"
+        className="grid shrink-0 grid-cols-2 gap-2 xl:grid-cols-4"
         aria-label={L("মূল সূচক", "Key indicators")}
       >
         <Metric
@@ -247,8 +256,8 @@ export function NationalDashboard() {
         />
       </section>
 
-      <div className="grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
-        <section className="min-h-56 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="grid min-h-0 flex-1 gap-2 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
               <h2 className="font-semibold">
@@ -310,7 +319,7 @@ export function NationalDashboard() {
           )}
         </section>
 
-        <section className="min-h-56 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <section className="min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div>
               <h2 className="font-semibold">{L("সময়সীমা সতর্কতা", "Deadline alerts")}</h2>
@@ -377,32 +386,32 @@ export function NationalDashboard() {
         </section>
       </div>
 
-      <section aria-label={L("দ্রুত নেভিগেশন", "Quick navigation")}>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          {links.map(({ section, title, Icon }) => (
+      <section className="shrink-0" aria-label={L("দ্রুত নেভিগেশন", "Quick navigation")}>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {quickLinks.map(({ section, title, Icon }) => (
             <Link
               key={section}
               to="/dashboard/$section"
               params={{ section }}
-              className="group flex min-h-11 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold shadow-sm transition hover:border-teal-700 hover:text-teal-800 dark:border-slate-700 dark:bg-slate-900 dark:hover:text-teal-200"
+              className="group flex min-h-11 items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:border-emerald-500 hover:bg-emerald-50/60 hover:text-emerald-800 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-200"
             >
               <span className="flex min-w-0 items-center gap-2">
-                <Icon className="h-4 w-4 shrink-0 text-teal-800 dark:text-teal-300" />
+                <Icon className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-300" />
                 <span className="truncate">{title}</span>
               </span>
-              <ArrowRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+              <ArrowRight className="h-4 w-4 shrink-0 text-emerald-700 transition-transform group-hover:translate-x-0.5 dark:text-emerald-300" />
             </Link>
           ))}
         </div>
       </section>
 
       {user?.role === "uno" && (
-        <details className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+        <details className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 font-semibold">
             <Megaphone className="h-4 w-4 text-teal-800 dark:text-teal-300" />
             {L("উপজেলার সরকারি বিজ্ঞপ্তি সম্পাদনা", "Manage Upazila announcement")}
           </summary>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
             <label className="space-y-1 text-sm font-medium">
               {L("বাংলা বিজ্ঞপ্তি", "Notice in Bangla")}
               <Textarea
@@ -429,7 +438,13 @@ export function NationalDashboard() {
               />
               {L("বিজ্ঞপ্তিটি সক্রিয় রাখুন", "Publish this notice")}
             </label>
-            <div className="flex items-center justify-end">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Link
+                to="/announcements"
+                className="inline-flex min-h-9 items-center rounded-md px-2 text-sm font-semibold text-teal-800 underline-offset-2 hover:bg-teal-50 hover:underline dark:text-teal-200 dark:hover:bg-teal-950/40"
+              >
+                {L("সব নোটিশ দেখুন", "View all notices")}
+              </Link>
               <Button
                 size="sm"
                 disabled={savingNotice || (!noticeBn.trim() && !noticeEn.trim() && noticeActive)}
@@ -462,7 +477,7 @@ function Metric({
 }) {
   return (
     <div
-      className={`rounded-xl border bg-white p-3 shadow-sm dark:bg-slate-900 ${danger ? "border-rose-200 dark:border-rose-900" : "border-slate-200 dark:border-slate-700"}`}
+      className={`rounded-xl border bg-white p-2 shadow-sm dark:bg-slate-900 ${danger ? "border-rose-200 dark:border-rose-900" : "border-slate-200 dark:border-slate-700"}`}
     >
       <div className="flex items-center justify-between gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
         <span>{label}</span>
@@ -475,7 +490,7 @@ function Metric({
         </span>
       </div>
       <div
-        className={`mt-1 text-2xl font-bold tabular-nums ${danger ? "text-rose-700 dark:text-rose-300" : "text-slate-900 dark:text-white"}`}
+        className={`mt-0.5 text-xl font-bold tabular-nums ${danger ? "text-rose-700 dark:text-rose-300" : "text-slate-900 dark:text-white"}`}
       >
         {value}
       </div>

@@ -22,6 +22,7 @@ interface UnionStatisticsPanelProps {
   selectedUnionId?: string;
   onUnionChange?: (id: string) => void;
   showUnionFilter?: boolean;
+  compact?: boolean;
 }
 
 export function UnionStatisticsPanel({
@@ -31,6 +32,7 @@ export function UnionStatisticsPanel({
   selectedUnionId = "all",
   onUnionChange = () => {},
   showUnionFilter = true,
+  compact = false,
 }: UnionStatisticsPanelProps) {
   const { L, n } = useApp();
   const visibleUnions = unions.filter(
@@ -48,13 +50,18 @@ export function UnionStatisticsPanel({
 
   return (
     <section
-      className="mb-6 rounded-xl border border-border bg-card p-4 sm:p-5"
+      className={`rounded-xl border border-border bg-card ${
+        compact ? "min-h-0 p-2" : "mb-6 p-4 sm:p-5"
+      }`}
       aria-labelledby="union-statistics-title"
     >
-      <h2 id="union-statistics-title" className="font-display text-xl font-bold">
+      <h2
+        id="union-statistics-title"
+        className={`font-display font-bold ${compact ? "text-sm" : "text-xl"}`}
+      >
         {L("ইউনিয়নভিত্তিক মাসিক লক্ষ্যমাত্রা", "Monthly targets by union")}
       </h2>
-      <p className="mb-3 text-sm text-muted-foreground">
+      <p className={`text-muted-foreground ${compact ? "mb-1 text-[10px]" : "mb-3 text-sm"}`}>
         {L(
           `${upazila.bn} উপজেলার ${n(upazila.unions.length)}টি ইউনিয়ন ও পৌরসভা · জন্ম লক্ষ্য ${n(TARGET.birth)}, মৃত্যু লক্ষ্য ${n(TARGET.death)}টি`,
           `${upazila.en} Upazila · ${upazila.unions.length} unions/municipality · monthly targets: ${TARGET.birth} births and ${TARGET.death} deaths`,
@@ -62,7 +69,9 @@ export function UnionStatisticsPanel({
       </p>
       {showUnionFilter && (
         <div
-          className="mb-2 flex max-w-full touch-pan-x gap-2 overflow-x-auto overscroll-x-contain pb-2"
+          className={`mb-2 flex max-w-full touch-pan-x gap-2 overflow-x-auto overscroll-x-contain ${
+            compact ? "pb-1" : "pb-2"
+          }`}
           role="group"
           aria-label={L("ইউনিয়ন পরিসংখ্যান ফিল্টার", "Filter union statistics")}
         >
@@ -92,7 +101,7 @@ export function UnionStatisticsPanel({
         </div>
       )}
       <div className="overflow-x-auto overscroll-x-contain">
-        <div className="h-80" style={{ minWidth: chartWidth }}>
+        <div className={compact ? "h-28" : "h-80"} style={{ minWidth: chartWidth }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 8, right: 12, left: -16, bottom: 44 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />

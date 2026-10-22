@@ -33,7 +33,7 @@ export function ModuleNavigation() {
   return (
     <nav
       aria-label={L("মূল মডিউলসমূহ", "Core modules")}
-      className="mb-4 flex gap-2 overflow-x-auto rounded-xl border border-emerald-100 bg-white p-2 shadow-sm"
+      className="mb-2 flex gap-2 overflow-x-auto rounded-xl border border-emerald-100 bg-white p-2 shadow-sm"
     >
       {modules
         .filter((item) => item.roles.includes(user.role))

@@ -93,6 +93,36 @@
   animation-play-state: paused;
 }
 
+.dashboard-viewport {
+  height: calc(100svh - 4rem);
+  overflow-y: auto;
+}
+
+@media (min-width: 1024px) and (min-height: 840px) {
+  .dashboard-viewport {
+    overflow: hidden;
+  }
+}
+
+.dashboard-viewport:has(details[open]),
+.dashboard-viewport:has(.super-dashboard) {
+  overflow-y: auto;
+}
+
+.dashboard-viewport:has(details[open]) .national-dashboard {
+  overflow-y: auto;
+}
+
+.dashboard-content {
+  scrollbar-width: thin;
+}
+
+@media (min-width: 1024px) and (min-height: 840px) {
+  .dashboard-content {
+    overflow-y: hidden;
+  }
+}
+
 @keyframes announcement-marquee {
   to {
     transform: translateX(-50%);

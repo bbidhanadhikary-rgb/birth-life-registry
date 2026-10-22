@@ -144,4 +144,4 @@ export interface AppState {
   sessionId: string | null;
 }
 
-export const TARGET = { birth: 50, death: 20 };
+export const TARGET = { birth: 56, death: 18 };

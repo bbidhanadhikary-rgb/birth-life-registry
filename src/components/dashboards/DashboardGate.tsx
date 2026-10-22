@@ -8,10 +8,12 @@ import { useApp } from "@/lib/store";
 export function DashboardGate({
   children,
   workerLayout = true,
+  fitViewport = false,
   developmentPreviewRole,
 }: {
   children: ReactNode;
   workerLayout?: boolean;
+  fitViewport?: boolean;
   developmentPreviewRole?: "worker" | "police" | "admin" | "uno";
 }) {
   const { user, L, authReady, mfa, enterDemoLogin } = useApp();
@@ -79,5 +81,15 @@ export function DashboardGate({
     );
   }
 
-  return <div className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">{children}</div>;
+  return (
+    <div
+      className={
+        fitViewport
+          ? "mx-auto flex h-full min-h-0 w-full max-w-none flex-col px-4 py-2 sm:px-6 lg:px-8"
+          : "mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8"
+      }
+    >
+      {children}
+    </div>
+  );
 }

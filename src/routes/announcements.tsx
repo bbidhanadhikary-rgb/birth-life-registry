@@ -13,14 +13,14 @@ export const Route = createFileRoute("/announcements")({
 });
 
 function AnnouncementsPage() {
-  const { announcements, authReady, L, state } = useApp();
+  const { announcements, authReady, L, state, user } = useApp();
+  const canViewInactive = user?.role === "uno" || user?.role === "super";
   const notices = announcements
-    .filter((notice) => notice.active && (notice.noticeBn.trim() || notice.noticeEn.trim()))
+    .filter((notice) => (notice.active || canViewInactive) && (notice.noticeBn.trim() || notice.noticeEn.trim()))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 
   return (
-    <>
-      <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+    <main className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
       <Link
         to="/"
         className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
@@ -45,7 +45,10 @@ function AnnouncementsPage() {
       </header>
 
       {!authReady ? (
-        <p className="rounded-xl border border-slate-200 bg-white p-6 text-center text-slate-600" role="status">
+        <p
+          className="rounded-xl border border-slate-200 bg-white p-6 text-center text-slate-600"
+          role="status"
+        >
           {L("নোটিশ লোড হচ্ছে…", "Loading notices…")}
         </p>
       ) : notices.length ? (
@@ -58,10 +61,20 @@ function AnnouncementsPage() {
                 className="rounded-xl border border-emerald-100 bg-white p-5 shadow-sm sm:p-6"
               >
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                  <span className="font-semibold text-emerald-900">
-                    {area ? L(area.bn, area.en) : L("সরকারি দপ্তর", "Government office")}
-                  </span>
-                  <time className="text-sm text-slate-500" dateTime={new Date(notice.updatedAt).toISOString()}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold text-emerald-900">
+                      {area ? L(area.bn, area.en) : L("সরকারি দপ্তর", "Government office")}
+                    </span>
+                    {!notice.active && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                        {L("নিষ্ক্রিয়", "Inactive")}
+                      </span>
+                    )}
+                  </div>
+                  <time
+                    className="text-sm text-slate-500"
+                    dateTime={new Date(notice.updatedAt).toISOString()}
+                  >
                     {new Intl.DateTimeFormat(L("bn-BD", "en-GB"), {
                       dateStyle: "medium",
                       timeZone: "Asia/Dhaka",
@@ -87,7 +100,6 @@ function AnnouncementsPage() {
           {L("এই মুহূর্তে কোনো সক্রিয় নোটিশ নেই।", "There are no active notices at this time.")}
         </p>
       )}
-      </main>
-    </>
+    </main>
   );
 }

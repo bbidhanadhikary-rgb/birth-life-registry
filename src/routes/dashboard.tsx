@@ -50,8 +50,17 @@ function Dashboard() {
   }
 
   if (user.role === "super") {
-    return <div className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8"><ModuleNavigation /><SuperDashboard /></div>;
+    return <div className="super-dashboard mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8"><ModuleNavigation /><SuperDashboard /></div>;
   }
 
-  return <><div className="mx-auto w-full max-w-none px-4 pt-3 sm:px-6 lg:px-8"><ModuleNavigation /></div><RegistrationDashboard role={user.role} /></>;
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 px-4 pt-2 sm:px-6 lg:px-8">
+        <ModuleNavigation />
+      </div>
+      <div className="min-h-0 flex-1">
+        <RegistrationDashboard role={user.role} />
+      </div>
+    </div>
+  );
 }

@@ -1,4 +1,5 @@
 import { Megaphone } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { useApp } from "@/lib/store";
 
 export function AnnouncementTicker() {
@@ -27,10 +28,14 @@ export function AnnouncementTicker() {
       aria-label={L("সরকারি ঘোষণা", "Official announcement")}
     >
       <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-2 sm:px-6 lg:px-8">
-        <span className="inline-flex shrink-0 items-center gap-2 rounded-md bg-white/15 px-2 py-1 text-xs font-semibold text-white">
+        <Link
+          to="/announcements"
+          aria-label={L("সব সরকারি বিজ্ঞপ্তি দেখুন", "View all official announcements")}
+          className="inline-flex shrink-0 items-center gap-2 rounded-md bg-white/15 px-2 py-1 text-xs font-semibold text-white transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
           <Megaphone className="h-4 w-4" aria-hidden="true" />
           <span>{L("সরকারি বিজ্ঞপ্তি", "Official notice")}</span>
-        </span>
+        </Link>
         <span className="shrink-0 text-xs text-emerald-50">
           {noticeArea ? L(noticeArea.bn, noticeArea.en) : L("সারা বাংলাদেশ", "Nationwide")}
         </span>
@@ -42,6 +47,12 @@ export function AnnouncementTicker() {
             </span>
           </div>
         </div>
+        <Link
+          to="/announcements"
+          className="shrink-0 rounded px-2 py-1 text-xs font-semibold text-white underline-offset-2 hover:bg-white/15 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          {L("সব নোটিশ", "All notices")}
+        </Link>
       </div>
     </div>
   );

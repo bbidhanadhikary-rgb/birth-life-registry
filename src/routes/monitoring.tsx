@@ -18,14 +18,14 @@ function MonitoringRoute() {
   const { L, user } = useApp();
   const canMonitor = user && ["uno", "district", "super"].includes(user.role);
   return (
-    <DashboardGate developmentPreviewRole="uno">
+    <DashboardGate fitViewport developmentPreviewRole="uno">
       {canMonitor ? (
-        <>
-          <div className="mx-auto w-full max-w-none px-4 pt-4 sm:px-6 lg:px-8">
+        <div className="monitoring-dashboard flex h-full min-h-0 flex-col">
+          <div className="shrink-0">
             <ModuleNavigation />
           </div>
           <NationalDashboard />
-        </>
+        </div>
       ) : (
         <main className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
           <ModuleNavigation />

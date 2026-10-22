@@ -19,6 +19,8 @@ import {
   Home,
   Inbox,
   MapPinned,
+  Megaphone,
+  MessageSquare,
   MessageSquareWarning,
   PencilLine,
   ShieldAlert,
@@ -39,8 +41,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, useCaseHelpers } from "@/components/shared";
 import { downloadCSV, printPDF } from "@/lib/report";
-import { MonthlyProgressCard } from "@/components/dashboards/MonthlyProgressCard";
+import {
+  MonthlyProgressCard,
+  type MonthlyProgressCounts,
+} from "@/components/dashboards/MonthlyProgressCard";
 import { UnionStatisticsPanel } from "@/components/dashboards/UnionStatisticsPanel";
+import { LoginDialog } from "@/components/Header";
 
 type DashboardRole = Role | "public";
 type ActionFilter = "birth" | "death" | "pending" | "progress" | "completed" | "urgent";
@@ -275,8 +281,8 @@ function monthKey(timestamp: number) {
 const publicActions: RoleAction[] = [
   { id: "reports", titleBn: "এলাকাভিত্তিক প্রতিবেদন", titleEn: "Area-wise report", descriptionBn: "প্রশাসনিক এলাকার সারসংক্ষেপ", descriptionEn: "Administrative area summaries", Icon: MapPinned },
   { id: "deadlines", titleBn: "সময়সীমা পর্যবেক্ষণ", titleEn: "Deadline monitoring", descriptionBn: "৩৬৫ দিনের সম্মতি ও সতর্কতা", descriptionEn: "365-day compliance and alerts", Icon: CalendarCheck2, filter: "urgent" },
-  { id: "national-summary", titleBn: "জাতীয় পরিসংখ্যান ও অগ্রগতির সারসংক্ষেপ", titleEn: "National statistics and progress summary", descriptionBn: "জাতীয় নিবন্ধন অগ্রগতি ও বিশ্লেষণ", descriptionEn: "National registration progress and analytics", Icon: ChartNoAxesCombined },
-  { id: "announcements", titleBn: "জরুরি ঘোষণা ও নোটিশ বোর্ড", titleEn: "Emergency announcements and notice board", descriptionBn: "সর্বশেষ সরকারি ঘোষণা ও নোটিশ দেখুন", descriptionEn: "View the latest official announcements and notices", Icon: MessageSquareWarning },
+  { id: "worker-report", titleBn: "রিপোর্ট", titleEn: "Reports", descriptionBn: "সকল ধরনের প্রতিবেদন দেখুন", descriptionEn: "View all types of reports", Icon: FileText },
+  { id: "feedback", titleBn: "অভিযোগ জানান বা পরামর্শ দিন", titleEn: "Submit complaint or suggestion", descriptionBn: "আইসিটি সহায়তা ও পরামর্শ দিন", descriptionEn: "Request ICT support or share a suggestion", Icon: MessageSquare },
 ];
 
 const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district">, RoleAction[]> = {
@@ -317,6 +323,7 @@ const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district"
     { id: "upazila-progress-cases", titleBn: "চলমান নিবন্ধন", titleEn: "Registrations in progress", descriptionBn: "চলমান জন্ম ও মৃত্যু নিবন্ধন", descriptionEn: "Birth and death registrations in progress", Icon: Clock3, filter: "progress" },
     { id: "upazila-completed", titleBn: "সম্পন্ন কেস", titleEn: "Completed cases", descriptionBn: "চূড়ান্ত নিবন্ধন সম্পন্ন কেস", descriptionEn: "Cases with completed registration", Icon: CheckCheck, filter: "completed" },
     { id: "master-report", titleBn: "মাস্টার প্রতিবেদন", titleEn: "Master report", descriptionBn: "উপজেলাভিত্তিক জন্ম ও মৃত্যু সারসংক্ষেপ", descriptionEn: "Upazila birth and death summary", Icon: FileText },
+    { id: "notice-management", titleBn: "জরুরি ঘোষণা ও নোটিশ বোর্ড", titleEn: "Emergency announcements and notice board", descriptionBn: "বিজ্ঞপ্তি দেখুন ও পরিচালনা করুন", descriptionEn: "View and manage official notices", Icon: Megaphone },
   ],
 };
 
@@ -329,38 +336,19 @@ function QuickAccessCard({
   publicDashboard: boolean;
   onActivate: () => void;
 }) {
-  const className = publicDashboard
-    ? "group flex min-h-20 flex-row items-center gap-2.5 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-600/60 hover:bg-emerald-50/70 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 sm:min-h-22 sm:gap-3"
-    : "role-action-card group flex min-h-[3.5rem] cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-left shadow-sm transition-all hover:scale-[1.02] hover:border-teal-600/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 max-[360px]:min-h-12 max-[360px]:gap-1.5 max-[360px]:px-2 sm:min-h-[3.75rem] sm:gap-3 sm:px-4 max-sm:flex-col max-sm:justify-center max-sm:px-1 max-sm:py-1 max-sm:text-center";
+  const className =
+    "role-action-card group flex min-h-[3.5rem] cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-left shadow-sm transition-all hover:scale-[1.02] hover:border-emerald-500 hover:bg-emerald-50/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 max-[360px]:min-h-12 max-[360px]:gap-1.5 max-[360px]:px-2 sm:min-h-[3.75rem] sm:gap-3 sm:px-4 max-sm:flex-col max-sm:justify-center max-sm:px-1 max-sm:py-1 max-sm:text-center";
   const content = (
     <>
-      <span
-        className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
-          publicDashboard
-            ? "bg-gradient-to-br from-emerald-700 to-teal-800 text-white shadow-md shadow-emerald-900/20 group-hover:from-emerald-600 group-hover:to-teal-700"
-            : "bg-[#102a43] text-teal-200 transition group-hover:bg-teal-800 max-sm:hidden"
-        }`}
-      >
-        <item.Icon className={publicDashboard ? "h-5 w-5" : "h-4 w-4"} aria-hidden="true" />
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white transition-colors group-hover:bg-emerald-800 max-sm:hidden">
+        <item.Icon className="h-4 w-4" aria-hidden="true" />
       </span>
-      <span className={`min-w-0 ${publicDashboard ? "flex flex-1 flex-col gap-0.5" : "flex-1 max-sm:w-full"}`}>
-        <span
-          className={`flex items-start gap-1 font-bold ${
-            publicDashboard
-              ? "text-sm leading-snug text-[#102a43] sm:text-base"
-              : "text-xs text-[#102a43] sm:text-sm max-sm:justify-center max-sm:text-[10px]"
-          }`}
-        >
-          <span className={publicDashboard ? "whitespace-normal" : "truncate"}>{item.title}</span>
-          <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" aria-hidden="true" />
+      <span className="flex-1 max-sm:w-full">
+        <span className="flex items-start gap-1 text-xs font-bold text-[#102a43] sm:text-sm max-sm:justify-center max-sm:text-[10px]">
+          <span className="truncate">{item.title}</span>
+          <ArrowUpRight className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" aria-hidden="true" />
         </span>
-        <span
-          className={`block ${
-            publicDashboard
-              ? "text-xs leading-relaxed text-slate-600 sm:text-sm"
-              : "mt-0.5 truncate text-[10px] text-slate-500 max-[360px]:hidden sm:text-xs max-sm:hidden"
-          }`}
-        >
+        <span className="mt-0.5 block truncate text-[10px] text-slate-500 max-[360px]:hidden sm:text-xs max-sm:hidden">
           {item.description}
         </span>
       </span>
@@ -392,6 +380,19 @@ function QuickAccessCard({
           <Link to="/announcements" className={className}>
             {content}
           </Link>
+        );
+      case "notice-management":
+        return (
+          <Link to="/monitoring" className={className}>
+            {content}
+          </Link>
+        );
+      case "worker-report":
+      case "feedback":
+        return (
+          <button type="button" onClick={onActivate} className={className}>
+            {content}
+          </button>
         );
     }
     return null;
@@ -433,6 +434,7 @@ export function RegistrationDashboard({
   const [feedbackSubject, setFeedbackSubject] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackSaving, setFeedbackSaving] = useState(false);
+  const [feedbackLoginOpen, setFeedbackLoginOpen] = useState(false);
   useEffect(() => {
     if (initialAction) setActiveCard({ kind: "action", id: initialAction });
   }, [initialAction]);
@@ -487,7 +489,7 @@ export function RegistrationDashboard({
   );
   const roleScopedCases = useMemo(
     () => {
-      if (!user) return state.cases;
+      if (!user) return roleConfig === "public" ? state.cases : [];
       if (demoMode && (user.role === "worker" || user.role === "police")) {
         return state.cases.filter(
           (item) =>
@@ -498,7 +500,7 @@ export function RegistrationDashboard({
       }
       return scopedCases(state, user);
     },
-    [demoMode, state, user],
+    [demoMode, roleConfig, state, user],
   );
   const filteredCases = useMemo(() => {
     return user && (user.role === "worker" || user.role === "police")
@@ -508,8 +510,8 @@ export function RegistrationDashboard({
   const currentMonth = monthKey(Date.now());
   const monthCases = filteredCases.filter((item) => monthKey(item.createdAt) === currentMonth);
   useEffect(() => {
+    setWardMonthlyCounts(null);
     if (demoMode || !user || (user.role !== "worker" && user.role !== "police")) {
-      setWardMonthlyCounts(null);
       return;
     }
     let active = true;
@@ -557,21 +559,22 @@ export function RegistrationDashboard({
     };
   }, [L, demoMode, user]);
   const hasWardAggregate = !demoMode && (user?.role === "worker" || user?.role === "police");
-  const metricCaseType =
-    roleConfig === "worker" ? "birth" : roleConfig === "police" ? "death" : null;
-  const roleMonthlyCounts = metricCaseType
-    ? wardMonthlyCounts?.[metricCaseType]
-    : undefined;
-  const localMetricMonthCases = metricCaseType
-    ? monthCases.filter((item) => item.type === metricCaseType)
-    : monthCases;
-  const monthlyCounts = hasWardAggregate
-    ? roleMonthlyCounts ?? { pending: 0, progress: 0, completed: 0, total: 0 }
-    : {
-        pending: localMetricMonthCases.filter((item) => item.status === "pending").length,
-        progress: localMetricMonthCases.filter((item) => item.status === "progress").length,
-        completed: localMetricMonthCases.filter((item) => item.status === "completed").length,
-      };
+  const localMonthlyCounts: MonthlyProgressCounts = {
+    birth: {
+      pending: monthCases.filter((item) => item.type === "birth" && item.status === "pending").length,
+      progress: monthCases.filter((item) => item.type === "birth" && item.status === "progress").length,
+      completed: monthCases.filter((item) => item.type === "birth" && item.status === "completed").length,
+    },
+    death: {
+      pending: monthCases.filter((item) => item.type === "death" && item.status === "pending").length,
+      progress: monthCases.filter((item) => item.type === "death" && item.status === "progress").length,
+      completed: monthCases.filter((item) => item.type === "death" && item.status === "completed").length,
+    },
+  };
+  const monthlyCounts: MonthlyProgressCounts =
+    hasWardAggregate && wardMonthlyCounts
+      ? { birth: wardMonthlyCounts.birth, death: wardMonthlyCounts.death }
+      : localMonthlyCounts;
   const assignedUpazila = user && state.upazilas.find((item) => item.id === user.upazilaId);
   const assignedUnion = assignedUpazila?.unions.find((item) => item.id === user?.unionId);
   const assignedWardCount = assignedUnion
@@ -583,25 +586,29 @@ export function RegistrationDashboard({
     return item.id === user.upazilaId;
   });
   const selectedUnionCount = scopedUpazilas.reduce((count, item) => count + item.unions.length, 0);
-  const monthlyTarget = Math.max(
-    1,
-    roleConfig === "uno" && user?.role === "uno"
-      ? (assignedUpazila?.unions.length ?? 1) * (TARGET.birth + TARGET.death)
+  const monthlyTargetScale =
+    roleConfig !== "public" && !user
+      ? 0
+      : roleConfig === "uno" && user?.role === "uno"
+      ? assignedUpazila?.unions.length ?? 1
       : roleConfig === "admin" && user?.role === "admin"
-        ? TARGET.birth + TARGET.death
+        ? 1
         : roleConfig === "worker" && user?.role === "worker"
-          ? Math.ceil(TARGET.birth / assignedWardCount)
+          ? 1 / assignedWardCount
           : roleConfig === "police" && user?.role === "police"
-            ? Math.ceil(TARGET.death / assignedWardCount)
-          : roleConfig === "uno"
-            ? Math.max(1, selectedUnionCount) * (TARGET.birth + TARGET.death)
-            : roleConfig === "worker" || roleConfig === "police"
-              ? Math.ceil((roleConfig === "worker" ? TARGET.birth : TARGET.death) / 9)
-              : Math.max(1, selectedUnionCount) * (TARGET.birth + TARGET.death),
-  );
-  const monthlyReceived = hasWardAggregate
-    ? roleMonthlyCounts?.total ?? 0
-    : localMetricMonthCases.length;
+            ? 1 / assignedWardCount
+            : roleConfig === "uno"
+              ? Math.max(1, selectedUnionCount)
+              : roleConfig === "worker" || roleConfig === "police"
+                ? 1 / 9
+                : Math.max(1, selectedUnionCount);
+  const monthlyTargets = {
+    birth: Math.ceil(TARGET.birth * monthlyTargetScale),
+    death: Math.ceil(TARGET.death * monthlyTargetScale),
+  };
+  const monthlyTarget = monthlyTargets.birth + monthlyTargets.death;
+  const monthlyReceived =
+    hasWardAggregate && wardMonthlyCounts ? wardMonthlyCounts.total : monthCases.length;
   const openCases = filteredCases.filter((item) => item.status !== "completed" && item.status !== "rejected");
   const urgency = useMemo(() => {
     const counts = { green: 0, yellow: 0, red: 0, expired: 0, review: 0 };
@@ -667,9 +674,7 @@ export function RegistrationDashboard({
             : null,
         ].filter(Boolean).join(" · ");
 
-  const quickAccessActions = actions.filter(
-    ({ id }) => id !== "worker-report" && id !== "feedback",
-  );
+  const quickAccessActions = actions.slice(0, 4);
   const isEntryCard = activeCard?.id === "birth-entry" || activeCard?.id === "death-entry";
   const formType: "birth" | "death" | null =
     activeCard?.id === "birth-entry" || activeCard?.id === "birth-correction"
@@ -803,21 +808,21 @@ export function RegistrationDashboard({
   };
 
   return (
-    <section className="flex min-h-[calc(100svh-var(--app-header-height,9rem)-4rem)] flex-col bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
-      <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-2 px-4 py-1.5 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-2 sm:px-6 sm:py-2 lg:px-8">
-        <div className="grid flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:gap-4">
+    <section className="dashboard-content flex h-full min-h-0 flex-col overflow-y-auto bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
+      <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-1 px-4 py-1 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-1.5 sm:px-6 sm:py-1.5 lg:px-8">
+        <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:gap-3">
           <div className="flex min-h-0 flex-col justify-center">
-            <span className="mb-2 inline-flex w-fit items-center gap-2 rounded-full border border-teal-700/15 bg-white px-3 py-1 text-xs font-semibold text-teal-800 shadow-[0_0_18px_-8px_rgba(13,148,136,0.55)] max-[360px]:mb-1">
+            <span className="mb-1 inline-flex w-fit items-center gap-2 rounded-full border border-teal-700/15 bg-white px-3 py-1 text-xs font-semibold text-teal-800 shadow-[0_0_18px_-8px_rgba(13,148,136,0.55)] max-[360px]:mb-1">
               <span className="h-2 w-2 rounded-full bg-teal-500" aria-hidden="true" />
               {L("জাতীয় প্রশাসনিক অগ্রগতি", "National administrative progress")}
             </span>
-            <h1 className="max-w-3xl font-display text-3xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-2xl sm:text-4xl lg:text-5xl xl:text-6xl">
+            <h1 className="max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
               ই-নিবন্ধন ট্র্যাকার
             </h1>
-            <p className="mt-1 max-w-3xl text-sm font-semibold leading-snug text-teal-800 max-[360px]:text-xs sm:text-base lg:text-lg">
+            <p className="mt-1 max-w-3xl text-xs font-semibold leading-snug text-teal-800 max-[360px]:text-[11px] sm:text-sm lg:text-base">
               Birth &amp; Death Registration 365-Day Compliance System
             </p>
-            <p className="mt-2 max-w-3xl text-xs font-medium leading-relaxed text-slate-700 max-[360px]:mt-1 max-[360px]:text-[11px] sm:text-sm">
+            <p className="mt-1 max-w-3xl text-[11px] font-medium leading-snug text-slate-700 sm:text-xs">
               {L(
                 "জন্মের ৩৬৫ দিনের মধ্যে জন্ম ও মৃত্যু নিবন্ধন নিশ্চিতকরণ ব্যবস্থা",
                 "A system to ensure birth and death registration within 365 days",
@@ -828,12 +833,16 @@ export function RegistrationDashboard({
           <MonthlyProgressCard
             counts={monthlyCounts}
             received={monthlyReceived}
-            target={monthlyTarget}
-            warning={
-              hasWardAggregate && !wardMonthlyCounts
-                ? L("ওয়ার্ডের সামগ্রিক তথ্য লোড করা যায়নি", "Ward aggregate could not be loaded")
-                : undefined
-            }
+            targets={monthlyTargets}
+            compact
+            {...(hasWardAggregate && !wardMonthlyCounts
+              ? {
+                  warning: L(
+                    "ওয়ার্ডের সামগ্রিক তথ্য লোড করা যায়নি",
+                    "Ward aggregate could not be loaded",
+                  ),
+                }
+              : {})}
           />
         </div>
 
@@ -844,24 +853,23 @@ export function RegistrationDashboard({
             unions={[assignedUnion]}
             selectedUnionId={assignedUnion.id}
             showUnionFilter={false}
+            compact
           />
         )}
 
-        <section aria-labelledby="quick-actions-heading">
+        <section className="shrink-0" aria-labelledby="quick-actions-heading">
           <div className="mb-1">
             <h2
               id="quick-actions-heading"
-              className="font-display text-sm font-bold text-[#102a43] sm:text-base"
+              className="font-display text-sm font-bold text-[#102a43]"
             >
               {L("দ্রুত প্রবেশ", "Quick actions")}
             </h2>
           </div>
           <div
-            className={`grid gap-2 sm:gap-3 ${
-              roleConfig === "public" || roleConfig === "police"
-                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
-                : "role-action-grid grid-cols-4"
-            }`}
+            className={
+              "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"
+            }
           >
             {quickAccessActions.map(({ id, title, description, Icon }) => (
               <QuickAccessCard
@@ -948,33 +956,74 @@ export function RegistrationDashboard({
                   </Button>
                 </div>
               ) : activeCard?.id === "feedback" ? (
-                <form className="max-w-2xl space-y-4" onSubmit={submitFeedback}>
-                  <div className="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-center">
-                    <label htmlFor="support-category" className="text-sm font-semibold">{L("বার্তার ধরন", "Message type")}</label>
-                    <Select value={feedbackCategory} onValueChange={(value) => setFeedbackCategory(value as "complaint" | "suggestion")}>
-                      <SelectTrigger id="support-category"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="complaint">{L("অভিযোগ", "Complaint")}</SelectItem>
-                        <SelectItem value="suggestion">{L("পরামর্শ", "Suggestion")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-center">
-                    <label htmlFor="support-subject" className="text-sm font-semibold">{L("বিষয়", "Subject")}</label>
-                    <Input id="support-subject" maxLength={160} minLength={3} required value={feedbackSubject} onChange={(event) => setFeedbackSubject(event.target.value)} />
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-start">
-                    <label htmlFor="support-message" className="pt-2 text-sm font-semibold">{L("বিস্তারিত", "Details")}</label>
-                    <Textarea id="support-message" className="min-h-32" maxLength={4000} minLength={10} required value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} />
-                  </div>
-                  <div className="flex justify-end">
-                    <Button type="submit" disabled={feedbackSaving}>
-                      {feedbackSaving ? L("জমা হচ্ছে…", "Submitting…") : L("জমা দিন", "Submit")}
+                !user ? (
+                  <div className="max-w-xl space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      {L("অভিযোগ বা পরামর্শ জমা দিতে প্রথমে লগইন করুন।", "Please sign in to submit a complaint or suggestion.")}
+                    </p>
+                    <Button type="button" onClick={() => setFeedbackLoginOpen(true)}>
+                      {L("লগইন করুন", "Sign in")}
                     </Button>
                   </div>
-                </form>
+                ) : (
+                  <form className="max-w-2xl space-y-4" onSubmit={submitFeedback}>
+                    <div className="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-center">
+                      <label htmlFor="support-category" className="text-sm font-semibold">
+                        {L("বার্তার ধরন", "Message type")}
+                      </label>
+                      <Select
+                        value={feedbackCategory}
+                        onValueChange={(value) =>
+                          setFeedbackCategory(value as "complaint" | "suggestion")
+                        }
+                      >
+                        <SelectTrigger id="support-category">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="complaint">{L("অভিযোগ", "Complaint")}</SelectItem>
+                          <SelectItem value="suggestion">{L("পরামর্শ", "Suggestion")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-center">
+                      <label htmlFor="support-subject" className="text-sm font-semibold">
+                        {L("বিষয়", "Subject")}
+                      </label>
+                      <Input
+                        id="support-subject"
+                        maxLength={160}
+                        minLength={3}
+                        required
+                        value={feedbackSubject}
+                        onChange={(event) => setFeedbackSubject(event.target.value)}
+                      />
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-start">
+                      <label htmlFor="support-message" className="pt-2 text-sm font-semibold">
+                        {L("বিস্তারিত", "Details")}
+                      </label>
+                      <Textarea
+                        id="support-message"
+                        className="min-h-32"
+                        maxLength={4000}
+                        minLength={10}
+                        required
+                        value={feedbackMessage}
+                        onChange={(event) => setFeedbackMessage(event.target.value)}
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <Button type="submit" disabled={feedbackSaving}>
+                        {feedbackSaving
+                          ? L("জমা হচ্ছে…", "Submitting…")
+                          : L("জমা দিন", "Submit")}
+                      </Button>
+                    </div>
+                  </form>
+                )
               ) : (
-              <div className="space-y-5">
+                <div className="space-y-5">
                 <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900">
                   {L("নির্বাচিত এলাকা", "Selected area")}: {scopeLabel}
                 </div>
@@ -1071,12 +1120,13 @@ export function RegistrationDashboard({
                     </div>
                   </div>
                 )}
-              </div>
+                </div>
               )}
             </>
           )}
         </DialogContent>
       </Dialog>
+      <LoginDialog open={feedbackLoginOpen} onClose={() => setFeedbackLoginOpen(false)} />
     </section>
   );
 }

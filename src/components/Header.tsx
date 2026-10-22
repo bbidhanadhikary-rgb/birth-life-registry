@@ -52,38 +52,42 @@ export function Header() {
   return (
     <header ref={headerRef} className="fixed inset-x-0 top-0 z-50 border-b border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-sm">
       <nav aria-label={L("ড্যাশবোর্ড নির্বাচন", "Dashboard switcher")} className="bg-emerald-900/90">
-        <div className="mx-auto flex w-full max-w-none gap-1 overflow-x-auto px-4 py-1.5 sm:px-6 lg:px-8">
-          {tabs.map(([role, bn, en]) => (
-            <Link
-              key={en}
-              to="/"
-              search={role ? { role } : {}}
-              activeOptions={{ exact: true, includeSearch: true }}
-              className="whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold sm:text-sm"
-              inactiveProps={{ className: "text-emerald-50 hover:bg-emerald-700" }}
-              activeProps={{ className: "bg-white text-emerald-900 hover:bg-white" }}
-            >
-              {L(bn, en)}
-            </Link>
-          ))}
-          {showStaffLinks && (
-            <>
-              <Link
-                to="/"
-                search={(previous) => ({ ...previous, action: "worker-report" })}
-                className="ml-auto shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-emerald-50 hover:bg-emerald-700 sm:text-sm"
-              >
-                {L("রিপোর্ট", "Reports")}
-              </Link>
-              <Link
-                to="/"
-                search={(previous) => ({ ...previous, action: "feedback" })}
-                className="shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-emerald-50 hover:bg-emerald-700 sm:text-sm"
-              >
-                {L("অভিযোগ ও পরামর্শ", "Complaints and feedback")}
-              </Link>
-            </>
-          )}
+        <div className="w-full px-4 py-1.5 sm:px-6 lg:px-8">
+          <div className="flex w-full flex-wrap items-center justify-between gap-x-1 gap-y-1">
+            <div className="flex flex-wrap items-center gap-1">
+              {tabs.map(([role, bn, en]) => (
+                <Link
+                  key={en}
+                  to="/"
+                  search={role ? { role } : {}}
+                  activeOptions={{ exact: true, includeSearch: true }}
+                  className="whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold sm:text-sm"
+                  inactiveProps={{ className: "text-emerald-50 hover:bg-emerald-700" }}
+                  activeProps={{ className: "bg-white text-emerald-900 hover:bg-white" }}
+                >
+                  {L(bn, en)}
+                </Link>
+              ))}
+            </div>
+            {showStaffLinks && (
+              <div className="ml-auto flex flex-wrap items-center gap-4">
+                <Link
+                  to="/"
+                  search={(previous) => ({ ...previous, action: "worker-report" })}
+                  className="shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-emerald-50 hover:bg-emerald-700 sm:text-sm"
+                >
+                  {L("রিপোর্ট", "Reports")}
+                </Link>
+                <Link
+                  to="/"
+                  search={(previous) => ({ ...previous, action: "feedback" })}
+                  className="shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-emerald-50 hover:bg-emerald-700 sm:text-sm"
+                >
+                  {L("অভিযোগ ও পরামর্শ", "Complaints and feedback")}
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
       {!online && (
