@@ -59,7 +59,7 @@ function DashboardSection() {
 }
 
 function DashboardSectionContent({ section }: { section: string }) {
-  const { user, state, L, selectedUpazilaId, setSelectedUpazilaId } = useApp();
+  const { user, state, L, selectedUpazilaId } = useApp();
   const [unionId, setUnionId] = useState("all");
   const [areaFilters, setAreaFilters] = useState({
     division: "all",
@@ -96,25 +96,14 @@ function DashboardSectionContent({ section }: { section: string }) {
       : user.role === "district"
         ? state.upazilas.filter((up) => up.districtEn === user.districtId)
         : state.upazilas.filter((up) => up.id === user.upazilaId);
-  const geographicUpazilas = BANGLADESH_ADMINISTRATIVE_AREAS.filter(
-    (area) =>
-      (area.level === "upazila" || area.level === "city_corporation") &&
-      (user.role === "super" ||
-        registeredUpazilas.some(
-          (registered) =>
-            sameAdministrativeName(registered.en, area.en) ||
-            sameAdministrativeName(registered.bn, area.bn),
-        )),
+  const geographicAreas = BANGLADESH_ADMINISTRATIVE_AREAS;
+  const geographicUpazilas = geographicAreas.filter(
+    (area) => area.level === "upazila" || area.level === "city_corporation",
   );
-  const availableDivisionIds = new Set(geographicUpazilas.map((area) => area.divisionId));
-  const divisionOptions = BANGLADESH_ADMINISTRATIVE_AREAS.filter(
-    (area) => area.level === "division" && availableDivisionIds.has(area.id),
-  );
-  const availableDistrictIds = new Set(geographicUpazilas.map((area) => area.districtId));
+  const divisionOptions = geographicAreas.filter((area) => area.level === "division");
   const districtOptions = BANGLADESH_ADMINISTRATIVE_AREAS.filter(
     (area) =>
       area.level === "district" &&
-      availableDistrictIds.has(area.id) &&
       (area.divisionId === areaFilters.division || areaFilters.division === "all"),
   );
   const matchingGeographicUpazilas = geographicUpazilas.filter(
@@ -130,18 +119,11 @@ function DashboardSectionContent({ section }: { section: string }) {
       area.id === areaFilters.union &&
       (area.level === "union" || area.level === "municipality"),
   );
-  const assignedUnion = registeredUpazilas
-    .flatMap((upazila) => upazila.unions)
-    .find((union) => union.id === user.unionId);
   const unionOptions = selectedGeographicUpazila
-    ? BANGLADESH_ADMINISTRATIVE_AREAS.filter(
+    ? geographicAreas.filter(
         (area) =>
           (area.level === "union" || area.level === "municipality") &&
-          area.parentId === selectedGeographicUpazila.id &&
-          (user.role !== "admin" ||
-            (assignedUnion &&
-              (sameAdministrativeName(area.en, assignedUnion.en) ||
-                sameAdministrativeName(area.bn, assignedUnion.bn)))),
+          area.parentId === selectedGeographicUpazila.id,
       )
     : [];
   const wardOptions =
@@ -293,13 +275,6 @@ function DashboardSectionContent({ section }: { section: string }) {
               options={matchingGeographicUpazilas}
               onChange={(selectedId) => {
                 setAreaFilters({ ...areaFilters, upazila: selectedId, union: "all", ward: "all" });
-                const selected = geographicUpazilas.find((area) => area.id === selectedId);
-                const registered = selected && registeredUpazilas.find(
-                  (item) =>
-                    sameAdministrativeName(item.en, selected.en) ||
-                    sameAdministrativeName(item.bn, selected.bn),
-                );
-                setSelectedUpazilaId(registered?.id);
               }}
             />
             <AreaFilterSelect
@@ -323,7 +298,11 @@ function DashboardSectionContent({ section }: { section: string }) {
               upazila={reportUpazila}
               cases={areaCases}
               unions={reportUnions}
-              selectedUnionId={selectedRegisteredUnion?.id ?? "all"}
+              selectedUnionId={
+                areaFilters.union === "all"
+                  ? "all"
+                  : selectedRegisteredUnion?.id ?? "__no_registered_union__"
+              }
               showUnionFilter={false}
             />
           ) : (
@@ -331,6 +310,10 @@ function DashboardSectionContent({ section }: { section: string }) {
               {L("নির্বাচিত এলাকায় কোনো নিবন্ধিত উপজেলা পাওয়া যায়নি।", "No registered upazila was found in this selection.")}
             </p>
           )}
+          <AreaReportRecords
+            key={`${areaFilters.division}:${areaFilters.district}:${areaFilters.upazila}:${areaFilters.union}:${areaFilters.ward}`}
+            cases={areaCases}
+          />
         </div>
       )}
       {(section === "compliance" || section === "alerts") && upazila && (
@@ -384,6 +367,117 @@ function AreaFilterSelect({
         ))}
       </select>
     </label>
+  );
+}
+
+function AreaReportRecords({ cases }: { cases: RegCase[] }) {
+  const { L, n } = useApp();
+  const { address, date } = useCaseHelpers();
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const filtered = useMemo(
+    () =>
+      normalizedQuery
+        ? cases.filter((item) =>
+            [item.id, item.name.bn, item.name.en, item.nid].some((value) =>
+              value.toLocaleLowerCase().includes(normalizedQuery),
+            ),
+          )
+        : cases,
+    [cases, normalizedQuery],
+  );
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, pageCount - 1);
+  const visible = filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+
+  return (
+    <section
+      className="rounded-xl border border-border bg-card p-4 sm:p-5"
+      aria-labelledby="area-report-records-title"
+    >
+      <h2 id="area-report-records-title" className="font-semibold">
+        {L("এলাকাভিত্তিক নিবন্ধন রেকর্ড", "Area-wise registration records")}
+      </h2>
+      <label className="relative mt-3 block max-w-xl">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <Input
+          className="pl-9"
+          type="search"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPage(0);
+          }}
+          placeholder={L("নাম, রেকর্ড আইডি বা NID দিয়ে খুঁজুন", "Search by name, record ID or NID")}
+          aria-label={L("নিবন্ধন খুঁজুন", "Search registrations")}
+        />
+      </label>
+      <p className="my-3 text-sm text-muted-foreground">
+        {L(`${n(filtered.length)}টি রেকর্ড`, `${n(filtered.length)} records`)}
+      </p>
+      {visible.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[44rem] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground">
+                <th scope="col" className="px-3 py-2 font-semibold">{L("নাম", "Name")}</th>
+                <th scope="col" className="px-3 py-2 font-semibold">{L("ধরন", "Type")}</th>
+                <th scope="col" className="px-3 py-2 font-semibold">{L("ঠিকানা", "Address")}</th>
+                <th scope="col" className="px-3 py-2 font-semibold">{L("আবেদনের তারিখ", "Filed")}</th>
+                <th scope="col" className="px-3 py-2 font-semibold">{L("অবস্থা", "Status")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((item) => (
+                <tr key={item.id} className="border-b border-border last:border-0">
+                  <td className="px-3 py-2 font-medium">{L(item.name.bn, item.name.en)}</td>
+                  <td className="px-3 py-2">
+                    {item.type === "birth" ? L("জন্ম", "Birth") : L("মৃত্যু", "Death")}
+                  </td>
+                  <td className="px-3 py-2">{address(item)}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{date(item.createdAt)}</td>
+                  <td className="px-3 py-2"><StatusBadge s={item.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+          {L("নির্বাচিত এলাকায় কোনো রেকর্ড পাওয়া যায়নি।", "No records found in the selected area.")}
+        </p>
+      )}
+      {filtered.length > pageSize && (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === 0}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            <ChevronLeft className="mr-1 h-4 w-4" />
+            {L("আগের", "Previous")}
+          </Button>
+          <span className="text-sm tabular-nums text-muted-foreground">
+            {n(currentPage + 1)} / {n(pageCount)}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage + 1 >= pageCount}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            {L("পরের", "Next")}
+            <ChevronRight className="ml-1 h-4 w-4" />
+          </Button>
+        </div>
+      )}
+    </section>
   );
 }
 

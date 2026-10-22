@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Footer } from "@/components/Footer";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { TARGET, type RegCase, type Role } from "@/lib/types";
@@ -687,7 +686,7 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
   };
 
   return (
-    <section className="flex min-h-[calc(100svh-var(--app-header-height,9rem))] flex-col bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
+    <section className="flex min-h-[calc(100svh-var(--app-header-height,9rem)-4rem)] flex-col bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
       <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-2 px-4 py-1.5 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-2 sm:px-6 sm:py-2 lg:px-8">
         <div className="grid flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.8fr_1.2fr] lg:items-center lg:gap-4">
           <div className="flex min-h-0 flex-col justify-center">
@@ -756,7 +755,6 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
           </div>
         </section>
       </div>
-      <Footer compact />
       <Dialog
         open={activeCard !== null}
         onOpenChange={(open) => {

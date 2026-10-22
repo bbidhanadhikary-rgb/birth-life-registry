@@ -36,7 +36,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCaseHelpers } from "@/components/shared";
-import { Footer } from "@/components/Footer";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { compressImage } from "@/lib/compress-image";
@@ -1143,8 +1142,6 @@ export function WorkerDashboard() {
           </div>
         </section>
       </div>
-
-      <Footer compact />
 
       <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
         <DialogContent className="max-h-[92svh] max-w-4xl overflow-y-auto rounded-2xl border-emerald-200 p-4 sm:p-6">

@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Megaphone } from "lucide-react";
-import { Footer } from "@/components/Footer";
 import { useApp } from "@/lib/store";
 
 export const Route = createFileRoute("/announcements")({
@@ -89,7 +88,6 @@ function AnnouncementsPage() {
         </p>
       )}
       </main>
-      <Footer />
     </>
   );
 }

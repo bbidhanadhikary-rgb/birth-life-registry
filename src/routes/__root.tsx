@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "../lib/store";
 import { Header, RoleSwitcherBar } from "../components/Header";
+import { Footer } from "../components/Footer";
 import { Toaster } from "sonner";
 
 function NotFoundComponent() {
@@ -48,7 +49,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   return (
     <StoreProvider>
       <Header />
-      <main className="box-border min-h-screen bg-background pt-[var(--app-header-height,9rem)]">
+      <main className="box-border min-h-[calc(100svh-4rem)] bg-background pt-[var(--app-header-height,9rem)]">
         <div className="flex min-h-[calc(100svh-var(--app-header-height,9rem))] items-center justify-center px-4">
           <div className="max-w-md text-center">
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
@@ -77,6 +78,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
           </div>
         </div>
       </main>
+      <Footer compact />
       <Toaster richColors position="top-center" />
     </StoreProvider>
   );
@@ -131,7 +133,8 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <StoreProvider>
         <Header />
-        <main className="box-border min-h-screen pt-[var(--app-header-height,9rem)]"><Outlet /></main>
+        <main className="box-border min-h-[calc(100svh-4rem)] pt-[var(--app-header-height,9rem)]"><Outlet /></main>
+        <Footer compact />
         <RoleSwitcherBar />
         <Toaster richColors position="top-center" />
       </StoreProvider>

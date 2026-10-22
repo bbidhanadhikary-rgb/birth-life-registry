@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, ClipboardClock } from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { AlertTriangle, ArrowLeft, ClipboardClock } from "lucide-react";
 import { roleLabel, useApp } from "@/lib/store";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database, Json } from "@/integrations/supabase/types";
@@ -94,6 +95,13 @@ export function CorrectionLogPage() {
 
   return (
     <main className="mx-auto w-full max-w-none px-4 py-4 sm:px-6 lg:px-8">
+      <Link
+        to="/dashboard"
+        className="mb-2 inline-flex min-h-10 items-center gap-2 rounded-md px-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        {L("ড্যাশবোর্ডে ফিরে যান", "Back to dashboard")}
+      </Link>
       <ModuleNavigation />
       <header className="mb-5">
         <p className="text-sm font-semibold text-emerald-800">
