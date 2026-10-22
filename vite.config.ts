@@ -34,8 +34,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: ({ request, url }) =>
-              request.mode === "navigate" && url.pathname === "/",
+            urlPattern: ({ request, url }) => request.mode === "navigate" && url.pathname === "/",
             handler: "NetworkFirst",
             options: {
               cacheName: "public-home-page",
