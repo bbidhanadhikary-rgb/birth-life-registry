@@ -46,12 +46,72 @@ import type { Bi, CaseFileMetadata, RegCase } from "@/lib/types";
 
 const emptyBi: Bi = { bn: "", en: "" };
 type CaseType = "birth" | "death";
+type RegistrationDraft = {
+  name: Bi;
+  father: Bi;
+  mother: Bi;
+  spouseName: Bi;
+  applicantNameBn: string;
+  applicantRelationshipBn: string;
+  cause: Bi;
+  nid: string;
+  mobile: string;
+  gender: RegCase["gender"];
+  dob: string;
+  dod: string;
+  order: string;
+  fatherBrn: string;
+  motherBrn: string;
+  birthPlace: Bi;
+  present: Bi;
+  permanent: Bi;
+  samePermanent: boolean;
+  samePresent: boolean;
+};
 type DialogState =
   | { kind: "form"; type: CaseType; entry?: RegCase | undefined }
   | { kind: "entries"; type: CaseType }
   | { kind: "epi" }
   | null;
 type EpiVisit = Tables<"epi_visits">;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isBi(value: unknown): value is Bi {
+  return isRecord(value) && typeof value.bn === "string" && typeof value.en === "string";
+}
+
+function readRegistrationDraft(key: string): Partial<RegistrationDraft> | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const stored = window.localStorage.getItem(key);
+    if (!stored) return undefined;
+    const value: unknown = JSON.parse(stored);
+    if (!isRecord(value)) return undefined;
+    const draft: Partial<RegistrationDraft> = {};
+    for (const field of ["name", "father", "mother", "spouseName", "cause", "birthPlace", "present", "permanent"] as const) {
+      if (isBi(value[field])) draft[field] = value[field];
+    }
+    for (const field of ["applicantNameBn", "applicantRelationshipBn", "nid", "mobile", "dob", "dod", "order", "fatherBrn", "motherBrn"] as const) {
+      if (typeof value[field] === "string") draft[field] = value[field];
+    }
+    if (value.gender === "male" || value.gender === "female" || value.gender === "other") {
+      draft.gender = value.gender;
+    }
+    if (typeof value.samePermanent === "boolean") draft.samePermanent = value.samePermanent;
+    if (typeof value.samePresent === "boolean") draft.samePresent = value.samePresent;
+    return draft;
+  } catch (cause) {
+    console.error("Could not load registration draft", cause);
+    return undefined;
+  }
+}
+
+function normalizeDuplicateName(value: string) {
+  return value.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+}
 
 function captureCoordinates(): Promise<{ latitude: number; longitude: number }> {
   if (!navigator.geolocation) {
@@ -130,7 +190,6 @@ function BiField({
         autoComplete="off"
         maxLength={100}
         placeholder="Enter in English"
-        required={required}
         value={value.en}
         onChange={(event) => onChange({ ...value, en: event.target.value })}
       />
@@ -185,7 +244,6 @@ function BiTextAreaField({
           aria-label={`${labelEn} — English`}
           maxLength={500}
           placeholder="Enter in English"
-          required={required}
           rows={compact ? 3 : 2}
           value={value.en}
           onChange={(event) => onChange({ ...value, en: event.target.value })}
@@ -211,41 +269,52 @@ export function RegForm({
   const { L, user, state, addCase, updateCase, demoMode, enterDemoLogin } = useApp();
   const upazila = user ? state.upazilas.find((area) => area.id === user.upazilaId) : undefined;
   const union = upazila?.unions.find((area) => area.id === user?.unionId);
-  const [name, setName] = useState<Bi>(entry?.name ?? emptyBi);
-  const [father, setFather] = useState<Bi>(entry?.father ?? emptyBi);
-  const [mother, setMother] = useState<Bi>(entry?.mother ?? emptyBi);
-  const [spouseName, setSpouseName] = useState<Bi>(entry?.details?.spouseName ?? emptyBi);
+  const draftKey = `birth-life-registry:entry-draft:${user?.id ?? "unassigned"}:${type}:${entry?.id ?? "new"}`;
+  const savedDraft = useMemo(() => readRegistrationDraft(draftKey), [draftKey]);
+  const [name, setName] = useState<Bi>(savedDraft?.name ?? entry?.name ?? emptyBi);
+  const [father, setFather] = useState<Bi>(savedDraft?.father ?? entry?.father ?? emptyBi);
+  const [mother, setMother] = useState<Bi>(savedDraft?.mother ?? entry?.mother ?? emptyBi);
+  const [spouseName, setSpouseName] = useState<Bi>(
+    savedDraft?.spouseName ?? entry?.details?.spouseName ?? emptyBi,
+  );
   const [applicantNameBn, setApplicantNameBn] = useState(
-    entry?.details?.applicantNameBn ?? entry?.details?.applicantName?.bn ?? "",
+    savedDraft?.applicantNameBn ?? entry?.details?.applicantNameBn ?? entry?.details?.applicantName?.bn ?? "",
   );
   const [applicantRelationshipBn, setApplicantRelationshipBn] = useState(
-    entry?.details?.applicantRelationshipBn ?? entry?.details?.applicantRelationship?.bn ?? "",
+    savedDraft?.applicantRelationshipBn ?? entry?.details?.applicantRelationshipBn ?? entry?.details?.applicantRelationship?.bn ?? "",
   );
-  const [cause, setCause] = useState<Bi>(entry?.cause ?? emptyBi);
-  const [nid, setNid] = useState(entry?.nid ?? "");
-  const [mobile, setMobile] = useState(entry?.parentMobile ?? "");
-  const [gender, setGender] = useState<RegCase["gender"]>(entry?.gender ?? "male");
-  const [dob, setDob] = useState(entry?.dob ?? "");
-  const [dod, setDod] = useState(entry?.dod ?? "");
-  const [order, setOrder] = useState(entry?.order ?? "1");
-  const [fatherBrn, setFatherBrn] = useState(entry?.details?.fatherBrn ?? "");
-  const [motherBrn, setMotherBrn] = useState(entry?.details?.motherBrn ?? "");
+  const [cause, setCause] = useState<Bi>(savedDraft?.cause ?? entry?.cause ?? emptyBi);
+  const [nid, setNid] = useState(savedDraft?.nid ?? entry?.nid ?? "");
+  const [mobile, setMobile] = useState(savedDraft?.mobile ?? entry?.parentMobile ?? "");
+  const [gender, setGender] = useState<RegCase["gender"]>(savedDraft?.gender ?? entry?.gender ?? "male");
+  const [dob, setDob] = useState(savedDraft?.dob ?? entry?.dob ?? "");
+  const [dod, setDod] = useState(savedDraft?.dod ?? entry?.dod ?? "");
+  const [order, setOrder] = useState(savedDraft?.order ?? entry?.order ?? "1");
+  const [fatherBrn, setFatherBrn] = useState(savedDraft?.fatherBrn ?? entry?.details?.fatherBrn ?? "");
+  const [motherBrn, setMotherBrn] = useState(savedDraft?.motherBrn ?? entry?.details?.motherBrn ?? "");
   const [birthPlace, setBirthPlace] = useState<Bi>(
-    type === "death"
-      ? entry?.details?.deathPlace ?? entry?.details?.birthPlace ?? emptyBi
-      : entry?.details?.birthPlace ?? emptyBi,
+    savedDraft?.birthPlace ??
+      (type === "death"
+        ? entry?.details?.deathPlace ?? entry?.details?.birthPlace ?? emptyBi
+        : entry?.details?.birthPlace ?? emptyBi),
   );
-  const [present, setPresent] = useState<Bi>(entry?.details?.presentAddress ?? emptyBi);
-  const [permanent, setPermanent] = useState<Bi>(entry?.details?.permanentAddress ?? emptyBi);
+  const [present, setPresent] = useState<Bi>(
+    savedDraft?.present ?? entry?.details?.presentAddress ?? emptyBi,
+  );
+  const [permanent, setPermanent] = useState<Bi>(
+    savedDraft?.permanent ?? entry?.details?.permanentAddress ?? emptyBi,
+  );
   const [samePermanent, setSamePermanent] = useState(
-    Boolean(entry?.details?.birthPlace &&
-      entry.details.permanentAddress?.bn === entry.details.birthPlace.bn &&
-      entry.details.permanentAddress?.en === entry.details.birthPlace.en),
+    savedDraft?.samePermanent ??
+      Boolean(entry?.details?.birthPlace &&
+        entry.details.permanentAddress?.bn === entry.details.birthPlace.bn &&
+        entry.details.permanentAddress?.en === entry.details.birthPlace.en),
   );
   const [samePresent, setSamePresent] = useState(
-    Boolean(entry?.details?.birthPlace &&
-      entry.details.presentAddress?.bn === entry.details.birthPlace.bn &&
-      entry.details.presentAddress?.en === entry.details.birthPlace.en),
+    savedDraft?.samePresent ??
+      Boolean(entry?.details?.birthPlace &&
+        entry.details.presentAddress?.bn === entry.details.birthPlace.bn &&
+        entry.details.presentAddress?.en === entry.details.birthPlace.en),
   );
   const [attachments, setAttachments] = useState<(File | null)[]>([null, null, null]);
   const [visitPhoto, setVisitPhoto] = useState<File | null>(null);
@@ -259,8 +328,72 @@ export function RegForm({
   const [compressing, setCompressing] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const draftSaveErrorShown = useRef(false);
   const oldFiles = entry?.files ?? [];
   const oldVisitPhoto = oldFiles.find((file) => file.fieldVisit);
+
+  useEffect(() => {
+    const draft: RegistrationDraft = {
+      name,
+      father,
+      mother,
+      spouseName,
+      applicantNameBn,
+      applicantRelationshipBn,
+      cause,
+      nid,
+      mobile,
+      gender,
+      dob,
+      dod,
+      order,
+      fatherBrn,
+      motherBrn,
+      birthPlace,
+      present,
+      permanent,
+      samePermanent,
+      samePresent,
+    };
+    const timeout = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(draftKey, JSON.stringify(draft));
+        draftSaveErrorShown.current = false;
+      } catch (causeError) {
+        console.error("Could not save registration draft", causeError);
+        if (!draftSaveErrorShown.current) {
+          toast.error(
+            L("খসড়া সংরক্ষণ করা যায়নি", "Could not save this form draft"),
+          );
+          draftSaveErrorShown.current = true;
+        }
+      }
+    }, 300);
+    return () => window.clearTimeout(timeout);
+  }, [
+    applicantNameBn,
+    applicantRelationshipBn,
+    birthPlace,
+    cause,
+    dob,
+    dod,
+    draftKey,
+    father,
+    fatherBrn,
+    gender,
+    L,
+    mobile,
+    mother,
+    motherBrn,
+    name,
+    nid,
+    order,
+    permanent,
+    present,
+    samePermanent,
+    samePresent,
+    spouseName,
+  ]);
 
   const chooseImage = async (index: number, file?: File) => {
     if (!file) return;
@@ -498,18 +631,11 @@ export function RegForm({
       setError(L("আপনার নির্ধারিত এলাকা পাওয়া যায়নি", "Your assigned area could not be found"));
       return;
     }
-    if (
-      !name.bn.trim() ||
-      !name.en.trim() ||
-      !father.bn.trim() ||
-      !father.en.trim() ||
-      !mother.bn.trim() ||
-      !mother.en.trim()
-    ) {
+    if (!name.bn.trim() || !father.bn.trim() || !mother.bn.trim()) {
       setError(
         L(
-          "শিশু/ব্যক্তি, পিতা ও মাতার নাম বাংলা ও ইংরেজিতে দিন",
-          "Enter the child/person, father and mother's names in Bangla and English",
+          "শিশু/ব্যক্তি, পিতা ও মাতার নাম বাংলায় দিন",
+          "Enter the child/person, father and mother's names in Bangla",
         ),
       );
       return;
@@ -538,7 +664,7 @@ export function RegForm({
     }
     if (
       !dob ||
-      (type === "death" && (!dod || !cause.bn.trim() || !cause.en.trim()))
+      (type === "death" && (!dod || !cause.bn.trim()))
     ) {
       setError(
         L(
@@ -552,11 +678,8 @@ export function RegForm({
       setError(L("পিতা/মাতার জন্ম নিবন্ধন নম্বর ১৭ অঙ্কের হতে হবে", "Father's/mother's BRN must be exactly 17 digits"));
       return;
     }
-    if (
-      !birthPlace.bn.trim() || !birthPlace.en.trim() ||
-      !present.bn.trim() || !present.en.trim() || !permanent.bn.trim() || !permanent.en.trim()
-    ) {
-      setError(L("জন্ম/মৃত্যুর স্থান এবং বর্তমান ও স্থায়ী ঠিকানা বাংলা ও ইংরেজিতে দিন", "Enter the place of birth/death and present and permanent addresses in Bangla and English"));
+    if (!birthPlace.bn.trim() || !present.bn.trim() || !permanent.bn.trim()) {
+      setError(L("জন্ম/মৃত্যুর স্থান এবং বর্তমান ও স্থায়ী ঠিকানা বাংলায় দিন", "Enter the place of birth/death and present and permanent addresses in Bangla"));
       return;
     }
     if (dob > new Date().toISOString().slice(0, 10) || (type === "death" && (dod < dob || dod > new Date().toISOString().slice(0, 10)))) {
@@ -567,9 +690,94 @@ export function RegForm({
       setError(L("সন্তানের ক্রম ১ থেকে ২০-এর মধ্যে দিন", "Child order must be between 1 and 20"));
       return;
     }
+    const normalize = normalizeDuplicateName;
+    const duplicate = state.cases.some(
+      (existing) =>
+        existing.id !== entry?.id &&
+        existing.type === type &&
+        existing.dob === dob &&
+        existing.upazilaId === user.upazilaId &&
+        existing.unionId === user.unionId &&
+        existing.ward === (user.ward ?? 1) &&
+        normalize(existing.father.bn) === normalize(father.bn) &&
+        normalize(existing.mother.bn) === normalize(mother.bn),
+    );
+    if (duplicate) {
+      setError(
+        L(
+          "একই জন্মতারিখ ও পিতা-মাতার নামে একটি আবেদন আগে থেকেই রয়েছে। তথ্য যাচাই করে পুনরায় জমা দেবেন না।",
+          "A record with the same date of birth and parents already exists. Check the existing record before submitting again.",
+        ),
+      );
+      return;
+    }
 
     setSaving(true);
     try {
+      if (!demoMode && navigator.onLine) {
+        const { data: possibleDuplicates, error: duplicateQueryError } = await supabase
+          .from("cases")
+          .select("id, father_bn, mother_bn")
+          .eq("type", type)
+          .eq("dob", dob)
+          .eq("upazila_id", user.upazilaId)
+          .eq("union_id", user.unionId)
+          .eq("ward", user.ward ?? 1);
+        if (duplicateQueryError) {
+          setError(
+            L(
+              `ডুপ্লিকেট আবেদন যাচাই করা যায়নি: ${duplicateQueryError.message}`,
+              `Could not check for duplicate applications: ${duplicateQueryError.message}`,
+            ),
+          );
+          return;
+        }
+        const serverDuplicate = possibleDuplicates?.some(
+          (candidate) =>
+            candidate.id !== entry?.id &&
+            normalize(candidate.father_bn) === normalize(father.bn) &&
+            normalize(candidate.mother_bn) === normalize(mother.bn),
+        );
+        if (serverDuplicate) {
+          setError(
+            L(
+              "একই জন্মতারিখ ও পিতা-মাতার নামে একটি আবেদন আগে থেকেই রয়েছে। তথ্য যাচাই করে পুনরায় জমা দেবেন না।",
+              "A record with the same date of birth and parents already exists. Check the existing record before submitting again.",
+            ),
+          );
+          return;
+        }
+      }
+      let submittedVisitPhotoMetadata = visitPhotoMetadata;
+      if (
+        gpsEnabled &&
+        visitPhoto &&
+        (submittedVisitPhotoMetadata?.latitude === undefined ||
+          submittedVisitPhotoMetadata.longitude === undefined)
+      ) {
+        try {
+          const coordinates = await captureCoordinates();
+          submittedVisitPhotoMetadata = {
+            capturedAt: submittedVisitPhotoMetadata?.capturedAt ?? new Date().toISOString(),
+            ...coordinates,
+          };
+          setVisitPhotoMetadata(submittedVisitPhotoMetadata);
+          setLocationError("");
+        } catch (causeError) {
+          const message =
+            causeError instanceof Error
+              ? causeError.message
+              : L("GPS লোকেশন পাওয়া যায়নি", "Could not capture GPS location");
+          setLocationError(message);
+          setError(
+            L(
+              `GPS লোকেশন নেওয়া যায়নি: ${message}। লোকেশন ছাড়া জমা দিতে GPS বন্ধ করুন।`,
+              `Could not capture GPS: ${message}. Turn off GPS to submit without location.`,
+            ),
+          );
+          return;
+        }
+      }
       const data = {
         type,
         name,
@@ -601,7 +809,9 @@ export function RegForm({
       const selectedFiles = [...selectedAttachments, ...(visitPhoto ? [visitPhoto] : [])];
       const fileMetadata: CaseFileMetadata[] = [
         ...selectedAttachments.map(() => ({})),
-        ...(visitPhoto && visitPhotoMetadata ? [{ fieldVisit: visitPhotoMetadata }] : []),
+        ...(visitPhoto && submittedVisitPhotoMetadata
+          ? [{ fieldVisit: submittedVisitPhotoMetadata }]
+          : []),
       ];
       if (entry) {
         const updated = await updateCase(entry.id, {
@@ -624,6 +834,11 @@ export function RegForm({
           return;
         }
         toast.success(L("এন্ট্রি জমা হয়েছে", "Entry submitted"));
+      }
+      try {
+        window.localStorage.removeItem(draftKey);
+      } catch (causeError) {
+        console.error("Could not clear submitted registration draft", causeError);
       }
       onSaved();
     } finally {
