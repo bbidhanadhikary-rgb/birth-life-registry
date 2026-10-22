@@ -44,24 +44,31 @@ export const checkCaseDuplicate = createServerFn({ method: "POST" })
       throw new Error("Only active health workers with an assigned area can check case duplicates");
     }
 
-    const { data: matches, error } = await db
-      .from("cases")
-      .select("id, father_bn, mother_bn")
-      .eq("type", data.type)
-      .eq("dob", data.dob)
-      .eq("upazila_id", profile.upazila_id)
-      .eq("union_id", profile.union_id)
-      .eq("ward", profile.ward)
-      .limit(2000);
-
-    if (error) throw new Error(`Could not check for duplicate cases: ${error.message}`);
     const normalize = normalizeName;
-    return {
-      duplicate: (matches ?? []).some(
-        (match) =>
-          match.id !== data.excludeId &&
-          normalize(match.father_bn) === normalize(data.fatherBn) &&
-          normalize(match.mother_bn) === normalize(data.motherBn),
-      ),
-    };
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data: matches, error } = await db
+        .from("cases")
+        .select("id, father_bn, mother_bn")
+        .eq("type", data.type)
+        .eq("dob", data.dob)
+        .eq("upazila_id", profile.upazila_id)
+        .eq("union_id", profile.union_id)
+        .eq("ward", profile.ward)
+        .order("created_at")
+        .range(offset, offset + pageSize - 1);
+
+      if (error) throw new Error(`Could not check for duplicate cases: ${error.message}`);
+      if (
+        (matches ?? []).some(
+          (match) =>
+            match.id !== data.excludeId &&
+            normalize(match.father_bn) === normalize(data.fatherBn) &&
+            normalize(match.mother_bn) === normalize(data.motherBn),
+        )
+      ) {
+        return { duplicate: true };
+      }
+      if ((matches?.length ?? 0) < pageSize) return { duplicate: false };
+    }
   });
