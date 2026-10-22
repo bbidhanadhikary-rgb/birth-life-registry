@@ -203,7 +203,8 @@ function BiField({
         aria-label={`${label} — English`}
         autoComplete="off"
         maxLength={100}
-        placeholder="Enter in English"
+        placeholder="Enter in English (optional)"
+        required={false}
         value={value.en}
         onChange={(event) => onChange({ ...value, en: event.target.value })}
       />
@@ -257,7 +258,8 @@ function BiTextAreaField({
           className={compact ? "h-[4.5rem] min-h-[4.5rem] px-3 py-1.5 text-base md:text-base placeholder:text-base" : undefined}
           aria-label={`${labelEn} — English`}
           maxLength={500}
-          placeholder="Enter in English"
+          placeholder="Enter in English (optional)"
+          required={false}
           rows={compact ? 3 : 2}
           value={value.en}
           onChange={(event) => onChange({ ...value, en: event.target.value })}
