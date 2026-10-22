@@ -57,8 +57,8 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
-  --font-sans: "Hind Siliguri", system-ui, sans-serif;
-  --font-display: "Tiro Bangla", "Hind Siliguri", serif;
+  --font-sans: "Noto Sans Bengali", "Hind Siliguri", system-ui, sans-serif;
+  --font-display: "Tiro Bangla", "Noto Sans Bengali", "Hind Siliguri", serif;
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -69,7 +69,19 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-@utility bg-hero { background: radial-gradient(circle at 85% 20%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 55%), radial-gradient(circle at 10% 90%, color-mix(in oklch, var(--destructive) 10%, transparent), transparent 50%); }
+@utility bg-hero {
+  background:
+    radial-gradient(
+      circle at 85% 20%,
+      color-mix(in oklch, var(--primary) 18%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      circle at 10% 90%,
+      color-mix(in oklch, var(--destructive) 10%, transparent),
+      transparent 50%
+    );
+}
 
 .announcement-track {
   display: flex;
@@ -95,9 +107,12 @@
 
 :root {
   --radius: 0.75rem;
-  --success: oklch(0.55 0.13 155); --success-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.82 0.15 80); --warning-foreground: oklch(0.25 0.05 70);
-  --info: oklch(0.55 0.13 240); --info-foreground: oklch(0.99 0 0);
+  --success: oklch(0.55 0.13 155);
+  --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.82 0.15 80);
+  --warning-foreground: oklch(0.25 0.05 70);
+  --info: oklch(0.55 0.13 240);
+  --info-foreground: oklch(0.99 0 0);
   --background: oklch(0.985 0.008 120);
   --foreground: oklch(0.2 0.03 160);
   --card: oklch(1 0 0);
@@ -133,7 +148,9 @@
 }
 
 .dark {
-  --success: oklch(0.65 0.14 155); --warning: oklch(0.78 0.14 80); --info: oklch(0.65 0.13 240);
+  --success: oklch(0.65 0.14 155);
+  --warning: oklch(0.78 0.14 80);
+  --info: oklch(0.65 0.13 240);
   --background: oklch(0.17 0.02 165);
   --foreground: oklch(0.984 0.003 247.858);
   --card: oklch(0.22 0.025 165);

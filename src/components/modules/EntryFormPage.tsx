@@ -2,11 +2,20 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { RegForm } from "@/components/dashboards/Worker";
 import { ModuleNavigation } from "./ModuleNavigation";
-import { useApp } from "@/lib/store";
+import { scopedCases, useApp } from "@/lib/store";
 
-export function EntryFormPage({ type }: { type: "birth" | "death" }) {
-  const { L, user } = useApp();
+export function EntryFormPage({
+  type,
+  applicationId,
+}: {
+  type: "birth" | "death";
+  applicationId?: string | undefined;
+}) {
+  const { L, user, state } = useApp();
   const navigate = useNavigate();
+  const entry = applicationId
+    ? scopedCases(state, user).find((item) => item.id === applicationId && item.type === type)
+    : undefined;
 
   if (user?.role !== "worker") {
     return (
@@ -27,6 +36,20 @@ export function EntryFormPage({ type }: { type: "birth" | "death" }) {
     );
   }
 
+  if (applicationId && !entry) {
+    return (
+      <div className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
+        <ModuleNavigation />
+        <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+          {L(
+            "আবেদনটি পাওয়া যায়নি অথবা এটি সংশোধনের অনুমতি নেই",
+            "Application not found or you are not allowed to correct it",
+          )}
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-none px-4 py-3 sm:px-6 lg:px-8">
       <Link
@@ -39,9 +62,14 @@ export function EntryFormPage({ type }: { type: "birth" | "death" }) {
       <ModuleNavigation />
       <div className={type === "birth" ? "w-full max-w-full space-y-1" : "space-y-3"}>
         <RegForm
-          key={type}
+          key={`${type}-${entry?.id ?? "new"}`}
           type={type}
-          onSaved={() => void navigate({ to: "/dashboard" })}
+          entry={entry}
+          onSaved={() =>
+            void (entry
+              ? navigate({ to: "/worker-applications/$type", params: { type } })
+              : navigate({ to: "/dashboard" }))
+          }
           onCancel={() => void navigate({ to: "/dashboard" })}
         />
       </div>

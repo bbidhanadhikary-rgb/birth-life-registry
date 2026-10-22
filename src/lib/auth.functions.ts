@@ -18,7 +18,7 @@ async function rolesOf(userId: string) {
 
 /* ---------- Password sign-in (officers) ---------- */
 export const passwordSignIn = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ email: z.string().trim().toLowerCase().email().max(255), password: z.string().min(1).max(128) }).parse(d))
+  .validator((d) => z.object({ email: z.string().trim().toLowerCase().email().max(255), password: z.string().min(1).max(128) }).parse(d))
   .handler(async ({ data }): Promise<Result> => {
     const ip = clientIp(); const id = `email:${data.email}`;
     const lock = await lockoutMinutes(id, ip);
@@ -35,7 +35,7 @@ export const passwordSignIn = createServerFn({ method: "POST" })
 
 /* ---------- Phone OTP (field staff) ---------- */
 export const sendPhoneOtp = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ mobile: z.string().max(20) }).parse(d))
+  .validator((d) => z.object({ mobile: z.string().max(20) }).parse(d))
   .handler(async ({ data }): Promise<{ ok: boolean; error?: string; lockedMinutes?: number }> => {
     const phone = normalizePhone(data.mobile);
     if (!phone) return { ok: false, error: "bad_phone" };
@@ -58,7 +58,7 @@ export const sendPhoneOtp = createServerFn({ method: "POST" })
   });
 
 export const verifyPhoneOtp = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ mobile: z.string().max(20), code: z.string().regex(/^\d{6}$/) }).parse(d))
+  .validator((d) => z.object({ mobile: z.string().max(20), code: z.string().regex(/^\d{6}$/) }).parse(d))
   .handler(async ({ data }): Promise<Result> => {
     const phone = normalizePhone(data.mobile);
     if (!phone) return { ok: false, error: "bad_phone" };
@@ -73,7 +73,7 @@ export const verifyPhoneOtp = createServerFn({ method: "POST" })
 
 /* ---------- Password reset (expiring one-time email link) ---------- */
 export const requestPasswordReset = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ email: z.string().trim().toLowerCase().email().max(255) }).parse(d))
+  .validator((d) => z.object({ email: z.string().trim().toLowerCase().email().max(255) }).parse(d))
   .handler(async ({ data }) => {
     const ip = clientIp(); const id = `email:${data.email}`;
     if ((await recentCount(id, "reset", 60)) < 3) {
@@ -92,7 +92,7 @@ export const needsSetup = createServerFn({ method: "GET" }).handler(async () => 
 });
 
 export const bootstrapSuperAdmin = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({
+  .validator((d) => z.object({
     email: z.string().trim().toLowerCase().email().max(255),
     password: z.string().min(12).max(128),
     nameBn: z.string().trim().min(1).max(100), nameEn: z.string().trim().min(1).max(100),
@@ -112,7 +112,7 @@ export const bootstrapSuperAdmin = createServerFn({ method: "POST" })
 /* ---------- Staff provisioning (Super Admin / UNO) ---------- */
 export const createStaff = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({
+  .validator((d) => z.object({
     role: z.enum(["worker", "police", "admin", "uno"]),
     nameBn: z.string().trim().min(1).max(100), nameEn: z.string().trim().min(1).max(100),
     contact: z.string().trim().max(255),
@@ -185,7 +185,7 @@ export const generateRecoveryCodes = createServerFn({ method: "POST" })
 
 export const useRecoveryCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ code: z.string().trim().toUpperCase().regex(/^[0-9A-F]{5}-[0-9A-F]{5}$/) }).parse(d))
+  .validator((d) => z.object({ code: z.string().trim().toUpperCase().regex(/^[0-9A-F]{5}-[0-9A-F]{5}$/) }).parse(d))
   .handler(async ({ data, context }) => {
     const ip = clientIp(); const id = `recovery:${context.userId}`;
     const lock = await lockoutMinutes(id, ip);
@@ -205,7 +205,7 @@ export const useRecoveryCode = createServerFn({ method: "POST" })
 
 export const logSecurityEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ action: z.enum(["mfa:enrolled", "mfa:verified"]) }).parse(d))
+  .validator((d) => z.object({ action: z.enum(["mfa:enrolled", "mfa:verified"]) }).parse(d))
   .handler(async ({ data, context }) => {
     const db = await admin();
     await db.from("audit_logs").insert({ user_id: context.userId, action: data.action });

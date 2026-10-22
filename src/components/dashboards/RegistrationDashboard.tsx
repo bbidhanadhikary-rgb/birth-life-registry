@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowUpRight,
   Baby,
@@ -31,7 +31,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { TARGET, type RegCase, type Role } from "@/lib/types";
-import { scopedCases, useApp } from "@/lib/store";
+import { getDemoAttachmentPreview, scopedCases, useApp } from "@/lib/store";
 import { RegForm } from "@/components/dashboards/Worker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,13 +67,15 @@ function ApplicationList({
   onNew?: () => void;
   onReject: (item: RegCase) => void;
 }) {
-  const { L, n } = useApp();
+  const { L, n, demoMode } = useApp();
   const { address, rows } = useCaseHelpers();
   const [pageSize, setPageSize] = useState(10);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"all" | "approved">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [attachmentPreviews, setAttachmentPreviews] = useState<(string | undefined)[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const completed = cases.filter((item) => item.status === "completed");
   const filtered = cases.filter((item) => {
     if (view === "approved" && item.status !== "completed") return false;
@@ -87,6 +89,44 @@ function ApplicationList({
   const first = filtered.length ? (currentPage - 1) * pageSize + 1 : 0;
   const last = Math.min(currentPage * pageSize, filtered.length);
   const title = type === "birth" ? L("জন্ম নিবন্ধনের আবেদন", "Birth Registration Applications") : L("মৃত্যু নিবন্ধনের আবেদন", "Death Registration Applications");
+
+  useEffect(() => {
+    const selectedCase = cases.find((item) => item.id === expandedId);
+    if (!selectedCase || selectedCase.files.length === 0) {
+      setAttachmentPreviews([]);
+      setAttachmentsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const objectUrls: string[] = [];
+    setAttachmentPreviews([]);
+    setAttachmentsLoading(true);
+    void Promise.all(selectedCase.files.map(async (file, index) => {
+      if (file.url || file.dataUrl) return file.url ?? file.dataUrl;
+      if (!file.path) return getDemoAttachmentPreview(selectedCase.id, index);
+      if (demoMode) return getDemoAttachmentPreview(selectedCase.id, index);
+      const { data, error } = await supabase.storage.from("case-files").download(file.path);
+      if (error) {
+        toast.error(`${L("সংযুক্তি লোড করা যায়নি", "Could not load attachment")}: ${file.name} · ${error.message}`);
+        return undefined;
+      }
+      const objectUrl = URL.createObjectURL(data);
+      if (cancelled) {
+        URL.revokeObjectURL(objectUrl);
+        return undefined;
+      }
+      objectUrls.push(objectUrl);
+      return objectUrl;
+    })).then((previews) => {
+      if (cancelled) return;
+      setAttachmentPreviews(previews);
+      setAttachmentsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [cases, demoMode, expandedId, L]);
 
   return (
     <section className="space-y-4" aria-label={title}>
@@ -120,7 +160,7 @@ function ApplicationList({
         <table className="w-full min-w-[880px] border-collapse text-left text-sm">
           <thead className="bg-emerald-50 text-emerald-950">
             <tr>
-              {[L("ক্রমিক নং", "SL"), L("আবেদন নং", "App No"), L("নাম", "Name"), L("পিতার নাম", "Father's Name"), L("মাতার নাম", "Mother's Name"), L("অবস্থা", "Status"), L("কার্যক্রম", "Action")].map((heading) => <th key={heading} className="whitespace-nowrap border-b border-emerald-100 px-3 py-2.5 font-semibold">{heading}</th>)}
+              {[L("ক্রমিক নং", "SL"), L("আবেদন নং", "App No"), L("নাম", "Name"), L("পিতার নাম", "Father's Name"), L("মাতার নাম", "Mother's Name"), L("সংযুক্তি", "Attachments"), L("অবস্থা", "Status"), L("কার্যক্রম", "Action")].map((heading) => <th key={heading} className="whitespace-nowrap border-b border-emerald-100 px-3 py-2.5 font-semibold">{heading}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -132,6 +172,17 @@ function ApplicationList({
                   <td className="px-3 py-2.5 font-medium">{L(item.name.bn, item.name.en)}</td>
                   <td className="px-3 py-2.5">{L(item.father.bn, item.father.en)}</td>
                   <td className="px-3 py-2.5">{L(item.mother.bn, item.mother.en)}</td>
+                  <td className="px-3 py-2.5">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 px-2"
+                      disabled={item.files.length === 0}
+                      onClick={() => setExpandedId((current) => current === item.id ? null : item.id)}
+                    >
+                      {n(item.files.length)}
+                    </Button>
+                  </td>
                   <td className="px-3 py-2.5"><StatusBadge s={item.status} /></td>
                   <td className="px-3 py-2.5">
                     <div className="flex gap-1.5">
@@ -148,7 +199,7 @@ function ApplicationList({
                 </tr>
                 {expandedId === item.id && (
                   <tr className="border-b border-emerald-100 bg-emerald-50/60">
-                    <td colSpan={7} className="px-4 py-3 text-sm">
+                    <td colSpan={8} className="px-4 py-3 text-sm">
                       <div className="grid gap-2 sm:grid-cols-3">
                         <span>{L("জন্ম তারিখ", "Date of birth")}: {item.dob}</span>
                         {item.dod && <span>{L("মৃত্যুর তারিখ", "Date of death")}: {item.dod}</span>}
@@ -156,12 +207,47 @@ function ApplicationList({
                         <span className="sm:col-span-2">{L("ঠিকানা", "Address")}: {address(item) || "—"}</span>
                         <span>{L("NID", "NID")}: {item.nid || "—"}</span>
                       </div>
+                      {attachmentsLoading && expandedId === item.id && (
+                        <p className="mt-3 text-sm text-muted-foreground">
+                          {L("সংযুক্তি লোড হচ্ছে…", "Loading attachments…")}
+                        </p>
+                      )}
+                      {item.files.length > 0 && (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                          {item.files.map((file, fileIndex) => {
+                            const preview = attachmentPreviews[fileIndex];
+                            return (
+                              <article key={`${file.path ?? file.name}-${fileIndex}`} className="overflow-hidden rounded-lg border border-emerald-100 bg-white">
+                                <div className="flex h-40 items-center justify-center bg-slate-50 p-2">
+                                  {preview ? (
+                                    <img src={preview} alt={file.name} className="max-h-full max-w-full object-contain" />
+                                  ) : (
+                                    <span className="text-xs text-slate-500">{file.name}</span>
+                                  )}
+                                </div>
+                                <div className="space-y-1 p-2 text-xs">
+                                  <p className="break-all font-medium">{file.name}</p>
+                                  {file.fieldVisit && (
+                                    <>
+                                      <p className="font-semibold text-emerald-900">{L("বাড়ি পরিদর্শনের ছবি", "House visit photo")}</p>
+                                      <p>{L("ছবির সময়", "Photo time")}: {new Date(file.fieldVisit.capturedAt).toLocaleString()}</p>
+                                      {file.fieldVisit.latitude !== undefined && file.fieldVisit.longitude !== undefined && (
+                                        <p>GPS: {file.fieldVisit.latitude.toFixed(6)}, {file.fieldVisit.longitude.toFixed(6)}</p>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
+                              </article>
+                            );
+                          })}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 )}
               </Fragment>
             ))}
-            {!visible.length && <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">{L("কোনো আবেদন পাওয়া যায়নি", "No applications found")}</td></tr>}
+            {!visible.length && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">{L("কোনো আবেদন পাওয়া যায়নি", "No applications found")}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -197,22 +283,16 @@ const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district"
   worker: [
     { id: "birth-entry", titleBn: "শিশুর জন্ম তথ্য ও ডকুমেন্টস আপলোড", titleEn: "Child birth info & documents upload", descriptionBn: "নতুন জন্ম তথ্য ও ৩টি ডকুমেন্ট জমা দিন", descriptionEn: "Submit new birth details with documents", Icon: Baby, filter: "birth" },
     { id: "death-entry", titleBn: "মৃত ব্যক্তির তথ্য ও ডকুমেন্টস আপলোড", titleEn: "Deceased person info & documents upload", descriptionBn: "নতুন মৃত্যু তথ্য ও ডকুমেন্ট জমা দিন", descriptionEn: "Submit new death details with documents", Icon: HeartPulse, filter: "death" },
-    { id: "birth-correction", titleBn: "শিশুর জন্ম তথ্য সংশোধন", titleEn: "Correction of child birth info", descriptionBn: "অমীমাংসিত জন্ম এন্ট্রি সংশোধন করুন", descriptionEn: "Correct pending birth entries", Icon: PencilLine, filter: "birth" },
-    { id: "death-correction", titleBn: "মৃত ব্যক্তির তথ্য সংশোধন", titleEn: "Correction of deceased person info", descriptionBn: "অমীমাংসিত মৃত্যু এন্ট্রি সংশোধন করুন", descriptionEn: "Correct pending death entries", Icon: PencilLine, filter: "death" },
     { id: "birth-list", titleBn: "জন্ম নিবন্ধনের আবেদন তালিকা দেখুন", titleEn: "View birth registration application list", descriptionBn: "জমা দেওয়া জন্ম আবেদন ও মন্তব্য", descriptionEn: "Submitted birth applications and remarks", Icon: FileText, filter: "birth" },
     { id: "death-list", titleBn: "মৃত্যু নিবন্ধনের আবেদন তালিকা দেখুন", titleEn: "View death registration application list", descriptionBn: "জমা দেওয়া মৃত্যু আবেদন ও মন্তব্য", descriptionEn: "Submitted death applications and remarks", Icon: FileCheck2, filter: "death" },
     { id: "worker-report", titleBn: "রিপোর্ট", titleEn: "Reports", descriptionBn: "আমার রিপোর্ট ডাউনলোড করুন (Excel/PDF)", descriptionEn: "Download my report (Excel/PDF)", Icon: Download },
     { id: "feedback", titleBn: "অভিযোগ জানান বা পরামর্শ দিন", titleEn: "Submit complaint or suggestion", descriptionBn: "উপজেলা আইসিটি সহায়তা দলকে জানান", descriptionEn: "Reach the Upazila ICT support team", Icon: MessageSquareWarning },
   ],
   police: [
-    { id: "assigned", titleBn: "নির্ধারিত যাচাই", titleEn: "Assigned checks", descriptionBn: "আপনার ওয়ার্ডের যাচাইযোগ্য কেস", descriptionEn: "Cases assigned in your ward", Icon: Home, filter: "pending" },
-    { id: "birth-checks", titleBn: "জন্ম যাচাই", titleEn: "Birth checks", descriptionBn: "জন্ম নিবন্ধনের কাগজ যাচাই করুন", descriptionEn: "Check documents for birth registration", Icon: Baby, filter: "birth" },
-    { id: "death-checks", titleBn: "মৃত্যু যাচাই", titleEn: "Death checks", descriptionBn: "মৃত্যু নিবন্ধনের তথ্য যাচাই করুন", descriptionEn: "Verify death registration information", Icon: HeartPulse, filter: "death" },
-    { id: "epi-cards", titleBn: "EPI কার্ড", titleEn: "EPI cards", descriptionBn: "EPI কার্ড যাচাইয়ের কেস দেখুন", descriptionEn: "Review cases requiring EPI card checks", Icon: ClipboardCheck, filter: "birth" },
-    { id: "nid-checks", titleBn: "NID যাচাই", titleEn: "NID checks", descriptionBn: "অভিভাবকের NID যাচাইয়ের কেস", descriptionEn: "Review cases requiring parent NID checks", Icon: UserRoundCheck, filter: "pending" },
-    { id: "collection-pending", titleBn: "সংগ্রহ বাকি", titleEn: "Collection pending", descriptionBn: "যেসব কাগজ সংগ্রহ বাকি", descriptionEn: "Documents still waiting to be collected", Icon: Inbox, filter: "pending" },
-    { id: "collection-done", titleBn: "যাচাই সম্পন্ন", titleEn: "Checks completed", descriptionBn: "সম্পন্ন যাচাইয়ের কেস", descriptionEn: "Cases with completed verification", Icon: CheckCheck, filter: "completed" },
-    { id: "ward-report", titleBn: "ওয়ার্ড প্রতিবেদন", titleEn: "Ward report", descriptionBn: "ওয়ার্ডের জন্ম ও মৃত্যু কেস", descriptionEn: "Birth and death cases in your ward", Icon: ChartNoAxesCombined },
+    { id: "birth-entry", titleBn: "শিশুর জন্ম তথ্য ও ডকুমেন্টস আপলোড", titleEn: "Child birth info & documents upload", descriptionBn: "নতুন জন্ম তথ্য ও পরিদর্শনের ছবি জমা দিন", descriptionEn: "Submit birth details and a visit photo", Icon: Baby, filter: "birth" },
+    { id: "death-entry", titleBn: "মৃত ব্যক্তির তথ্য ও ডকুমেন্টস আপলোড", titleEn: "Deceased person info & documents upload", descriptionBn: "নতুন মৃত্যু তথ্য ও পরিদর্শনের ছবি জমা দিন", descriptionEn: "Submit death details and a visit photo", Icon: HeartPulse, filter: "death" },
+    { id: "birth-list", titleBn: "জন্ম নিবন্ধনের আবেদন তালিকা দেখুন", titleEn: "View birth registration application list", descriptionBn: "ওয়ার্ডের জন্ম আবেদন ও পরিদর্শন ছবি", descriptionEn: "Ward birth applications and visit photos", Icon: FileText, filter: "birth" },
+    { id: "death-list", titleBn: "মৃত্যু নিবন্ধনের আবেদন তালিকা দেখুন", titleEn: "View death registration application list", descriptionBn: "ওয়ার্ডের মৃত্যু আবেদন ও পরিদর্শন ছবি", descriptionEn: "Ward death applications and visit photos", Icon: FileCheck2, filter: "death" },
   ],
   admin: [
     { id: "birth-review", titleBn: "জন্ম পর্যালোচনা", titleEn: "Birth review", descriptionBn: "জন্ম নিবন্ধনের আবেদন পর্যালোচনা করুন", descriptionEn: "Review birth registration applications", Icon: Baby, filter: "birth" },
@@ -324,8 +404,17 @@ function QuickAccessCard({
   );
 }
 
-export function RegistrationDashboard({ role = "public" }: { role?: DashboardRole }) {
+export function RegistrationDashboard({
+  role = "public",
+  initialAction,
+  onActionDismiss,
+}: {
+  role?: DashboardRole;
+  initialAction?: "worker-report" | "feedback";
+  onActionDismiss?: () => void;
+}) {
   const { state, L, n, user, demoMode, patchCase } = useApp();
+  const navigate = useNavigate();
   const { rows } = useCaseHelpers();
   const [editEntry, setEditEntry] = useState<RegCase | null>(null);
   const [activeCard, setActiveCard] = useState<{ kind: "metric" | "action"; id: string } | null>(
@@ -344,6 +433,9 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
   const [feedbackSubject, setFeedbackSubject] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackSaving, setFeedbackSaving] = useState(false);
+  useEffect(() => {
+    if (initialAction) setActiveCard({ kind: "action", id: initialAction });
+  }, [initialAction]);
   const metrics = [
     {
       id: "districts",
@@ -375,7 +467,18 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
     },
   ];
   const roleConfig = role === "super" || role === "district" ? "uno" : role;
-  const actions = (roleConfig === "public" ? publicActions : roleActions[roleConfig]).map(
+  const roleActionItems = roleConfig === "public"
+    ? publicActions
+    : [
+        ...roleActions[roleConfig],
+        ...(roleConfig === "worker"
+          ? []
+          : [
+              { id: "worker-report", titleBn: "রিপোর্ট", titleEn: "Reports", descriptionBn: "নিবন্ধন প্রতিবেদন ডাউনলোড বা প্রিন্ট করুন", descriptionEn: "Download or print registration reports", Icon: Download },
+              { id: "feedback", titleBn: "অভিযোগ ও পরামর্শ", titleEn: "Complaints and feedback", descriptionBn: "অভিযোগ বা পরামর্শ জমা দিন", descriptionEn: "Submit a complaint or suggestion", Icon: MessageSquareWarning },
+            ]),
+      ];
+  const actions = roleActionItems.map(
     ({ titleBn, titleEn, descriptionBn, descriptionEn, ...action }) => ({
       ...action,
       title: L(titleBn, titleEn),
@@ -564,6 +667,9 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
             : null,
         ].filter(Boolean).join(" · ");
 
+  const quickAccessActions = actions.filter(
+    ({ id }) => id !== "worker-report" && id !== "feedback",
+  );
   const isEntryCard = activeCard?.id === "birth-entry" || activeCard?.id === "death-entry";
   const formType: "birth" | "death" | null =
     activeCard?.id === "birth-entry" || activeCard?.id === "birth-correction"
@@ -579,11 +685,22 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
           .some((value) => value.toLocaleLowerCase().includes(query));
       })
     : [];
-  const closeDialog = () => {
+  const dismissActiveCard = () => {
     setActiveCard(null);
     setEditEntry(null);
+    if (initialAction) onActionDismiss?.();
   };
-  const openCaseDialog = (kind: "metric" | "action", id: string) => setActiveCard({ kind, id });
+  const closeDialog = dismissActiveCard;
+  const openCaseDialog = (kind: "metric" | "action", id: string) => {
+    if (roleConfig === "worker" && (id === "birth-list" || id === "death-list")) {
+      void navigate({
+        to: "/worker-applications/$type",
+        params: { type: id === "birth-list" ? "birth" : "death" },
+      });
+      return;
+    }
+    setActiveCard({ kind, id });
+  };
   const rejectApplication = async (item: RegCase) => {
     if (user?.role !== "admin") return;
     if (!window.confirm(L("এই আবেদনটি বাতিল করবেন?", "Reject this application?"))) return;
@@ -621,7 +738,7 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
       toast.success(L("আপনার বার্তা জমা হয়েছে", "Your message has been submitted"));
       setFeedbackSubject("");
       setFeedbackMessage("");
-      setActiveCard(null);
+      dismissActiveCard();
     } catch (cause) {
       toast.error(cause instanceof Error ? cause.message : L("বার্তা জমা দেওয়া যায়নি", "Could not submit your message"));
     } finally {
@@ -741,10 +858,12 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
           </div>
           <div
             className={`grid gap-2 sm:gap-3 ${
-              roleConfig === "public" ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" : "role-action-grid grid-cols-4"
+              roleConfig === "public" || roleConfig === "police"
+                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+                : "role-action-grid grid-cols-4"
             }`}
           >
-            {actions.map(({ id, title, description, Icon }) => (
+            {quickAccessActions.map(({ id, title, description, Icon }) => (
               <QuickAccessCard
                 key={id}
                 item={{ id, title, description, Icon }}
@@ -759,8 +878,7 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
         open={activeCard !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setActiveCard(null);
-            setEditEntry(null);
+            dismissActiveCard();
           }
         }}
       >
@@ -817,7 +935,7 @@ export function RegistrationDashboard({ role = "public" }: { role?: DashboardRol
                   type={applicationListType}
                   cases={actionCases}
                   canReject={user?.role === "admin"}
-                  {...(user?.role === "worker" ? { onNew: () => openCaseDialog("action", `${applicationListType}-entry`) } : {})}
+                  {...(user?.role === "worker" || user?.role === "police" ? { onNew: () => openCaseDialog("action", `${applicationListType}-entry`) } : {})}
                   onReject={rejectApplication}
                 />
               ) : activeCard?.id === "worker-report" ? (

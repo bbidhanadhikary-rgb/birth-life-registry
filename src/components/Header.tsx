@@ -18,6 +18,7 @@ export function Header() {
   const { user, L, lang, toggleLang, dark, toggleTheme, logout, online, demoLoginAvailable } = useApp();
   const [dlg, setDlg] = useState<null | "login" | "manual" | "support">(null);
   const nav = useNavigate();
+  const showStaffLinks = Boolean(user);
   const headerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -65,6 +66,24 @@ export function Header() {
               {L(bn, en)}
             </Link>
           ))}
+          {showStaffLinks && (
+            <>
+              <Link
+                to="/"
+                search={(previous) => ({ ...previous, action: "worker-report" })}
+                className="ml-auto shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-emerald-50 hover:bg-emerald-700 sm:text-sm"
+              >
+                {L("রিপোর্ট", "Reports")}
+              </Link>
+              <Link
+                to="/"
+                search={(previous) => ({ ...previous, action: "feedback" })}
+                className="shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-emerald-50 hover:bg-emerald-700 sm:text-sm"
+              >
+                {L("অভিযোগ ও পরামর্শ", "Complaints and feedback")}
+              </Link>
+            </>
+          )}
         </div>
       </nav>
       {!online && (

@@ -1,14 +1,22 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { RegistrationDashboard } from "@/components/dashboards/RegistrationDashboard";
 import { useApp } from "@/lib/store";
 
 export const PREVIEW_ROLES = ["main", "health_worker", "village_police", "up_official", "uno"] as const;
 type PreviewRole = (typeof PREVIEW_ROLES)[number];
+const DASHBOARD_ACTIONS = ["worker-report", "feedback"] as const;
+type DashboardAction = (typeof DASHBOARD_ACTIONS)[number];
 const roleMap = { health_worker: "worker", village_police: "police", up_official: "admin", uno: "uno" } as const;
 
 export const Route = createFileRoute("/")({
-  validateSearch: (s: Record<string, unknown>): { role?: PreviewRole } =>
-    PREVIEW_ROLES.includes(s["role"] as PreviewRole) && s["role"] !== "main" ? { role: s["role"] as PreviewRole } : {},
+  validateSearch: (s: Record<string, unknown>): { role?: PreviewRole; action?: DashboardAction } => ({
+    ...(PREVIEW_ROLES.includes(s["role"] as PreviewRole) && s["role"] !== "main"
+      ? { role: s["role"] as PreviewRole }
+      : {}),
+    ...(DASHBOARD_ACTIONS.includes(s["action"] as DashboardAction)
+      ? { action: s["action"] as DashboardAction }
+      : {}),
+  }),
   head: () => ({
     meta: [
       { title: "National E-Registration Tracker — Birth & Death Registration" },
@@ -24,9 +32,25 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { user } = useApp();
-  const { role: preview } = Route.useSearch();
+  const navigate = useNavigate();
+  const { role: preview, action } = Route.useSearch();
   const role = user
     ? user.role === "super" ? "uno" : user.role
     : preview && preview !== "main" ? roleMap[preview] : "public";
-  return <RegistrationDashboard key={role} role={role} />;
+  return (
+    <RegistrationDashboard
+      key={role}
+      role={role}
+      {...(action ? { initialAction: action } : {})}
+      onActionDismiss={() => {
+        void navigate({
+          to: "/",
+          search: (previous) => {
+            const { action: _action, ...rest } = previous;
+            return rest;
+          },
+        });
+      }}
+    />
+  );
 }

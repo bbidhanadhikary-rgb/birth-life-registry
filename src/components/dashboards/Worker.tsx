@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   AlertTriangle,
   CalendarClock,
@@ -42,7 +42,7 @@ import { compressImage } from "@/lib/compress-image";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { downloadCSV, printPDF } from "@/lib/report";
 import { roleLabel, scopedCases, useApp } from "@/lib/store";
-import type { Bi, RegCase } from "@/lib/types";
+import type { Bi, CaseFileMetadata, RegCase } from "@/lib/types";
 
 const emptyBi: Bi = { bn: "", en: "" };
 type CaseType = "birth" | "death";
@@ -52,6 +52,19 @@ type DialogState =
   | { kind: "epi" }
   | null;
 type EpiVisit = Tables<"epi_visits">;
+
+function captureCoordinates(): Promise<{ latitude: number; longitude: number }> {
+  if (!navigator.geolocation) {
+    return Promise.reject(new Error("এই ডিভাইসে GPS পাওয়া যায়নি"));
+  }
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => resolve({ latitude: coords.latitude, longitude: coords.longitude }),
+      (error) => reject(new Error(error.message || "GPS লোকেশন পাওয়া যায়নি")),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
+    );
+  });
+}
 
 function FormRow({
   labelBn,
@@ -235,11 +248,19 @@ export function RegForm({
       entry.details.presentAddress?.en === entry.details.birthPlace.en),
   );
   const [attachments, setAttachments] = useState<(File | null)[]>([null, null, null]);
+  const [visitPhoto, setVisitPhoto] = useState<File | null>(null);
+  const [visitPhotoMetadata, setVisitPhotoMetadata] =
+    useState<CaseFileMetadata["fieldVisit"]>();
+  const [gpsEnabled, setGpsEnabled] = useState(false);
+  const gpsEnabledRef = useRef(false);
+  const [visitPhotoLoading, setVisitPhotoLoading] = useState(false);
+  const [locationError, setLocationError] = useState("");
   const [filesChanged, setFilesChanged] = useState(false);
   const [compressing, setCompressing] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const oldFiles = entry?.files ?? [];
+  const oldVisitPhoto = oldFiles.find((file) => file.fieldVisit);
 
   const chooseImage = async (index: number, file?: File) => {
     if (!file) return;
@@ -266,6 +287,48 @@ export function RegForm({
       toast.error(message);
     } finally {
       setCompressing(null);
+    }
+  };
+
+  const chooseVisitPhoto = async (file?: File) => {
+    if (!file) return;
+    const capturedAt = new Date().toISOString();
+    setVisitPhotoLoading(true);
+    setLocationError("");
+    setError("");
+    try {
+      const compressed = await compressImage(file);
+      let coordinates: { latitude: number; longitude: number } | undefined;
+      if (gpsEnabledRef.current) {
+        try {
+          const currentCoordinates = await captureCoordinates();
+          if (gpsEnabledRef.current) coordinates = currentCoordinates;
+        } catch (causeError) {
+          if (gpsEnabledRef.current) {
+            const message = causeError instanceof Error ? causeError.message : "GPS লোকেশন পাওয়া যায়নি";
+            setLocationError(message);
+            toast.error(L(`GPS লোকেশন নেওয়া যায়নি: ${message}`, `Could not capture GPS location: ${message}`));
+          }
+        }
+      }
+      setVisitPhoto(compressed);
+      setVisitPhotoMetadata({ capturedAt, ...coordinates });
+      setFilesChanged(true);
+      toast.success(
+        L(
+          `পরিদর্শনের ছবি প্রস্তুত · ${Math.ceil(compressed.size / 1024)} KB`,
+          `Visit photo ready · ${Math.ceil(compressed.size / 1024)} KB`,
+        ),
+      );
+    } catch (causeError) {
+      const message =
+        causeError instanceof Error
+          ? causeError.message
+          : L("পরিদর্শনের ছবি প্রস্তুত করা যায়নি", "Could not prepare the visit photo");
+      setError(message);
+      toast.error(message);
+    } finally {
+      setVisitPhotoLoading(false);
     }
   };
 
@@ -320,6 +383,109 @@ export function RegForm({
             "সংরক্ষিত ছবি অপরিবর্তিত থাকবে; নতুন ছবি দিলে সংযুক্তি প্রতিস্থাপিত হবে।",
             "Saved photos remain unless new photos are selected; selecting new photos replaces the attachments.",
           )}
+        </p>
+      )}
+    </fieldset>
+  );
+
+  const visitPhotoField = (
+    <fieldset className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+      <legend className="px-1 text-sm font-semibold text-emerald-950">
+        {L("বাড়ি পরিদর্শন ও ছবি আপলোড", "House visit and photo upload")}
+      </legend>
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-1 text-sm font-medium text-slate-800">
+        <input
+          type="checkbox"
+          role="switch"
+          checked={gpsEnabled}
+          onChange={(event) => {
+            const enabled = event.target.checked;
+            gpsEnabledRef.current = enabled;
+            setGpsEnabled(enabled);
+            setLocationError("");
+            if (!enabled) {
+              setVisitPhotoMetadata((current) =>
+                current ? { capturedAt: current.capturedAt } : undefined,
+              );
+            } else if (visitPhoto && visitPhotoMetadata) {
+              void captureCoordinates()
+                .then((coordinates) => {
+                  if (gpsEnabledRef.current) {
+                    setVisitPhotoMetadata((current) => current ? { ...current, ...coordinates } : current);
+                  }
+                })
+                .catch((causeError: unknown) => {
+                  if (!gpsEnabledRef.current) return;
+                  const message = causeError instanceof Error ? causeError.message : "GPS লোকেশন পাওয়া যায়নি";
+                  setLocationError(message);
+                  toast.error(L(`GPS লোকেশন নেওয়া যায়নি: ${message}`, `Could not capture GPS location: ${message}`));
+                });
+            }
+          }}
+          className="h-4 w-4 accent-emerald-700"
+        />
+        <span>{L("GPS লোকেশন যুক্ত করুন (ঐচ্ছিক)", "Add GPS location (optional)")}</span>
+      </label>
+      <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-emerald-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-emerald-50">
+        <FileImage className="h-4 w-4 shrink-0 text-emerald-700" />
+        <span className="min-w-0 flex-1 truncate">
+          {visitPhotoLoading
+            ? L("ছবি প্রস্তুত হচ্ছে…", "Preparing photo…")
+            : visitPhoto
+              ? `${visitPhoto.name} · ${Math.ceil(visitPhoto.size / 1024)} KB`
+              : oldVisitPhoto && !filesChanged
+                ? `${oldVisitPhoto.name} · ${L("সংরক্ষিত", "saved")}`
+              : L("পরিদর্শনের ছবি বাছুন বা তুলুন", "Choose or take a visit photo")}
+        </span>
+        {visitPhoto && (
+          <button
+            type="button"
+            className="font-bold text-red-700"
+            aria-label={L("পরিদর্শনের ছবি সরান", "Remove visit photo")}
+            onClick={(event) => {
+              event.preventDefault();
+              setVisitPhoto(null);
+              setVisitPhotoMetadata(undefined);
+              setFilesChanged(true);
+            }}
+          >
+            ×
+          </button>
+        )}
+        <input
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          disabled={visitPhotoLoading}
+          type="file"
+          onChange={(event) => {
+            void chooseVisitPhoto(event.currentTarget.files?.[0]);
+            event.currentTarget.value = "";
+          }}
+        />
+      </label>
+      {visitPhotoMetadata && (
+        <p className="text-xs text-slate-600">
+          {L("ছবির সময়", "Photo time")}: {new Date(visitPhotoMetadata.capturedAt).toLocaleString()}
+          {visitPhotoMetadata.latitude !== undefined && visitPhotoMetadata.longitude !== undefined
+            ? ` · GPS: ${visitPhotoMetadata.latitude.toFixed(6)}, ${visitPhotoMetadata.longitude.toFixed(6)}`
+            : gpsEnabled
+              ? ` · ${L("GPS লোকেশন সংরক্ষিত হয়নি", "GPS location was not saved")}`
+              : ""}
+        </p>
+      )}
+      {!visitPhoto && !filesChanged && oldVisitPhoto?.fieldVisit && (
+        <p className="text-xs text-slate-600">
+          {L("সংরক্ষিত ছবির সময়", "Saved photo time")}:{" "}
+          {new Date(oldVisitPhoto.fieldVisit.capturedAt).toLocaleString()}
+          {oldVisitPhoto.fieldVisit.latitude !== undefined &&
+            oldVisitPhoto.fieldVisit.longitude !== undefined &&
+            ` · GPS: ${oldVisitPhoto.fieldVisit.latitude.toFixed(6)}, ${oldVisitPhoto.fieldVisit.longitude.toFixed(6)}`}
+        </p>
+      )}
+      {locationError && (
+        <p className="text-xs text-amber-800">
+          {L("GPS ছাড়াই ছবি জমা দেওয়া যাবে", "The photo can still be submitted without GPS")}: {locationError}
         </p>
       )}
     </fieldset>
@@ -431,11 +597,17 @@ export function RegForm({
           applicantRelationshipBn: applicantRelationshipBn.trim(),
         },
       };
+      const selectedAttachments = attachments.filter((file): file is File => file !== null);
+      const selectedFiles = [...selectedAttachments, ...(visitPhoto ? [visitPhoto] : [])];
+      const fileMetadata: CaseFileMetadata[] = [
+        ...selectedAttachments.map(() => ({})),
+        ...(visitPhoto && visitPhotoMetadata ? [{ fieldVisit: visitPhotoMetadata }] : []),
+      ];
       if (entry) {
         const updated = await updateCase(entry.id, {
           ...data,
           ...(filesChanged
-            ? { files: attachments.filter((file): file is File => file !== null) }
+            ? { files: selectedFiles, fileMetadata }
             : {}),
         });
         if (!updated) return;
@@ -443,7 +615,8 @@ export function RegForm({
       } else {
         const addError = await addCase({
           ...data,
-          files: attachments.filter((file): file is File => file !== null),
+          files: selectedFiles,
+          fileMetadata,
         });
         if (addError) {
           setError(addError);
@@ -526,6 +699,7 @@ export function RegForm({
               </div>
             </FormRow>
             {attachmentFields}
+            {visitPhotoField}
           </div>
 
           <div className="space-y-1">
@@ -585,6 +759,7 @@ export function RegForm({
             <BiField label="স্বামী/স্ত্রীর নাম" labelEn="Spouse's Name" value={spouseName} onChange={setSpouseName} compact />
             <FormRow labelBn="জাতীয় পরিচয়পত্র নং" labelEn="National ID No." required compact><Input className="h-11 text-base" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="১০, ১৩ বা ১৭ অঙ্ক / 10, 13 or 17 digits" required value={nid} onChange={(event) => setNid(event.target.value.replace(/\D/g, "").slice(0, 17))} /></FormRow>
             {attachmentFields}
+            {visitPhotoField}
           </div>
           <div className="space-y-1">
             <FormRow labelBn="মোবাইল নম্বর" labelEn="Mobile Number" required compact><Input className="h-11 text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormRow>

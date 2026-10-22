@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database, Json } from "@/integrations/supabase/types";
 import { MAX_IMAGE_BYTES } from "./compress-image";
 import { seedState } from "./seed";
-import type { AppState, RegCase, Role, Upazila, User, Village, Union } from "./types";
+import type { AppState, CaseDetails, CaseFileMetadata, RegCase, Role, Upazila, User, Village, Union } from "./types";
 
 type Lang = "bn" | "en";
 export type Mfa = "ok" | "enroll" | "challenge";
@@ -21,18 +21,41 @@ const localDemoLoginAvailable =
   import.meta.env.DEV &&
   (!import.meta.env["VITE_SUPABASE_URL"] || !import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"]);
 const DEMO_CASES = "uert-demo-cases";
+const demoAttachmentPreviews = new Map<string, string>();
+export const getDemoAttachmentPreview = (caseId: string, fileIndex: number) =>
+  demoAttachmentPreviews.get(`${caseId}:${fileIndex}`);
+
+function saveDemoAttachmentPreviews(caseId: string, files: File[]) {
+  files.forEach((file, index) => {
+    const key = `${caseId}:${index}`;
+    const previousUrl = demoAttachmentPreviews.get(key);
+    if (previousUrl) URL.revokeObjectURL(previousUrl);
+    demoAttachmentPreviews.set(key, URL.createObjectURL(file));
+  });
+  for (const [key, url] of demoAttachmentPreviews) {
+    if (key.startsWith(`${caseId}:`) && Number(key.slice(caseId.length + 1)) >= files.length) {
+      URL.revokeObjectURL(url);
+      demoAttachmentPreviews.delete(key);
+    }
+  }
+}
 /** Local testing mode: dev server or Lovable preview hosts only (never the published site). */
 const previewTestingAllowed = () =>
   typeof window !== "undefined" &&
   (import.meta.env.DEV || /^(id-preview--|preview--)|lovableproject(-dev)?\.com$|^localhost$/.test(window.location.hostname));
-type NewCase = Omit<RegCase, "id" | "createdAt" | "synced" | "smsSent" | "remarks" | "status" | "createdBy" | "upazilaId" | "unionId" | "ward" | "files"> & { files: File[] };
+type NewCase = Omit<RegCase, "id" | "createdAt" | "synced" | "smsSent" | "remarks" | "status" | "createdBy" | "upazilaId" | "unionId" | "ward" | "files"> & {
+  files: File[];
+  fileMetadata?: CaseFileMetadata[];
+};
 type CaseCorrection = Pick<RegCase, "type" | "name" | "father" | "mother" | "nid" | "gender" | "dob" | "villageId"> &
   Pick<RegCase, "parentMobile" | "details"> & {
     order?: string | undefined;
     dod?: string | undefined;
     cause?: RegCase["cause"];
     files?: File[] | undefined;
+    fileMetadata?: CaseFileMetadata[] | undefined;
   };
+const MAX_CASE_FILES = 4;
 
 interface Ctx {
   state: AppState; user: User | null; authReady: boolean; mfa: Mfa; online: boolean; demoMode: boolean; demoLoginAvailable: boolean;
@@ -245,13 +268,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [dark, lang]);
   useEffect(() => {
     if (!demoMode) return;
-    try { localStorage.setItem(DEMO_CASES, JSON.stringify(state.cases.filter((c) => c.createdBy === "u-w1"))); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(
+        DEMO_CASES,
+        JSON.stringify(state.cases.filter((c) => c.createdBy === "u-w1" || c.createdBy === "u-p1")),
+      );
+    } catch { /* ignore */ }
   }, [demoMode, state.cases]);
   useEffect(() => { if (prefsReady.current) localStorage.setItem(QUEUE, JSON.stringify(pending)); }, [pending]);
 
   // Offline queue: flush when back online
   useEffect(() => {
-    if (demoMode || !online || !user || user.role !== "worker" || !pending.length) return;
+    if (demoMode || !online || !user || (user.role !== "worker" && user.role !== "police") || !pending.length) return;
     (async () => {
       const left: any[] = [];
       for (const row of pending) {
@@ -326,7 +354,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut(); setUser(null); setState(empty); setAnnouncements([]);
     },
     addCase: async (c) => {
-      if (!user || user.role !== "worker") return L("শুধু স্বাস্থ্যকর্মী তথ্য দিতে পারবেন", "Only health workers can enter data");
+      if (!user || (user.role !== "worker" && user.role !== "police")) {
+        return L("শুধু স্বাস্থ্যকর্মী বা গ্রাম পুলিশ তথ্য দিতে পারবেন", "Only health workers or village police may enter data");
+      }
+      if (c.files.length > MAX_CASE_FILES) {
+        return L("সর্বোচ্চ ৪টি ছবি সংযুক্ত করা যাবে", "You can attach up to 4 photos");
+      }
       if (c.files.some((file) => !file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES)) {
         return L("প্রতিটি ছবি ৭৫০ KB-এর মধ্যে হতে হবে", "Each image must be 750 KB or smaller");
       }
@@ -335,6 +368,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (state.cases.some((existing) => isDuplicateCase(existing, c, user))) {
           return dupMsg(c.type);
         }
+        saveDemoAttachmentPreviews(id, c.files);
         const localCase: RegCase = {
           ...c,
           id,
@@ -347,7 +381,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           upazilaId: user.upazilaId,
           unionId: user.unionId ?? "",
           ward: user.ward ?? 1,
-          files: c.files.map((file) => ({ name: file.name, size: file.size })),
+          files: c.files.map((file, index) => ({
+            name: file.name,
+            size: file.size,
+            ...c.fileMetadata?.[index],
+          })),
         };
         setState((current) => ({ ...current, cases: [localCase, ...current.cases] }));
         if (localCase.type === "birth" && localCase.parentMobile) {
@@ -375,13 +413,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         setPending((p) => [...p, { ...row, queued_at: new Date().toISOString() }]);
         return null;
       }
-      const files = [];
-      for (const f of c.files.slice(0, 3)) {
+      const files: Array<{
+        name: string;
+        size: number;
+        path: string;
+        fieldVisit?: RegCase["files"][number]["fieldVisit"];
+      }> = [];
+      for (const [index, f] of c.files.slice(0, MAX_CASE_FILES).entries()) {
         const safe = f.name.replace(/[^\w.-]+/g, "_").slice(-80);
-        const path = `${user.upazilaId}/${user.unionId}/${id}/${Date.now()}-${safe}`;
+        const path = `${user.upazilaId}/${user.unionId}/${id}/${Date.now()}-${crypto.randomUUID()}-${safe}`;
         const { error } = await supabase.storage.from("case-files").upload(path, f, { contentType: f.type });
         if (error) return L("ফাইল আপলোড ব্যর্থ", "File upload failed") + `: ${error.message}`;
-        files.push({ name: f.name, size: f.size, path });
+        files.push({ name: f.name, size: f.size, path, ...c.fileMetadata?.[index] });
       }
       const { error } = await supabase.from("cases").insert({ ...row, files });
       if (error) return error.code === "23505" ? dupMsg(c.type) : error.message;
@@ -391,6 +434,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateCase: async (id, correction) => {
       if (!user || user.role !== "worker") {
         toast.error(L("শুধু স্বাস্থ্যকর্মী তথ্য সংশোধন করতে পারবেন", "Only health workers can correct entries"));
+        return false;
+      }
+      if ((correction.files?.length ?? 0) > MAX_CASE_FILES) {
+        toast.error(L("সর্বোচ্চ ৪টি ছবি সংযুক্ত করা যাবে", "You can attach up to 4 photos"));
         return false;
       }
       if (correction.files?.some((file) => !file.type.startsWith("image/") || file.size > MAX_IMAGE_BYTES)) {
@@ -403,19 +450,30 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
+      const correctedDetails: CaseDetails = {
+        ...correction.details,
+        correctedAt: new Date().toISOString(),
+      };
+      const correctedCase = { ...correction, details: correctedDetails };
+
       if (demoMode) {
-        if (state.cases.some((item) => item.id !== id && item.type === correction.type && item.nid === correction.nid && (correction.type === "death" || item.order === correction.order))) {
+        if (state.cases.some((item) => item.id !== id && item.type === correctedCase.type && item.nid === correctedCase.nid && (correctedCase.type === "death" || item.order === correctedCase.order))) {
           toast.error(dupMsg(correction.type));
           return false;
         }
         const updatedCase: RegCase = {
           ...existing,
-          ...correction,
+          ...correctedCase,
           files: correction.files
-            ? correction.files.map((file) => ({ name: file.name, size: file.size }))
+            ? correction.files.map((file, index) => ({
+                name: file.name,
+                size: file.size,
+                ...correction.fileMetadata?.[index],
+              }))
             : existing.files,
           synced: false,
         };
+        if (correction.files) saveDemoAttachmentPreviews(id, correction.files);
         setState((current) => ({
           ...current,
           cases: current.cases.map((item) => item.id === id ? updatedCase : item),
@@ -434,8 +492,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return true;
       }
 
-      const uploads: { name: string; size: number; path: string }[] = [];
-      for (const file of (correction.files ?? []).slice(0, 3)) {
+      const uploads: Array<{
+        name: string;
+        size: number;
+        path: string;
+        fieldVisit?: RegCase["files"][number]["fieldVisit"];
+      }> = [];
+      for (const [index, file] of (correction.files ?? []).slice(0, MAX_CASE_FILES).entries()) {
         const safe = file.name.replace(/[^\w.-]+/g, "_").slice(-80);
         const path = `${user.upazilaId}/${user.unionId}/${id}/${Date.now()}-${crypto.randomUUID()}-${safe}`;
         const { error } = await supabase.storage.from("case-files").upload(path, file, { contentType: file.type });
@@ -444,27 +507,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           toast.error(L("ফাইল আপলোড ব্যর্থ", "File upload failed") + `: ${error.message}`);
           return false;
         }
-        uploads.push({ name: file.name, size: file.size, path });
+        uploads.push({ name: file.name, size: file.size, path, ...correction.fileMetadata?.[index] });
       }
 
       const update: Database["public"]["Tables"]["cases"]["Update"] = {
-        type: correction.type,
-        name_bn: correction.name.bn,
-        name_en: correction.name.en,
-        father_bn: correction.father.bn,
-        father_en: correction.father.en,
-        mother_bn: correction.mother.bn,
-        mother_en: correction.mother.en,
-        nid: correction.nid,
-        parent_mobile: correction.parentMobile ?? null,
-        gender: correction.gender,
-        dob: correction.dob,
-        child_order: correction.order ?? null,
-        dod: correction.dod ?? null,
-        cause_bn: correction.cause?.bn ?? null,
-        cause_en: correction.cause?.en ?? null,
-        village_id: correction.villageId,
-        details: JSON.parse(JSON.stringify(correction.details ?? {})) as Json,
+        type: correctedCase.type,
+        name_bn: correctedCase.name.bn,
+        name_en: correctedCase.name.en,
+        father_bn: correctedCase.father.bn,
+        father_en: correctedCase.father.en,
+        mother_bn: correctedCase.mother.bn,
+        mother_en: correctedCase.mother.en,
+        nid: correctedCase.nid,
+        parent_mobile: correctedCase.parentMobile ?? null,
+        gender: correctedCase.gender,
+        dob: correctedCase.dob,
+        child_order: correctedCase.order ?? null,
+        dod: correctedCase.dod ?? null,
+        cause_bn: correctedCase.cause?.bn ?? null,
+        cause_en: correctedCase.cause?.en ?? null,
+        village_id: correctedCase.villageId,
+        details: JSON.parse(JSON.stringify(correctedDetails)) as Json,
       };
       if (correction.files) update.files = uploads;
       const { data, error } = await supabase.from("cases").update(update).eq("id", id).select("id").maybeSingle();
@@ -584,7 +647,7 @@ export function scopedCases(state: AppState, u: User | null) {
     if (u.role === "uno") return true;
     if (c.unionId !== u.unionId) return false;
     if (u.role === "admin") return true;
-    if (u.role === "police") return c.ward === u.ward && !!c.police;
+    if (u.role === "police") return c.ward === u.ward && (c.createdBy === u.id || !!c.police);
     return c.createdBy === u.id;
   });
 }

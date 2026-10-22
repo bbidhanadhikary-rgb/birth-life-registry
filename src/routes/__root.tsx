@@ -102,7 +102,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Tiro+Bangla&display=swap" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Tiro+Bangla&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -133,7 +136,9 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <StoreProvider>
         <Header />
-        <main className="box-border min-h-[calc(100svh-4rem)] pt-[var(--app-header-height,9rem)]"><Outlet /></main>
+        <main className="box-border min-h-[calc(100svh-4rem)] pt-[var(--app-header-height,9rem)]">
+          <Outlet />
+        </main>
         <Footer compact />
         <RoleSwitcherBar />
         <Toaster richColors position="top-center" />
