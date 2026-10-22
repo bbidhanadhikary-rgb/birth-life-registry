@@ -165,6 +165,7 @@ function FormRow({
   required = false,
   compact = false,
   inline = false,
+  inlineProminent = false,
   labelAccessory,
   children,
 }: {
@@ -173,21 +174,22 @@ function FormRow({
   required?: boolean;
   compact?: boolean;
   inline?: boolean;
+  inlineProminent?: boolean;
   labelAccessory?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className={inline ? "flex min-w-0 flex-row items-center gap-2" : compact ? "grid min-w-0 gap-1 lg:grid-cols-[8rem_minmax(0,1fr)] lg:items-center lg:gap-2" : "grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-start sm:gap-4"}>
+    <div className={inlineProminent ? "grid min-w-0 grid-cols-[max-content_minmax(0,1fr)] items-center gap-1" : inline ? "flex min-w-0 flex-row items-center gap-1" : compact ? "grid min-w-0 gap-1 lg:grid-cols-[8rem_minmax(0,1fr)] lg:items-center lg:gap-2" : "grid gap-2 sm:grid-cols-[12rem_minmax(0,1fr)] sm:items-start sm:gap-4"}>
       <div className={`flex items-start ${inline ? "shrink-0" : ""} ${labelAccessory ? "gap-2" : ""} ${compact ? "lg:pt-0" : "pt-2"}`}>
         {labelAccessory}
         <div className={inline ? "min-w-0 whitespace-nowrap" : "min-w-0"}>
-          <p className={`${inline ? "text-xs" : compact ? "text-base" : "text-sm"} font-bold text-slate-800`}>
+          <p className={`${inline ? inlineProminent ? "text-base font-medium" : "text-xs font-bold" : compact ? "text-base font-bold" : "text-sm font-bold"} text-slate-800`}>
             {labelBn}{required && <span className="text-red-600"> *</span>}
           </p>
           <p className={`${inline ? "text-[10px]" : compact ? "text-sm" : "text-[11px]"} text-slate-500`}>{labelEn}</p>
         </div>
       </div>
-      <div className={inline ? "min-w-0 flex-1" : "min-w-0"}>{children}</div>
+      <div className={inlineProminent ? "min-w-0" : inline ? "min-w-0 flex-1" : "min-w-0"}>{children}</div>
     </div>
   );
 }
@@ -1040,7 +1042,7 @@ export function RegForm({
     <form
       className={`w-full max-w-full rounded-2xl border border-emerald-100 bg-white p-2 shadow-sm sm:p-3 ${
         type === "death"
-          ? "grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4"
+          ? "grid w-full grid-cols-1 gap-3 md:grid-cols-2 md:gap-6"
           : "space-y-1"
       }`}
       onSubmit={submit}
@@ -1154,10 +1156,10 @@ export function RegForm({
       ) : (
         <>
           <div className="min-w-0 space-y-1">
-            <div className="grid min-w-0 grid-cols-2 gap-2">
-              <FormRow labelBn="মৃত্যুর তারিখ" labelEn="Date of Death" required compact inline>
+            <div className="grid min-w-0 grid-cols-2 gap-1.5">
+              <FormRow labelBn="মৃত্যুর তারিখ" labelEn="Date of Death" required compact inline inlineProminent>
                 <Input
-                  className="h-11 min-w-0 px-1 text-[10px]"
+                  className="h-11 w-full min-w-0 px-1 text-xs"
                   type="text"
                   inputMode="numeric"
                   maxLength={10}
@@ -1168,9 +1170,9 @@ export function RegForm({
                   onChange={(event) => setDod(normalizeBengaliDigits(event.target.value))}
                 />
               </FormRow>
-              <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required compact inline>
+              <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required compact inline inlineProminent>
                 <Select value={order} onValueChange={setOrder} required>
-                  <SelectTrigger className="h-11 min-w-0 px-1 text-[10px]" aria-label="কত তম সন্তান / Child order">
+                  <SelectTrigger className="h-11 w-full min-w-0 px-1 text-xs" aria-label="কত তম সন্তান / Child order">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
