@@ -76,3 +76,28 @@ npm run dev
 `npm run build` creates the Nitro deployment output in `.output`. To preview a
 local production build with Vite, run `npm run preview`; it first creates the
 Vite-compatible SSR output in `dist` and then starts the preview server.
+
+## Supabase setup
+
+Copy `.env.example` to `.env` and configure the project URL and publishable key
+for both the browser (`VITE_` variables) and server. Server functions also
+require `SUPABASE_SERVICE_ROLE_KEY` for trusted admin operations such as OTP
+lookups and sign-in rate limiting. Keep that key in local/deployment secrets:
+never add a `VITE_` prefix or commit its value. `LOVABLE_DB_MIGRATION_URL` is a
+separate privileged database connection used only by Drizzle migrations; do not
+use it as an application runtime variable.
+
+Birth and death registrations share the RLS-protected `public.cases` table and
+are distinguished by its `type` column. Existing migrations define
+role/jurisdiction-scoped case policies, worker and police submission policies,
+and restrictive MFA policies for privileged roles. The app also requires a
+private `case-files` Storage bucket; existing Storage policies scope uploads by
+role and administrative area and reads to visible cases.
+
+Before applying migrations to a connected project, reconcile migration status:
+`drizzle/migrations/meta/_journal.json` currently ends at `0011`, while SQL
+files `0012` and `0013` are present but absent from that journal. Confirm which
+SQL has already been applied in the target database first; do not blindly run
+the migration directory against production. Live RLS and Storage behavior must
+be verified against the connected Supabase project after its deployment
+secrets and migration history are confirmed.
