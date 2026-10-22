@@ -166,6 +166,7 @@ function FormRow({
   compact = false,
   inline = false,
   inlineProminent = false,
+  inlineLarger = false,
   labelAccessory,
   children,
 }: {
@@ -175,6 +176,7 @@ function FormRow({
   compact?: boolean;
   inline?: boolean;
   inlineProminent?: boolean;
+  inlineLarger?: boolean;
   labelAccessory?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -183,7 +185,7 @@ function FormRow({
       <div className={`flex items-start ${inline ? "shrink-0" : ""} ${labelAccessory ? "gap-2" : ""} ${compact ? "lg:pt-0" : "pt-2"}`}>
         {labelAccessory}
         <div className={inline ? "min-w-0 whitespace-nowrap" : "min-w-0"}>
-          <p className={`${inline ? inlineProminent ? "text-base font-medium" : "text-xs font-bold" : compact ? "text-base font-bold" : "text-sm font-bold"} text-slate-800`}>
+          <p className={`${inline ? inlineProminent ? "text-base font-medium" : inlineLarger ? "text-sm font-medium" : "text-xs font-bold" : compact ? "text-base font-bold" : "text-sm font-bold"} text-slate-800`}>
             {labelBn}{required && <span className="text-red-600"> *</span>}
           </p>
           <p className={`${inline ? "text-[10px]" : compact ? "text-sm" : "text-[11px]"} text-slate-500`}>{labelEn}</p>
@@ -1065,7 +1067,7 @@ export function RegForm({
         <div className="grid min-w-0 items-start gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-4">
           <div className="min-w-0 space-y-1">
             <div className="grid min-w-0 grid-cols-2 gap-3">
-              <FormRow labelBn="জন্মতারিখ" labelEn="Date of Birth" required compact inline>
+              <FormRow labelBn="জন্মতারিখ" labelEn="Date of Birth" required compact inline inlineLarger>
                 <Input
                   className="h-11 min-w-0 px-1.5 text-xs"
                   type="text"
@@ -1078,7 +1080,7 @@ export function RegForm({
                   onChange={(event) => setDob(normalizeBengaliDigits(event.target.value))}
                 />
               </FormRow>
-              <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required compact inline>
+              <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required compact inline inlineLarger>
                 <Select value={order} onValueChange={setOrder} required>
                   <SelectTrigger className="h-11 min-w-0 px-1.5 text-xs" aria-label="কত তম সন্তান / Child order">
                     <SelectValue />
