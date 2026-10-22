@@ -639,6 +639,22 @@ export function RegForm({
                   onChange={(event) => void chooseImage(index, event.target.files?.[0])}
                 />
               </label>
+              {canPreview && (
+                <button
+                  type="button"
+                  className="rounded p-1 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-800"
+                  aria-label={L(`ছবি ${index + 1} দেখুন`, `Preview image ${index + 1}`)}
+                  onClick={() =>
+                    void showImagePreview(
+                      L(`ছবি ${index + 1}`, `Image ${index + 1}`),
+                      file,
+                      savedFile,
+                    )
+                  }
+                >
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
               {file && (
                 <button
                   type="button"
@@ -652,22 +668,6 @@ export function RegForm({
                   }}
                 >
                   ×
-                </button>
-              )}
-              {type === "death" && canPreview && (
-                <button
-                  type="button"
-                  className="rounded p-1 text-emerald-700 hover:bg-emerald-100"
-                  aria-label={L(`ছবি ${index + 1} দেখুন`, `Preview image ${index + 1}`)}
-                  onClick={() =>
-                    void showImagePreview(
-                      L(`ছবি ${index + 1}`, `Image ${index + 1}`),
-                      file,
-                      savedFile,
-                    )
-                  }
-                >
-                  <Eye className="h-4 w-4" aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -747,10 +747,10 @@ export function RegForm({
             }}
           />
         </label>
-        {type === "death" && (visitPhoto || (!filesChanged && oldVisitPhoto)) && (
+        {(visitPhoto || (!filesChanged && oldVisitPhoto)) && (
           <button
             type="button"
-            className="rounded p-1.5 text-emerald-700 hover:bg-emerald-100"
+            className="rounded p-1.5 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-800"
             aria-label={L("পরিদর্শনের ছবি দেখুন", "Preview visit photo")}
             onClick={() =>
               void showImagePreview(
@@ -1154,19 +1154,35 @@ export function RegForm({
       ) : (
         <>
           <div className="min-w-0 space-y-1">
-            <FormRow labelBn="মৃত্যুর তারিখ" labelEn="Date of Death" required compact>
-              <Input
-                className="h-11 text-base"
-                type="text"
-                inputMode="numeric"
-                maxLength={10}
-                placeholder="YYYY-MM-DD"
-                aria-label="মৃত্যুর তারিখ / Date of death"
-                required
-                value={dod}
-                onChange={(event) => setDod(normalizeBengaliDigits(event.target.value))}
-              />
-            </FormRow>
+            <div className="grid min-w-0 grid-cols-2 gap-2">
+              <FormRow labelBn="মৃত্যুর তারিখ" labelEn="Date of Death" required compact inline>
+                <Input
+                  className="h-11 min-w-0 px-1 text-[10px]"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="YYYY-MM-DD"
+                  aria-label="মৃত্যুর তারিখ / Date of death"
+                  required
+                  value={dod}
+                  onChange={(event) => setDod(normalizeBengaliDigits(event.target.value))}
+                />
+              </FormRow>
+              <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required compact inline>
+                <Select value={order} onValueChange={setOrder} required>
+                  <SelectTrigger className="h-11 min-w-0 px-1 text-[10px]" aria-label="কত তম সন্তান / Child order">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 20 }, (_, index) => index + 1).map((childOrder) => (
+                      <SelectItem key={childOrder} value={String(childOrder)}>
+                        {childOrderLabel(childOrder)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormRow>
+            </div>
             <FormRow labelBn="লিঙ্গ" labelEn="Gender" required compact>
               <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="লিঙ্গ / Gender">
                 {([
