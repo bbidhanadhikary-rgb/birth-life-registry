@@ -12,11 +12,13 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: false,
+      outDir: ".output/public",
       includeAssets: ["favicon.ico", "pwa-192x192.png", "pwa-512x512.png"],
       manifest: {
         name: "ই-নিবন্ধন ট্র্যাকার",
         short_name: "ই-নিবন্ধন",
         description: "জন্ম ও মৃত্যু নিবন্ধন ট্র্যাকার",
+        lang: "bn",
         theme_color: "#16a34a",
         background_color: "#ffffff",
         display: "standalone",
@@ -25,12 +27,6 @@ export default defineConfig({
         icons: [
           { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png" },
           { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png" },
-          {
-            src: "/pwa-512x512.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
-          },
         ],
       },
       workbox: {
@@ -38,10 +34,11 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: ({ request }) => request.mode === "navigate",
+            urlPattern: ({ request, url }) =>
+              request.mode === "navigate" && url.pathname === "/",
             handler: "NetworkFirst",
             options: {
-              cacheName: "page-cache",
+              cacheName: "public-home-page",
               networkTimeoutSeconds: 3,
               expiration: { maxEntries: 30, maxAgeSeconds: 30 * 24 * 60 * 60 },
             },
