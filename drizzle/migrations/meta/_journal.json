@@ -85,6 +85,27 @@
       "when": 1792600000000,
       "tag": "0011_case_field_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792601000000,
+      "tag": "0012_monthly_ward_case_type_counts",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792602000000,
+      "tag": "0013_police_case_submissions",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792603000000,
+      "tag": "0014_union_village_manager",
+      "breakpoints": true
     }
   ]
 }

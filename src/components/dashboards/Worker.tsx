@@ -28,8 +28,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -45,7 +43,7 @@ import { checkCaseDuplicate } from "@/lib/case.functions";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { downloadCSV, printPDF } from "@/lib/report";
 import { roleLabel, scopedCases, useApp } from "@/lib/store";
-import type { Bi, CaseFileMetadata, RegCase } from "@/lib/types";
+import type { Bi, CaseFileMetadata, RegCase, Union, Upazila, Village } from "@/lib/types";
 
 const emptyBi: Bi = { bn: "", en: "" };
 type CaseType = "birth" | "death";
@@ -65,11 +63,8 @@ type RegistrationDraft = {
   order: string;
   fatherBrn: string;
   motherBrn: string;
-  birthPlace: Bi;
-  present: Bi;
-  permanent: Bi;
-  samePermanent: boolean;
-  samePresent: boolean;
+  villageId: string;
+  addressHolding: string;
 };
 type DialogState =
   | { kind: "form"; type: CaseType; entry?: RegCase | undefined }
@@ -98,10 +93,10 @@ function readRegistrationDraft(key: string): Partial<RegistrationDraft> | undefi
     const value: unknown = JSON.parse(stored);
     if (!isRecord(value)) return undefined;
     const draft: Partial<RegistrationDraft> = {};
-    for (const field of ["name", "father", "mother", "spouseName", "cause", "birthPlace", "present", "permanent"] as const) {
+    for (const field of ["name", "father", "mother", "spouseName", "cause"] as const) {
       if (isBi(value[field])) draft[field] = value[field];
     }
-    for (const field of ["applicantNameBn", "applicantRelationshipBn", "nid", "mobile", "dob", "dod", "order", "fatherBrn", "motherBrn"] as const) {
+    for (const field of ["applicantNameBn", "applicantRelationshipBn", "nid", "mobile", "dob", "dod", "order", "fatherBrn", "motherBrn", "villageId", "addressHolding"] as const) {
       if (typeof value[field] === "string") draft[field] = value[field];
     }
     if (
@@ -110,12 +105,6 @@ function readRegistrationDraft(key: string): Partial<RegistrationDraft> | undefi
       value["gender"] === "other"
     ) {
       draft.gender = value["gender"];
-    }
-    if (typeof value["samePermanent"] === "boolean") {
-      draft.samePermanent = value["samePermanent"];
-    }
-    if (typeof value["samePresent"] === "boolean") {
-      draft.samePresent = value["samePresent"];
     }
     return draft;
   } catch (cause) {
@@ -135,9 +124,39 @@ function normalizeBengaliDigits(value: string) {
 }
 
 function childOrderLabel(order: number) {
-  const bengaliNumber = String(order).replace(/\d/g, (digit) => "০১২৩৪৫৬৭৮৯"[Number(digit)]);
+  const bengaliNumber = String(order).replace(/\d/g, (digit) => "০১২৩৪৫৬৭৮৯".charAt(Number(digit)));
   const suffix = ["ম", "য়", "য়", "র্থ", "ম", "ষ্ঠ", "ম", "ম", "ম", "ম"][order - 1] ?? "তম";
   return `${bengaliNumber}${suffix} সন্তান`;
+}
+
+function configuredAddress(
+  village: Village,
+  union: Union,
+  upazila: Upazila,
+  holding: string,
+): Bi {
+  const holdingBn = holding.trim() ? `বাসা/হোল্ডিং: ${holding.trim()}` : "";
+  const holdingEn = holding.trim() ? `House/holding: ${holding.trim()}` : "";
+  return {
+    bn: [
+      village.bn,
+      `${village.ward} নং ওয়ার্ড`,
+      `ডাকঘর: ${village.poBn}`,
+      union.bn,
+      `${upazila.bn} উপজেলা`,
+      `${upazila.districtBn} জেলা`,
+      holdingBn,
+    ].filter(Boolean).join(", "),
+    en: [
+      village.en,
+      `Ward ${village.ward}`,
+      `Post office: ${village.poEn}`,
+      union.en,
+      `${upazila.en} Upazila`,
+      `${upazila.districtEn} District`,
+      holdingEn,
+    ].filter(Boolean).join(", "),
+  };
 }
 
 function isValidIsoDate(value: string) {
@@ -196,6 +215,81 @@ function FormRow({
   );
 }
 
+function VillageAddressField({
+  union,
+  upazila,
+  districtBn,
+  districtEn,
+  villageId,
+  onVillageChange,
+  holding,
+  onHoldingChange,
+  L,
+  n,
+}: {
+  union: Union;
+  upazila: Upazila;
+  districtBn: string;
+  districtEn: string;
+  villageId: string;
+  onVillageChange: (id: string) => void;
+  holding: string;
+  onHoldingChange: (value: string) => void;
+  L: (bn: string, en: string) => string;
+  n: (value: number | string) => string;
+}) {
+  const village = union.villages.find((item) => item.id === villageId);
+  const details = [
+    [L("ওয়ার্ড", "Ward"), village ? `${n(village.ward)} ${L("নং", "No.")}` : ""],
+    [L("ডাকঘর", "Post office"), village ? L(village.poBn, village.poEn) : ""],
+    [L("ইউনিয়ন", "Union"), L(union.bn, union.en)],
+    [L("উপজেলা", "Upazila"), L(upazila.bn, upazila.en)],
+    [L("জেলা", "District"), L(districtBn, districtEn)],
+  ];
+
+  return (
+    <fieldset className="min-w-0 space-y-2 rounded-lg border border-emerald-200 bg-emerald-50/40 p-2">
+      <legend className="px-1 text-sm font-bold text-slate-800">
+        {L("গ্রাম/মহল্লা ও ঠিকানা", "Village/neighborhood address")}
+        <span className="text-red-600"> *</span>
+      </legend>
+      <Label htmlFor="village-select" className="text-xs font-semibold">
+        {L("গ্রাম/মহল্লা নির্বাচন", "Select village/neighborhood")}
+      </Label>
+      <Select value={villageId} onValueChange={onVillageChange} required>
+        <SelectTrigger id="village-select" className="h-10 w-full min-w-0">
+          <SelectValue placeholder={L("গ্রাম/মহল্লা নির্বাচন করুন", "Choose village/neighborhood")} />
+        </SelectTrigger>
+        <SelectContent>
+          {union.villages.map((item) => (
+            <SelectItem key={item.id} value={item.id}>{L(item.bn, item.en)}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+        {details.map(([label, value]) => (
+          <div key={label} className="min-w-0 rounded-md bg-white px-2 py-1">
+            <p className="text-[10px] font-medium text-slate-500">{label}</p>
+            <p className="truncate text-xs font-semibold text-slate-800">{value || "—"}</p>
+          </div>
+        ))}
+      </div>
+      <div>
+        <Label htmlFor="address-holding" className="text-xs font-medium">
+          {L("বাসা/হোল্ডিং নম্বর বা সড়ক (ঐচ্ছিক)", "House/holding number or road (optional)")}
+        </Label>
+        <Input
+          id="address-holding"
+          className="mt-1 h-9"
+          maxLength={160}
+          value={holding}
+          onChange={(event) => onHoldingChange(event.target.value)}
+        />
+      </div>
+    </fieldset>
+  );
+}
+
 function BiField({
   label,
   labelEn,
@@ -249,53 +343,6 @@ function BiField({
   );
 }
 
-function BiTextAreaField({
-  labelBn,
-  labelEn,
-  value,
-  onChange,
-  required = false,
-  compact = false,
-  comfortable = false,
-  labelAccessory,
-}: {
-  labelBn: string;
-  labelEn: string;
-  value: Bi;
-  onChange: (next: Bi) => void;
-  required?: boolean;
-  compact?: boolean;
-  comfortable?: boolean;
-  labelAccessory?: React.ReactNode;
-}) {
-  return (
-    <FormRow labelBn={labelBn} labelEn={labelEn} required={required} compact={compact} labelAccessory={labelAccessory}>
-      <div className={compact ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2 sm:grid-cols-2"}>
-        <Textarea
-          className={comfortable ? "h-20 min-h-20 px-3 py-2 text-base md:text-base placeholder:text-base" : compact ? "h-[4.5rem] min-h-[4.5rem] px-3 py-1.5 text-base md:text-base placeholder:text-base" : undefined}
-          aria-label={`${labelBn} — বাংলা`}
-          maxLength={500}
-          placeholder="বাংলায় লিখুন"
-          required={required}
-          rows={compact ? 3 : 2}
-          value={value.bn}
-          onChange={(event) => onChange({ ...value, bn: event.target.value })}
-        />
-        <Textarea
-          className={comfortable ? "h-20 min-h-20 px-3 py-2 text-base md:text-base placeholder:text-base" : compact ? "h-[4.5rem] min-h-[4.5rem] px-3 py-1.5 text-base md:text-base placeholder:text-base" : undefined}
-          aria-label={`${labelEn} — English`}
-          maxLength={500}
-          placeholder="Enter in English (optional)"
-          required={false}
-          rows={compact ? 3 : 2}
-          value={value.en}
-          onChange={(event) => onChange({ ...value, en: event.target.value })}
-        />
-      </div>
-    </FormRow>
-  );
-}
-
 export function RegForm({
   type,
   entry,
@@ -309,7 +356,7 @@ export function RegForm({
   onCancel?: () => void;
   onEdit?: () => void;
 }) {
-  const { L, user, state, addCase, updateCase, demoMode, enterDemoLogin } = useApp();
+  const { L, n, user, state, addCase, updateCase, demoMode, enterDemoLogin } = useApp();
   const checkForDuplicate = useServerFn(checkCaseDuplicate);
   const upazila = user ? state.upazilas.find((area) => area.id === user.upazilaId) : undefined;
   const union = upazila?.unions.find((area) => area.id === user?.unionId);
@@ -338,30 +385,11 @@ export function RegForm({
   const [order, setOrder] = useState(savedDraft?.order ?? entry?.order ?? "1");
   const [fatherBrn, setFatherBrn] = useState(savedDraft?.fatherBrn ?? entry?.details?.fatherBrn ?? "");
   const [motherBrn, setMotherBrn] = useState(savedDraft?.motherBrn ?? entry?.details?.motherBrn ?? "");
-  const [birthPlace, setBirthPlace] = useState<Bi>(
-    savedDraft?.birthPlace ??
-      (type === "death"
-        ? entry?.details?.deathPlace ?? entry?.details?.birthPlace ?? emptyBi
-        : entry?.details?.birthPlace ?? emptyBi),
+  const [villageId, setVillageId] = useState(savedDraft?.villageId ?? entry?.villageId ?? "");
+  const [addressHolding, setAddressHolding] = useState(
+    savedDraft?.addressHolding ?? entry?.details?.addressHolding ?? "",
   );
-  const [present, setPresent] = useState<Bi>(
-    savedDraft?.present ?? entry?.details?.presentAddress ?? emptyBi,
-  );
-  const [permanent, setPermanent] = useState<Bi>(
-    savedDraft?.permanent ?? entry?.details?.permanentAddress ?? emptyBi,
-  );
-  const [samePermanent, setSamePermanent] = useState(
-    savedDraft?.samePermanent ??
-      Boolean(entry?.details?.birthPlace &&
-        entry.details.permanentAddress?.bn === entry.details.birthPlace.bn &&
-        entry.details.permanentAddress?.en === entry.details.birthPlace.en),
-  );
-  const [samePresent, setSamePresent] = useState(
-    savedDraft?.samePresent ??
-      Boolean(entry?.details?.birthPlace &&
-        entry.details.presentAddress?.bn === entry.details.birthPlace.bn &&
-        entry.details.presentAddress?.en === entry.details.birthPlace.en),
-  );
+  const selectedVillage = union?.villages.find((village) => village.id === villageId);
   const [attachments, setAttachments] = useState<(File | null)[]>([null, null, null]);
   const [visitPhoto, setVisitPhoto] = useState<File | null>(null);
   const [visitPhotoMetadata, setVisitPhotoMetadata] =
@@ -417,30 +445,8 @@ export function RegForm({
     setOrder(draft?.order ?? entry?.order ?? "1");
     setFatherBrn(draft?.fatherBrn ?? entry?.details?.fatherBrn ?? "");
     setMotherBrn(draft?.motherBrn ?? entry?.details?.motherBrn ?? "");
-    setBirthPlace(
-      draft?.birthPlace ??
-        (type === "death"
-          ? entry?.details?.deathPlace ?? entry?.details?.birthPlace ?? emptyBi
-          : entry?.details?.birthPlace ?? emptyBi),
-    );
-    setPresent(draft?.present ?? entry?.details?.presentAddress ?? emptyBi);
-    setPermanent(draft?.permanent ?? entry?.details?.permanentAddress ?? emptyBi);
-    setSamePermanent(
-      draft?.samePermanent ??
-        Boolean(
-          entry?.details?.birthPlace &&
-            entry.details.permanentAddress?.bn === entry.details.birthPlace.bn &&
-            entry.details.permanentAddress?.en === entry.details.birthPlace.en,
-        ),
-    );
-    setSamePresent(
-      draft?.samePresent ??
-        Boolean(
-          entry?.details?.birthPlace &&
-            entry.details.presentAddress?.bn === entry.details.birthPlace.bn &&
-            entry.details.presentAddress?.en === entry.details.birthPlace.en,
-        ),
-    );
+    setVillageId(draft?.villageId ?? entry?.villageId ?? "");
+    setAddressHolding(draft?.addressHolding ?? entry?.details?.addressHolding ?? "");
     setActiveDraftKey(draftKey);
   }, [activeDraftKey, draftKey, entry, type]);
 
@@ -462,11 +468,8 @@ export function RegForm({
       order,
       fatherBrn,
       motherBrn,
-      birthPlace,
-      present,
-      permanent,
-      samePermanent,
-      samePresent,
+      villageId,
+      addressHolding,
     };
     const timeout = window.setTimeout(() => {
       try {
@@ -487,7 +490,7 @@ export function RegForm({
     activeDraftKey,
     applicantNameBn,
     applicantRelationshipBn,
-    birthPlace,
+    addressHolding,
     cause,
     dob,
     dod,
@@ -502,10 +505,7 @@ export function RegForm({
     name,
     nid,
     order,
-    permanent,
-    present,
-    samePermanent,
-    samePresent,
+    villageId,
     spouseName,
   ]);
 
@@ -863,8 +863,8 @@ export function RegForm({
       setError(L("পিতা/মাতার জন্ম নিবন্ধন নম্বর ১৭ অঙ্কের হতে হবে", "Father's/mother's BRN must be exactly 17 digits"));
       return;
     }
-    if (!birthPlace.bn.trim() || !present.bn.trim() || !permanent.bn.trim()) {
-      setError(L("জন্ম/মৃত্যুর স্থান এবং বর্তমান ও স্থায়ী ঠিকানা বাংলায় দিন", "Enter the place of birth/death and present and permanent addresses in Bangla"));
+    if (!selectedVillage) {
+      setError(L("গ্রাম/মহল্লা নির্বাচন করুন", "Select a village/neighborhood"));
       return;
     }
     if (dob > new Date().toISOString().slice(0, 10) || (type === "death" && (dod < dob || dod > new Date().toISOString().slice(0, 10)))) {
@@ -952,6 +952,12 @@ export function RegForm({
           return;
         }
       }
+      const registryAddress = configuredAddress(
+        selectedVillage,
+        union,
+        upazila,
+        addressHolding,
+      );
       const data = {
         type,
         name,
@@ -964,14 +970,15 @@ export function RegForm({
         order: type === "birth" ? order : undefined,
         dod: type === "death" ? dod : undefined,
         cause: type === "death" ? cause : undefined,
-        villageId: entry?.villageId ?? "",
+        villageId: selectedVillage.id,
         details: {
           fatherBrn: fatherBrn || undefined,
           motherBrn: motherBrn || undefined,
-          birthPlace: type === "birth" ? { bn: birthPlace.bn.trim(), en: birthPlace.en.trim() } : undefined,
-          deathPlace: type === "death" ? { bn: birthPlace.bn.trim(), en: birthPlace.en.trim() } : undefined,
-          presentAddress: { bn: present.bn.trim(), en: present.en.trim() },
-          permanentAddress: { bn: permanent.bn.trim(), en: permanent.en.trim() },
+          birthPlace: type === "birth" ? registryAddress : undefined,
+          deathPlace: type === "death" ? registryAddress : undefined,
+          presentAddress: registryAddress,
+          permanentAddress: registryAddress,
+          addressHolding: addressHolding.trim() || undefined,
           spouseName: type === "death" ? spouseName : undefined,
           applicantName: undefined,
           applicantRelationship: undefined,
@@ -1125,27 +1132,20 @@ export function RegForm({
           </div>
 
           <div className="min-w-0 space-y-1">
-            <BiTextAreaField labelBn="জন্মস্থানের ঠিকানা" labelEn="Place of Birth Address" value={birthPlace} onChange={(next) => { setBirthPlace(next); if (samePermanent) setPermanent(next); if (samePresent) setPresent(next); }} required compact comfortable />
-            <BiTextAreaField
-              labelBn="স্থায়ী ঠিকানা"
-              labelEn="Permanent Address"
-              value={permanent}
-              onChange={(next) => { setPermanent(next); setSamePermanent(false); }}
-              required
-              compact
-              comfortable
-              labelAccessory={<Checkbox aria-label="স্থায়ী ঠিকানা জন্মস্থানের মতো" title="জন্মস্থানের ঠিকানার মতো" checked={samePermanent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePermanent(enabled); if (enabled) setPermanent(birthPlace); }} className="mt-0.5 h-4 w-4" />}
-            />
-            <BiTextAreaField
-              labelBn="বর্তমান ঠিকানা"
-              labelEn="Present Address"
-              value={present}
-              onChange={(next) => { setPresent(next); setSamePresent(false); }}
-              required
-              compact
-              comfortable
-              labelAccessory={<Checkbox aria-label="বর্তমান ঠিকানা জন্মস্থানের মতো" title="জন্মস্থানের ঠিকানার মতো" checked={samePresent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePresent(enabled); if (enabled) setPresent(birthPlace); }} className="mt-0.5 h-4 w-4" />}
-            />
+            {union && upazila && (
+              <VillageAddressField
+                union={union}
+                upazila={upazila}
+                districtBn={upazila.districtBn}
+                districtEn={upazila.districtEn}
+                villageId={villageId}
+                onVillageChange={setVillageId}
+                holding={addressHolding}
+                onHoldingChange={setAddressHolding}
+                L={L}
+                n={n}
+              />
+            )}
             <FormRow labelBn="আবেদনকারীর তথ্য" labelEn="Applicant Details" required compact>
               <div className="grid gap-2">
                 <Input className="h-10 text-sm md:text-sm" autoComplete="name" maxLength={100} placeholder="আবেদনকারীর নাম" aria-label="আবেদনকারীর নাম" required value={applicantNameBn} onChange={(event) => setApplicantNameBn(event.target.value)} />
@@ -1174,7 +1174,7 @@ export function RegForm({
               </FormRow>
               <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required compact inline inlineProminent>
                 <Select value={order} onValueChange={setOrder} required>
-                  <SelectTrigger className="h-11 w-full min-w-0 px-1 text-xs" aria-label="কত তম সন্তান / Child order">
+                  <SelectTrigger className="h-14 w-full min-w-0 px-3 py-2.5 text-lg font-semibold" aria-label="কত তম সন্তান / Child order">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1236,9 +1236,20 @@ export function RegForm({
             <FormRow labelBn="মোবাইল নম্বর" labelEn="Mobile Number" required compact><Input className="h-11 text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormRow>
           </div>
           <div className="min-w-0 space-y-1">
-            <BiTextAreaField labelBn="মৃত্যুর স্থান / ঠিকানা" labelEn="Place of Death / Address" value={birthPlace} onChange={(next) => { setBirthPlace(next); if (samePermanent) setPermanent(next); if (samePresent) setPresent(next); }} required compact />
-            <BiTextAreaField labelBn="স্থায়ী ঠিকানা" labelEn="Permanent Address" value={permanent} onChange={(next) => { setPermanent(next); setSamePermanent(false); }} required compact labelAccessory={<Checkbox aria-label="স্থায়ী ঠিকানা মৃত্যুর স্থানের মতো" checked={samePermanent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePermanent(enabled); if (enabled) setPermanent(birthPlace); }} className="mt-0.5 h-4 w-4" />} />
-            <BiTextAreaField labelBn="বর্তমান ঠিকানা" labelEn="Present Address" value={present} onChange={(next) => { setPresent(next); setSamePresent(false); }} required compact labelAccessory={<Checkbox aria-label="বর্তমান ঠিকানা মৃত্যুর স্থানের মতো" checked={samePresent} onCheckedChange={(checked) => { const enabled = checked === true; setSamePresent(enabled); if (enabled) setPresent(birthPlace); }} className="mt-0.5 h-4 w-4" />} />
+            {union && upazila && (
+              <VillageAddressField
+                union={union}
+                upazila={upazila}
+                districtBn={upazila.districtBn}
+                districtEn={upazila.districtEn}
+                villageId={villageId}
+                onVillageChange={setVillageId}
+                holding={addressHolding}
+                onHoldingChange={setAddressHolding}
+                L={L}
+                n={n}
+              />
+            )}
             <FormRow labelBn="আবেদনকারীর তথ্য" labelEn="Applicant Details" required compact><div className="grid gap-2"><Input className="h-10 text-sm" placeholder="আবেদনকারীর নাম" required value={applicantNameBn} onChange={(event) => setApplicantNameBn(event.target.value)} /><Input className="h-10 text-sm" placeholder="আবেদনকারীর সাথে সম্পর্ক" required value={applicantRelationshipBn} onChange={(event) => setApplicantRelationshipBn(event.target.value)} /></div>            </FormRow>
             {attachmentFields}
             {visitPhotoField}

@@ -72,6 +72,7 @@ export interface CaseDetails {
   deathPlace?: Bi | undefined;
   presentAddress?: Bi | undefined;
   permanentAddress?: Bi | undefined;
+  addressHolding?: string | undefined;
   spouseName?: Bi | undefined;
   applicantName?: Bi | undefined;
   applicantRelationship?: Bi | undefined;
