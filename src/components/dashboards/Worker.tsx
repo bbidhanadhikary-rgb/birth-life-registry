@@ -185,7 +185,7 @@ function FormRow({
       <div className={`flex items-start ${inline ? "shrink-0" : ""} ${labelAccessory ? "gap-2" : ""} ${compact ? "lg:pt-0" : "pt-2"}`}>
         {labelAccessory}
         <div className={inline ? "min-w-0 whitespace-nowrap" : "min-w-0"}>
-          <p className={`${inline ? inlineProminent ? "text-base font-medium" : inlineLarger ? "text-sm font-medium" : "text-xs font-bold" : compact ? "text-base font-bold" : "text-sm font-bold"} text-slate-800`}>
+          <p className={`${inline ? inlineProminent ? "text-base font-medium" : inlineLarger ? "text-lg font-semibold" : "text-xs font-bold" : compact ? "text-base font-bold" : "text-sm font-bold"} text-slate-800`}>
             {labelBn}{required && <span className="text-red-600"> *</span>}
           </p>
           <p className={`${inline ? "text-[10px]" : compact ? "text-sm" : "text-[11px]"} text-slate-500`}>{labelEn}</p>
