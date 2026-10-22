@@ -7,6 +7,7 @@ import {
   ClipboardList,
   CloudOff,
   Download,
+  Eye,
   FileImage,
   FileText,
   HeartPulse,
@@ -367,6 +368,7 @@ export function RegForm({
   const [locationError, setLocationError] = useState("");
   const [filesChanged, setFilesChanged] = useState(false);
   const [compressing, setCompressing] = useState<number | null>(null);
+  const [imagePreview, setImagePreview] = useState<{ src: string; title: string; objectUrl: boolean } | null>(null);
   const [saving, setSaving] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
@@ -376,6 +378,12 @@ export function RegForm({
   const [activeDraftKey, setActiveDraftKey] = useState(draftKey);
   const oldFiles = entry?.files ?? [];
   const oldVisitPhoto = oldFiles.find((file) => file.fieldVisit);
+
+  useEffect(() => {
+    if (!imagePreview?.objectUrl) return;
+    const objectUrl = imagePreview.src;
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [imagePreview]);
 
   useEffect(() => {
     if (activeDraftKey === draftKey) return;
@@ -567,50 +575,104 @@ export function RegForm({
     }
   };
 
+  const showImagePreview = async (
+    title: string,
+    file?: File | null,
+    storedFile?: RegCase["files"][number],
+  ) => {
+    try {
+      if (file) {
+        setImagePreview({ src: URL.createObjectURL(file), title, objectUrl: true });
+        return;
+      }
+      if (storedFile?.dataUrl) {
+        setImagePreview({ src: storedFile.dataUrl, title, objectUrl: false });
+        return;
+      }
+      if (storedFile?.path) {
+        const { data, error: downloadError } = await supabase.storage
+          .from("case-files")
+          .download(storedFile.path);
+        if (downloadError) throw downloadError;
+        setImagePreview({ src: URL.createObjectURL(data), title, objectUrl: true });
+        return;
+      }
+      if (storedFile?.url) {
+        setImagePreview({ src: storedFile.url, title, objectUrl: false });
+        return;
+      }
+      toast.error(L("ছবির প্রিভিউ পাওয়া যায়নি", "Image preview is unavailable"));
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      toast.error(L(`ছবি খোলা যায়নি: ${message}`, `Could not open image: ${message}`));
+    }
+  };
+
   const attachmentFields = (
     <fieldset className="space-y-1">
       <legend className="text-sm font-semibold text-slate-700">
         {L("ছবি সংযুক্তি · প্রতিটি সর্বোচ্চ ৭৫০ KB", "Photo attachments · maximum 750 KB each")}
       </legend>
       <div className={`grid grid-cols-3 ${type === "birth" ? "gap-1.5 sm:gap-2" : "gap-1"}`}>
-        {attachments.map((file, index) => (
-          <label
-            key={index}
-            className={`flex min-w-0 cursor-pointer items-center gap-1 rounded-lg border border-dashed border-emerald-300 bg-white hover:bg-emerald-50 ${type === "birth" ? "min-h-12 px-2 py-1.5 text-xs sm:text-sm" : "min-h-10 px-1.5 py-1 text-[11px]"}`}
-          >
-            <FileImage className={`${type === "birth" ? "h-4 w-4" : "h-3.5 w-3.5"} shrink-0 text-emerald-700`} />
-            <span className="min-w-0 flex-1 truncate">
-              {compressing === index
-                ? L("সংকুচিত হচ্ছে…", "Compressing…")
-                : file
-                  ? `${file.name} · ${Math.ceil(file.size / 1024)} KB`
-                  : (oldFiles[index]?.name ?? L(`ছবি ${index + 1} বাছুন`, `Choose image ${index + 1}`))}
-            </span>
-            {file && (
-              <button
-                type="button"
-                className="font-bold text-red-700"
-                aria-label={L("ছবি সরান", "Remove image")}
-                onClick={(event) => {
-                  event.preventDefault();
-                  setAttachments((current) =>
-                    current.map((item, position) => (position === index ? null : item)),
-                  );
-                  setFilesChanged(true);
-                }}
-              >
-                ×
-              </button>
-            )}
-            <input
-              accept="image/*"
-              className="sr-only"
-              disabled={compressing !== null}
-              type="file"
-              onChange={(event) => void chooseImage(index, event.target.files?.[0])}
-            />
-          </label>
-        ))}
+        {attachments.map((file, index) => {
+          const savedFile = !filesChanged ? oldFiles[index] : undefined;
+          const canPreview = Boolean(file || savedFile?.path || savedFile?.url || savedFile?.dataUrl);
+          return (
+            <div
+              key={index}
+              className={`flex min-w-0 items-center gap-0.5 rounded-lg border border-dashed border-emerald-300 bg-white hover:bg-emerald-50 ${type === "birth" ? "min-h-12 px-1 py-1" : "min-h-10 px-1 py-1"}`}
+            >
+              <label className={`flex min-w-0 flex-1 cursor-pointer items-center gap-1 ${type === "birth" ? "text-xs sm:text-sm" : "text-[11px]"}`}>
+                <FileImage className={`${type === "birth" ? "h-4 w-4" : "h-3.5 w-3.5"} shrink-0 text-emerald-700`} />
+                <span className="min-w-0 flex-1 truncate">
+                  {compressing === index
+                    ? L("সংকুচিত হচ্ছে…", "Compressing…")
+                    : file
+                      ? `${file.name} · ${Math.ceil(file.size / 1024)} KB`
+                      : (savedFile?.name ?? L(`ছবি ${index + 1} বাছুন`, `Choose image ${index + 1}`))}
+                </span>
+                <input
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={compressing !== null}
+                  type="file"
+                  onChange={(event) => void chooseImage(index, event.target.files?.[0])}
+                />
+              </label>
+              {file && (
+                <button
+                  type="button"
+                  className="px-1 font-bold text-red-700"
+                  aria-label={L("ছবি সরান", "Remove image")}
+                  onClick={() => {
+                    setAttachments((current) =>
+                      current.map((item, position) => (position === index ? null : item)),
+                    );
+                    setFilesChanged(true);
+                  }}
+                >
+                  ×
+                </button>
+              )}
+              {type === "death" && canPreview && (
+                <button
+                  type="button"
+                  className="rounded p-1 text-emerald-700 hover:bg-emerald-100"
+                  aria-label={L(`ছবি ${index + 1} দেখুন`, `Preview image ${index + 1}`)}
+                  onClick={() =>
+                    void showImagePreview(
+                      L(`ছবি ${index + 1}`, `Image ${index + 1}`),
+                      file,
+                      savedFile,
+                    )
+                  }
+                >
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
       {entry && oldFiles.length > 0 && !filesChanged && (
         <p className="text-[11px] text-slate-500">
@@ -661,24 +723,52 @@ export function RegForm({
         />
         <span>{L("GPS লোকেশন যুক্ত করুন (ঐচ্ছিক)", "Add GPS location (optional)")}</span>
       </label>
-      <label className={`flex min-w-0 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-emerald-300 bg-white text-slate-700 hover:bg-emerald-50 ${type === "birth" ? "min-h-12 px-3 py-2 text-sm" : "min-h-10 px-2 py-1.5 text-xs"}`}>
-        <FileImage className="h-4 w-4 shrink-0 text-emerald-700" />
-        <span className="min-w-0 flex-1 truncate">
-          {visitPhotoLoading
-            ? L("ছবি প্রস্তুত হচ্ছে…", "Preparing photo…")
-            : visitPhoto
-              ? `${visitPhoto.name} · ${Math.ceil(visitPhoto.size / 1024)} KB`
-              : oldVisitPhoto && !filesChanged
-                ? `${oldVisitPhoto.name} · ${L("সংরক্ষিত", "saved")}`
-              : L("পরিদর্শনের ছবি বাছুন বা তুলুন", "Choose or take a visit photo")}
-        </span>
+      <div className="flex min-w-0 items-center gap-1">
+        <label className={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-emerald-300 bg-white text-slate-700 hover:bg-emerald-50 ${type === "birth" ? "min-h-12 px-3 py-2 text-sm" : "min-h-10 px-2 py-1.5 text-xs"}`}>
+          <FileImage className="h-4 w-4 shrink-0 text-emerald-700" />
+          <span className="min-w-0 flex-1 truncate">
+            {visitPhotoLoading
+              ? L("ছবি প্রস্তুত হচ্ছে…", "Preparing photo…")
+              : visitPhoto
+                ? `${visitPhoto.name} · ${Math.ceil(visitPhoto.size / 1024)} KB`
+                : oldVisitPhoto && !filesChanged
+                  ? `${oldVisitPhoto.name} · ${L("সংরক্ষিত", "saved")}`
+                : L("পরিদর্শনের ছবি বাছুন বা তুলুন", "Choose or take a visit photo")}
+          </span>
+          <input
+            accept="image/*"
+            capture="environment"
+            className="sr-only"
+            disabled={visitPhotoLoading}
+            type="file"
+            onChange={(event) => {
+              void chooseVisitPhoto(event.currentTarget.files?.[0]);
+              event.currentTarget.value = "";
+            }}
+          />
+        </label>
+        {type === "death" && (visitPhoto || (!filesChanged && oldVisitPhoto)) && (
+          <button
+            type="button"
+            className="rounded p-1.5 text-emerald-700 hover:bg-emerald-100"
+            aria-label={L("পরিদর্শনের ছবি দেখুন", "Preview visit photo")}
+            onClick={() =>
+              void showImagePreview(
+                L("পরিদর্শনের ছবি", "Inspection photo"),
+                visitPhoto,
+                oldVisitPhoto,
+              )
+            }
+          >
+            <Eye className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
         {visitPhoto && (
           <button
             type="button"
-            className="font-bold text-red-700"
+            className="rounded px-1 font-bold text-red-700"
             aria-label={L("পরিদর্শনের ছবি সরান", "Remove visit photo")}
-            onClick={(event) => {
-              event.preventDefault();
+            onClick={() => {
               setVisitPhoto(null);
               setVisitPhotoMetadata(undefined);
               setFilesChanged(true);
@@ -687,18 +777,7 @@ export function RegForm({
             ×
           </button>
         )}
-        <input
-          accept="image/*"
-          capture="environment"
-          className="sr-only"
-          disabled={visitPhotoLoading}
-          type="file"
-          onChange={(event) => {
-            void chooseVisitPhoto(event.currentTarget.files?.[0]);
-            event.currentTarget.value = "";
-          }}
-        />
-      </label>
+      </div>
       {visitPhotoMetadata && (
         <p className="text-xs text-slate-600">
           {L("ছবির সময়", "Photo time")}: {new Date(visitPhotoMetadata.capturedAt).toLocaleString()}
@@ -1179,6 +1258,29 @@ export function RegForm({
         </Button>
         </div>
       </div>
+      <Dialog
+        open={imagePreview !== null}
+        onOpenChange={(open) => {
+          if (!open) setImagePreview(null);
+        }}
+      >
+        <DialogContent className="max-h-[90svh] max-w-4xl overflow-hidden rounded-2xl border-emerald-200 p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="pr-8 text-center text-lg font-bold text-emerald-950">
+              {imagePreview?.title ?? L("ছবির প্রিভিউ", "Image preview")}
+            </DialogTitle>
+          </DialogHeader>
+          {imagePreview && (
+            <div className="flex max-h-[75svh] items-center justify-center overflow-hidden">
+              <img
+                src={imagePreview.src}
+                alt={imagePreview.title}
+                className="max-h-[75svh] max-w-full rounded-lg object-contain"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={successOpen}
         onOpenChange={(open) => {
