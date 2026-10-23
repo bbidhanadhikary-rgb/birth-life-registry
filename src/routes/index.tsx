@@ -37,10 +37,17 @@ function Index() {
   const role = user
     ? user.role === "super" ? "uno" : user.role
     : preview && preview !== "main" ? roleMap[preview] : "public";
+  const localAdminPreview =
+    import.meta.env.DEV &&
+    !user &&
+    role === "admin" &&
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
   return (
     <RegistrationDashboard
-      key={role}
+      key={`${user?.id ?? "preview"}:${preview ?? "main"}:${role}`}
       role={role}
+      localAdminPreview={localAdminPreview}
       {...(action ? { initialAction: action } : {})}
       onActionDismiss={() => {
         void navigate({

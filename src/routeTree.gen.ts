@@ -12,9 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as BirthEntryRouteImport } from './routes/birth-entry'
+import { Route as BirthRegistrationRouteImport } from './routes/birth-registration'
 import { Route as CorrectionLogRouteImport } from './routes/correction-log'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DeathEntryRouteImport } from './routes/death-entry'
+import { Route as DeathRegistrationRouteImport } from './routes/death-registration'
 import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReviewListRouteImport } from './routes/review-list'
@@ -38,6 +40,11 @@ const BirthEntryRoute = BirthEntryRouteImport.update({
   path: '/birth-entry',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BirthRegistrationRoute = BirthRegistrationRouteImport.update({
+  id: '/birth-registration',
+  path: '/birth-registration',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CorrectionLogRoute = CorrectionLogRouteImport.update({
   id: '/correction-log',
   path: '/correction-log',
@@ -51,6 +58,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const DeathEntryRoute = DeathEntryRouteImport.update({
   id: '/death-entry',
   path: '/death-entry',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeathRegistrationRoute = DeathRegistrationRouteImport.update({
+  id: '/death-registration',
+  path: '/death-registration',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MonitoringRoute = MonitoringRouteImport.update({
@@ -93,9 +105,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/announcements': typeof AnnouncementsRoute
   '/birth-entry': typeof BirthEntryRoute
+  '/birth-registration': typeof BirthRegistrationRoute
   '/correction-log': typeof CorrectionLogRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/death-entry': typeof DeathEntryRoute
+  '/death-registration': typeof DeathRegistrationRoute
   '/monitoring': typeof MonitoringRoute
   '/reset-password': typeof ResetPasswordRoute
   '/review-list': typeof ReviewListRoute
@@ -108,9 +122,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/announcements': typeof AnnouncementsRoute
   '/birth-entry': typeof BirthEntryRoute
+  '/birth-registration': typeof BirthRegistrationRoute
   '/correction-log': typeof CorrectionLogRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/death-entry': typeof DeathEntryRoute
+  '/death-registration': typeof DeathRegistrationRoute
   '/monitoring': typeof MonitoringRoute
   '/reset-password': typeof ResetPasswordRoute
   '/review-list': typeof ReviewListRoute
@@ -124,9 +140,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/announcements': typeof AnnouncementsRoute
   '/birth-entry': typeof BirthEntryRoute
+  '/birth-registration': typeof BirthRegistrationRoute
   '/correction-log': typeof CorrectionLogRoute
   '/dashboard': typeof DashboardRouteWithChildren
   '/death-entry': typeof DeathEntryRoute
+  '/death-registration': typeof DeathRegistrationRoute
   '/monitoring': typeof MonitoringRoute
   '/reset-password': typeof ResetPasswordRoute
   '/review-list': typeof ReviewListRoute
@@ -141,9 +159,11 @@ export interface FileRouteTypes {
     | '/'
     | '/announcements'
     | '/birth-entry'
+    | '/birth-registration'
     | '/correction-log'
     | '/dashboard'
     | '/death-entry'
+    | '/death-registration'
     | '/monitoring'
     | '/reset-password'
     | '/review-list'
@@ -156,9 +176,11 @@ export interface FileRouteTypes {
     | '/'
     | '/announcements'
     | '/birth-entry'
+    | '/birth-registration'
     | '/correction-log'
     | '/dashboard'
     | '/death-entry'
+    | '/death-registration'
     | '/monitoring'
     | '/reset-password'
     | '/review-list'
@@ -171,9 +193,11 @@ export interface FileRouteTypes {
     | '/'
     | '/announcements'
     | '/birth-entry'
+    | '/birth-registration'
     | '/correction-log'
     | '/dashboard'
     | '/death-entry'
+    | '/death-registration'
     | '/monitoring'
     | '/reset-password'
     | '/review-list'
@@ -187,9 +211,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AnnouncementsRoute: typeof AnnouncementsRoute
   BirthEntryRoute: typeof BirthEntryRoute
+  BirthRegistrationRoute: typeof BirthRegistrationRoute
   CorrectionLogRoute: typeof CorrectionLogRoute
   DashboardRoute: typeof DashboardRouteWithChildren
   DeathEntryRoute: typeof DeathEntryRoute
+  DeathRegistrationRoute: typeof DeathRegistrationRoute
   MonitoringRoute: typeof MonitoringRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ReviewListRoute: typeof ReviewListRoute
@@ -221,6 +247,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BirthEntryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/birth-registration': {
+      id: '/birth-registration'
+      path: '/birth-registration'
+      fullPath: '/birth-registration'
+      preLoaderRoute: typeof BirthRegistrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/correction-log': {
       id: '/correction-log'
       path: '/correction-log'
@@ -240,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/death-entry'
       fullPath: '/death-entry'
       preLoaderRoute: typeof DeathEntryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/death-registration': {
+      id: '/death-registration'
+      path: '/death-registration'
+      fullPath: '/death-registration'
+      preLoaderRoute: typeof DeathRegistrationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/monitoring': {
@@ -310,9 +350,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AnnouncementsRoute: AnnouncementsRoute,
   BirthEntryRoute: BirthEntryRoute,
+  BirthRegistrationRoute: BirthRegistrationRoute,
   CorrectionLogRoute: CorrectionLogRoute,
   DashboardRoute: DashboardRouteWithChildren,
   DeathEntryRoute: DeathEntryRoute,
+  DeathRegistrationRoute: DeathRegistrationRoute,
   MonitoringRoute: MonitoringRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ReviewListRoute: ReviewListRoute,

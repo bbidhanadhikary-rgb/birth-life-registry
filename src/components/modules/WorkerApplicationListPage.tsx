@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Eye, FileText, Filter, Paperclip, Pencil, Printer } from "lucide-react";
+import { CheckCheck, Eye, FileText, Filter, Home, Paperclip, Pencil, Printer } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -23,9 +23,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { getDemoAttachmentPreview, scopedCases, useApp } from "@/lib/store";
 import type { RegCase } from "@/lib/types";
 
-const PAGE_SIZE = 10;
 type StatusFilter = "all" | "pending" | "progress" | "completed" | "issue" | "corrected";
 type AttachmentPreview = { url: string; mimeType?: string };
+export type AdministrativeApplicationListOptions = {
+  cases: RegCase[];
+  actions: (item: RegCase, onReviewPhotos: () => void) => ReactNode;
+  onRegister: (item: RegCase) => void;
+  onEdit: (item: RegCase) => void;
+  onHome: () => void;
+  localPreview?: boolean;
+};
 
 function normalizeAttachmentUrl(url: string, mimeType?: string, fileName?: string) {
   if (/^(data:|blob:|https?:)/i.test(url)) return url;
@@ -35,12 +42,19 @@ function normalizeAttachmentUrl(url: string, mimeType?: string, fileName?: strin
   return `data:${inferredType};base64,${url}`;
 }
 
-export function WorkerApplicationListPage({ type }: { type: "birth" | "death" }) {
+export function WorkerApplicationListPage({
+  type,
+  administrative,
+}: {
+  type: "birth" | "death";
+  administrative?: AdministrativeApplicationListOptions;
+}) {
   const { L, n, user, state, findVillage, demoMode } = useApp();
   const navigate = useNavigate();
   const { address, date } = useCaseHelpers();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const pageSize = 10;
   const [page, setPage] = useState(1);
   const [selectedApplication, setSelectedApplication] = useState<RegCase | null>(null);
   const [selectedAttachments, setSelectedAttachments] = useState<RegCase | null>(null);
@@ -89,7 +103,7 @@ export function WorkerApplicationListPage({ type }: { type: "birth" | "death" })
                   ...(mimeType ? { mimeType } : {}),
                 };
               }
-              if (demoMode) return undefined;
+              if (demoMode || administrative?.localPreview) return undefined;
               if (!selectedAttachments.synced) return undefined;
             }
             if (!path) {
@@ -139,11 +153,16 @@ export function WorkerApplicationListPage({ type }: { type: "birth" | "death" })
       cancelled = true;
       generatedUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [L, demoMode, selectedAttachments]);
+  }, [L, administrative?.localPreview, demoMode, selectedAttachments]);
 
   const applications = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
-    return (user?.role === "worker" ? scopedCases(state, user) : [])
+    return (administrative
+      ? administrative.cases
+      : user?.role === "worker"
+        ? scopedCases(state, user)
+        : []
+    )
       .filter((item) => item.type === type)
       .filter((item) => {
         if (statusFilter === "all") return true;
@@ -169,15 +188,15 @@ export function WorkerApplicationListPage({ type }: { type: "birth" | "death" })
           ].some((value) => value.toLocaleLowerCase().includes(query)),
       )
       .sort((left, right) => right.createdAt - left.createdAt);
-  }, [search, state, statusFilter, type, user]);
+  }, [administrative, search, state, statusFilter, type, user]);
 
-  const pageCount = Math.max(1, Math.ceil(applications.length / PAGE_SIZE));
+  const pageCount = Math.max(1, Math.ceil(applications.length / pageSize));
   const currentPage = Math.min(page, pageCount);
-  const visible = applications.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const first = applications.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
-  const last = Math.min(currentPage * PAGE_SIZE, applications.length);
+  const visible = applications.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const first = applications.length ? (currentPage - 1) * pageSize + 1 : 0;
+  const last = Math.min(currentPage * pageSize, applications.length);
 
-  if (user?.role !== "worker") {
+  if (administrative ? user?.role !== "admin" && !administrative.localPreview : user?.role !== "worker") {
     return (
       <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
         {L("এই পাতায় প্রবেশের অনুমতি নেই", "You don't have access to this page")}
@@ -187,63 +206,104 @@ export function WorkerApplicationListPage({ type }: { type: "birth" | "death" })
 
   const title =
     type === "birth"
-      ? L("জন্ম নিবন্ধনের আবেদন তালিকা", "Birth Registration Applications")
-      : L("মৃত্যু নিবন্ধনের আবেদন তালিকা", "Death Registration Applications");
+      ? administrative
+        ? L("জন্ম নিবন্ধনের আবেদনের তালিকা", "Birth Registration Application List")
+        : L("জন্ম নিবন্ধনের আবেদন তালিকা", "Birth Registration Applications")
+      : administrative
+        ? L("মৃত্যু নিবন্ধনের আবেদনের তালিকা", "Death Registration Application List")
+        : L("মৃত্যু নিবন্ধনের আবেদন তালিকা", "Death Registration Applications");
 
   return (
-    <section className="mx-auto w-full max-w-none space-y-2 px-0 pb-2 pt-0">
-      <header className="flex flex-wrap items-end justify-between gap-2">
-        <div>
+    <section className="mx-auto w-full max-w-none px-0 pb-2 pt-0">
+      <header className={`mb-4 flex items-center justify-between gap-4 py-3 ${administrative ? "flex-nowrap overflow-x-auto" : "flex-wrap"}`}>
+        <div className="shrink-0">
           <h1 className="font-display text-xl font-bold leading-tight text-emerald-950 sm:text-2xl">
             {title}
           </h1>
         </div>
-        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-          <label className="w-full sm:w-40">
-            <span className="sr-only">{L("ফিল্টার / অবস্থা", "Filter / status")}</span>
-            <Select
-              value={statusFilter}
-              onValueChange={(value) => {
-                setStatusFilter(value as StatusFilter);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger
-                className="h-9 w-full text-sm"
-                aria-label={L("ফিল্টার / অবস্থা", "Filter / status")}
+        <div className={`flex items-center gap-2 ${administrative ? "shrink-0 flex-nowrap" : "w-full flex-col sm:w-auto sm:flex-row sm:items-center"}`}>
+          {administrative ? (
+            <label className="relative block w-40 shrink-0">
+              <span className="sr-only">{L("আবেদন ফিল্টার", "Application filter")}</span>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value as StatusFilter);
+                  setPage(1);
+                }}
               >
-                <Filter className="mr-1 h-4 w-4 text-emerald-700" aria-hidden="true" />
-                <SelectValue placeholder={L("ফিল্টার / অবস্থা", "Filter / status")} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{L("সব আবেদন", "All applications")}</SelectItem>
-                <SelectItem value="pending">{L("অপেক্ষমাণ", "Pending")}</SelectItem>
-                <SelectItem value="progress">{L("প্রক্রিয়াধীন", "In Progress")}</SelectItem>
-                <SelectItem value="completed">
-                  {L("নিবন্ধন সম্পন্ন", "Registration complete")}
-                </SelectItem>
-                <SelectItem value="issue">{L("সমস্যাযুক্ত", "Has issue")}</SelectItem>
-                <SelectItem value="corrected">{L("সংশোধিত", "Corrected")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </label>
-          <label className="w-full sm:w-56">
-            <span className="sr-only">{L("আবেদন খুঁজুন", "Search applications")}</span>
+                <SelectTrigger className="h-9 w-full pl-8" aria-label={L("আবেদন ফিল্টার", "Application filter")}>
+                  <Filter className="absolute left-2 h-4 w-4 text-emerald-700" aria-hidden="true" />
+                  <SelectValue placeholder={L("সব আবেদন", "All applications")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{L("সব আবেদন", "All applications")}</SelectItem>
+                  <SelectItem value="pending">{L("অপেক্ষমাণ", "Pending")}</SelectItem>
+                  <SelectItem value="progress">{L("প্রক্রিয়াধীন", "In progress")}</SelectItem>
+                  <SelectItem value="completed">{L("নিবন্ধন সম্পন্ন", "Registered")}</SelectItem>
+                  <SelectItem value="issue">{L("সমস্যাযুক্ত", "Has issue")}</SelectItem>
+                  <SelectItem value="corrected">{L("সংশোধিত", "Corrected")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          ) : (
+            <label className="w-full sm:w-40">
+              <span className="sr-only">{L("ফিল্টার / অবস্থা", "Filter / status")}</span>
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
+                  setStatusFilter(value as StatusFilter);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger
+                  className="h-9 w-full text-sm"
+                  aria-label={L("ফিল্টার / অবস্থা", "Filter / status")}
+                >
+                  <Filter className="mr-1 h-4 w-4 text-emerald-700" aria-hidden="true" />
+                  <SelectValue placeholder={L("ফিল্টার / অবস্থা", "Filter / status")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{L("সব আবেদন", "All applications")}</SelectItem>
+                  <SelectItem value="pending">{L("অপেক্ষমাণ", "Pending")}</SelectItem>
+                  <SelectItem value="progress">{L("প্রক্রিয়াধীন", "In Progress")}</SelectItem>
+                  <SelectItem value="completed">
+                    {L("নিবন্ধন সম্পন্ন", "Registration complete")}
+                  </SelectItem>
+                  <SelectItem value="issue">{L("সমস্যাযুক্ত", "Has issue")}</SelectItem>
+                  <SelectItem value="corrected">{L("সংশোধিত", "Corrected")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+          )}
+          <label className={administrative ? "w-64 shrink-0" : "w-full sm:w-56"}>
+            <span className="sr-only">{L("নাম বা আবেদন নম্বর দিয়ে খুঁজুন", "Search by name or application number")}</span>
             <Input
-              className="h-9 text-sm"
+              className="h-9 w-full text-sm"
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);
                 setPage(1);
               }}
-              placeholder={L("নাম বা আবেদন নম্বর দিয়ে খুঁজুন", "Search name or application ID")}
+              placeholder={L("নাম বা আবেদন নম্বর দিয়ে খুঁজুন", "Search by name or application number")}
             />
           </label>
+          {administrative && (
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0 whitespace-nowrap border-emerald-200 text-emerald-900 hover:bg-emerald-50"
+              onClick={administrative.onHome}
+            >
+              <Home className="mr-2 h-4 w-4" aria-hidden="true" />
+              {L("হোম পেজে ফিরে যান", "Back to home")}
+            </Button>
+          )}
         </div>
       </header>
 
       <div className="overflow-x-auto rounded-xl border border-emerald-100 bg-white shadow-sm">
-        <table className="w-full min-w-[1379px] table-fixed border-collapse text-left text-sm">
+        <table className={`w-full ${administrative ? "min-w-[1620px]" : "min-w-[1379px]"} table-fixed border-collapse text-left text-sm`}>
           <colgroup>
             <col className="w-[64px]" />
             <col className="w-[120px]" />
@@ -256,6 +316,7 @@ export function WorkerApplicationListPage({ type }: { type: "birth" | "death" })
             <col className="w-[115px]" />
             <col className="w-[94px]" />
             <col className="w-[151px]" />
+            {administrative && <col className="w-[240px]" />}
           </colgroup>
           <thead className="bg-emerald-50 text-emerald-950">
             <tr>
@@ -263,19 +324,20 @@ export function WorkerApplicationListPage({ type }: { type: "birth" | "death" })
                 L("ক্রমিক নং", "Serial"),
                 L("আবেদন নং", "Application ID"),
                 type === "birth" ? L("শিশুর নাম", "Child's name") : L("নাম", "Name"),
-                L("জন্ম তারিখ", "Date of birth"),
+                type === "birth" ? L("জন্ম তারিখ", "Date of birth") : L("মৃত্যুর তারিখ", "Date of death"),
                 L("পিতার নাম", "Father's name"),
                 L("মাতার নাম", "Mother's name"),
                 L("গ্রাম / এলাকা", "Village / area"),
                 L("সংযুক্তি", "Attachments"),
                 L("অবস্থা", "Status"),
                 L("কার্যক্রম", "Action"),
-                L("সংশোধন করুন", "Correction"),
+                administrative ? L("নিবন্ধিত করুন", "Mark registered") : L("সংশোধন করুন", "Correction"),
+                ...(administrative ? [L("প্রশাসনিক কার্যক্রম", "Administrative actions")] : []),
               ].map((heading, index) => (
                 <th
                   key={heading}
                   scope="col"
-                  className={`whitespace-nowrap border-b border-emerald-100 py-2.5 font-semibold ${index === 9 ? "px-1" : index === 10 ? "px-1.5 text-right" : "px-2.5"}`}
+                  className={`whitespace-nowrap border-b border-emerald-100 py-2.5 font-semibold ${index === 9 ? "px-1" : index === 10 ? "px-1.5 text-center" : "px-2.5"}`}
                 >
                   {heading}
                 </th>
@@ -290,12 +352,14 @@ export function WorkerApplicationListPage({ type }: { type: "birth" | "death" })
                 serial={first + index}
                 onView={() => setSelectedApplication(item)}
                 onAttachments={() => setSelectedAttachments(item)}
-                onEdit={() =>
-                  void navigate({
-                    to: type === "birth" ? "/birth-entry" : "/death-entry",
-                    search: { applicationId: item.id },
-                  })
-                }
+                onEdit={() => administrative
+                  ? administrative.onEdit(item)
+                  : void navigate({
+                      to: type === "birth" ? "/birth-entry" : "/death-entry",
+                      search: { applicationId: item.id },
+                    })}
+                administrativeActions={administrative?.actions(item, () => setSelectedAttachments(item))}
+                onRegister={administrative ? () => administrative.onRegister(item) : undefined}
                 villageName={(() => {
                   const village = findVillage(item.villageId);
                   if (village) return L(village.v.bn, village.v.en);
@@ -311,7 +375,7 @@ export function WorkerApplicationListPage({ type }: { type: "birth" | "death" })
             ))}
             {!visible.length && (
               <tr>
-                <td colSpan={11} className="px-3 py-10 text-center text-muted-foreground">
+                <td colSpan={administrative ? 12 : 11} className="px-3 py-10 text-center text-muted-foreground">
                   {L("কোনো আবেদন পাওয়া যায়নি", "No applications found")}
                 </td>
               </tr>
@@ -336,9 +400,24 @@ export function WorkerApplicationListPage({ type }: { type: "birth" | "death" })
           >
             {L("আগের", "Previous")}
           </Button>
-          <span className="tabular-nums font-semibold">
-            {n(currentPage)} / {n(pageCount)}
-          </span>
+          {administrative ? (
+            Array.from({ length: pageCount }, (_, index) => index + 1)
+              .slice(0, 3)
+              .map((number) => (
+                <Button
+                  key={number}
+                  size="sm"
+                  variant={number === currentPage ? "default" : "outline"}
+                  onClick={() => setPage(number)}
+                >
+                  {n(number)}
+                </Button>
+              ))
+          ) : (
+            <span className="tabular-nums font-semibold">
+              {n(currentPage)} / {n(pageCount)}
+            </span>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -634,6 +713,8 @@ function ApplicationRow({
   date,
   L,
   n,
+  administrativeActions,
+  onRegister,
 }: {
   item: RegCase;
   serial: number;
@@ -644,6 +725,8 @@ function ApplicationRow({
   date: (timestamp: number) => string;
   L: (bn: string, en: string) => string;
   n: (value: number | string) => string;
+  administrativeActions?: ReactNode;
+  onRegister?: () => void;
 }) {
   return (
     <>
@@ -658,7 +741,9 @@ function ApplicationRow({
         >
           {L(item.name.bn, item.name.en)}
         </td>
-        <td className="whitespace-nowrap px-2.5 py-1.5 text-base">{date(Date.parse(item.dob))}</td>
+        <td className="whitespace-nowrap px-2.5 py-1.5 text-base">
+          {date(Date.parse(item.type === "death" ? item.dod ?? item.dob : item.dob))}
+        </td>
         <td className="truncate px-2.5 py-1.5 text-base" title={L(item.father.bn, item.father.en)}>
           {L(item.father.bn, item.father.en)}
         </td>
@@ -698,32 +783,56 @@ function ApplicationRow({
             {L("দেখুন", "View")}
           </Button>
         </td>
-        <td className="py-1.5 pl-1 pr-1.5 text-right text-base">
-          <div className="flex justify-end">
+        <td className="px-1 py-1.5 text-center text-base">
+          {onRegister ? (
             <Button
               type="button"
               size="sm"
-              variant={item.details?.correctedAt ? "default" : "outline"}
-              className={
-                item.details?.correctedAt
-                  ? "whitespace-nowrap bg-green-600 text-white hover:bg-green-700"
-                  : "whitespace-nowrap border-amber-200 text-amber-900 hover:bg-amber-50"
-              }
-              onClick={onEdit}
+              variant={item.status === "completed" ? "outline" : "default"}
+              className="whitespace-nowrap"
+              onClick={onRegister}
               disabled={item.status === "completed" || item.status === "rejected"}
               title={
-                item.status === "completed" || item.status === "rejected"
-                  ? L("এই আবেদনটি সংশোধন করা যাবে না", "This application cannot be corrected")
-                  : item.details?.correctedAt
-                    ? L("সংশোধিত", "Corrected")
-                    : L("সংশোধন করুন", "Edit application")
+                item.status === "completed"
+                  ? L("এই আবেদনটি নিবন্ধিত হয়েছে", "This application is registered")
+                  : item.status === "rejected"
+                    ? L("বাতিল আবেদন নিবন্ধন করা যাবে না", "Rejected applications cannot be registered")
+                    : L("নিবন্ধিত করতে ক্লিক করুন", "Click to mark registered")
               }
             >
-              <Pencil className="mr-1 h-4 w-4" aria-hidden="true" />
-              {L("সংশোধন করুন", "Edit")}
+              <CheckCheck className="mr-1 h-4 w-4" aria-hidden="true" />
+              {item.status === "completed" ? L("নিবন্ধিত", "Registered") : L("নিবন্ধিত করুন", "Register")}
             </Button>
-          </div>
+          ) : (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                size="sm"
+                variant={item.details?.correctedAt ? "default" : "outline"}
+                className={
+                  item.details?.correctedAt
+                    ? "whitespace-nowrap bg-green-600 text-white hover:bg-green-700"
+                    : "whitespace-nowrap border-amber-200 text-amber-900 hover:bg-amber-50"
+                }
+                onClick={onEdit}
+                disabled={item.status === "completed" || item.status === "rejected"}
+                title={
+                  item.status === "completed" || item.status === "rejected"
+                    ? L("এই আবেদনটি সংশোধন করা যাবে না", "This application cannot be corrected")
+                    : item.details?.correctedAt
+                      ? L("সংশোধিত", "Corrected")
+                      : L("সংশোধন করুন", "Edit application")
+                }
+              >
+                <Pencil className="mr-1 h-4 w-4" aria-hidden="true" />
+                {L("সংশোধন করুন", "Edit")}
+              </Button>
+            </div>
+          )}
         </td>
+        {administrativeActions !== undefined && (
+          <td className="whitespace-nowrap px-2 py-1.5 text-base">{administrativeActions}</td>
+        )}
       </tr>
     </>
   );

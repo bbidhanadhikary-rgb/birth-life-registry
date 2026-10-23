@@ -59,8 +59,9 @@ export function Header() {
                 <Link
                   key={en}
                   to="/"
-                  search={role ? { role } : {}}
+                  search={() => (role ? { role } : {})}
                   activeOptions={{ exact: true, includeSearch: true }}
+                  resetScroll={false}
                   className="whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold sm:text-sm"
                   inactiveProps={{ className: "text-emerald-50 hover:bg-emerald-700" }}
                   activeProps={{ className: "bg-white text-emerald-900 hover:bg-white" }}

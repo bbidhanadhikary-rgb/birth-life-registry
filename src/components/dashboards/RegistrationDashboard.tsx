@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Clock3,
+  ChevronDown,
   Download,
   Eye,
   FileCheck2,
@@ -23,6 +24,7 @@ import {
   MessageSquare,
   MessageSquareWarning,
   PencilLine,
+  Printer,
   ShieldAlert,
   ShieldCheck,
   UserRoundCheck,
@@ -36,17 +38,25 @@ import { TARGET, type RegCase, type Role } from "@/lib/types";
 import { getDemoAttachmentPreview, scopedCases, useApp } from "@/lib/store";
 import { RegForm } from "@/components/dashboards/Worker";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, useCaseHelpers } from "@/components/shared";
 import { downloadCSV, printPDF } from "@/lib/report";
+import { seedState } from "@/lib/seed";
 import {
   MonthlyProgressCard,
   type MonthlyProgressCounts,
 } from "@/components/dashboards/MonthlyProgressCard";
-import { UnionStatisticsPanel } from "@/components/dashboards/UnionStatisticsPanel";
 import { LoginDialog } from "@/components/Header";
+import { WorkerApplicationListPage } from "@/components/modules/WorkerApplicationListPage";
 
 type DashboardRole = Role | "public";
 type ActionFilter = "birth" | "death" | "pending" | "progress" | "completed" | "urgent";
@@ -59,6 +69,48 @@ type RoleAction = {
   Icon: typeof MapPinned;
   filter?: ActionFilter;
 };
+type AdminRecord = {
+  id: string;
+  caseId: string;
+  upazilaId: string;
+  unionId: string;
+  kind: "greeting" | "legal";
+  title: string;
+  text: string;
+  createdAt: number;
+  signatureProofName?: string;
+  signatureProofDataUrl?: string;
+};
+
+const ADMIN_RECORDS_KEY = "uert-admin-records";
+
+function readAdminRecords(): AdminRecord[] {
+  const stored = localStorage.getItem(ADMIN_RECORDS_KEY);
+  if (!stored) return [];
+  const parsed: unknown = JSON.parse(stored);
+  if (!Array.isArray(parsed)) throw new Error("Stored administrative records must be an array");
+  return parsed.filter(
+    (record): record is AdminRecord =>
+      typeof record === "object" &&
+      record !== null &&
+      "id" in record &&
+      typeof record.id === "string" &&
+      "caseId" in record &&
+      typeof record.caseId === "string" &&
+      "upazilaId" in record &&
+      typeof record.upazilaId === "string" &&
+      "unionId" in record &&
+      typeof record.unionId === "string" &&
+      "kind" in record &&
+      (record.kind === "greeting" || record.kind === "legal") &&
+      "title" in record &&
+      typeof record.title === "string" &&
+      "text" in record &&
+      typeof record.text === "string" &&
+      "createdAt" in record &&
+      typeof record.createdAt === "number",
+  );
+}
 
 function ApplicationList({
   type,
@@ -278,6 +330,53 @@ function monthKey(timestamp: number) {
   }).format(timestamp);
 }
 
+function createLocalAdminPreviewCases(seedCases: RegCase[]) {
+  const cases = seedCases.filter(
+    (item) => item.upazilaId === "manirampur" && item.unionId === "mn-rohita",
+  ).map((item) => ({
+    ...item,
+    details: {
+      ...item.details,
+      ...(item.type === "birth"
+        ? { birthPlace: { bn: `রোহিতা · ওয়ার্ড ${item.ward}`, en: `Rohita · Ward ${item.ward}` } }
+        : { deathPlace: { bn: `রোহিতা · ওয়ার্ড ${item.ward}`, en: `Rohita · Ward ${item.ward}` } }),
+    },
+  }));
+  const birthTemplate = cases.find((item) => item.type === "birth");
+  const deathTemplate = cases.find((item) => item.type === "death");
+  if (!birthTemplate || !deathTemplate) return cases;
+  const now = Date.now();
+  return [
+    ...cases,
+    {
+      ...birthTemplate,
+      id: "preview-birth-ward-2",
+      name: { bn: "নমুনা জন্ম আবেদন - ওয়ার্ড ২", en: "Sample birth application - Ward 2" },
+      villageId: "mn-rohita-v2",
+      ward: 2,
+      createdBy: "local-preview",
+      createdAt: now,
+      details: {
+        ...birthTemplate.details,
+        birthPlace: { bn: "রোহিতা · ওয়ার্ড ২", en: "Rohita · Ward 2" },
+      },
+    },
+    {
+      ...deathTemplate,
+      id: "preview-death-ward-3",
+      name: { bn: "নমুনা মৃত্যু আবেদন - ওয়ার্ড ৩", en: "Sample death application - Ward 3" },
+      villageId: "mn-rohita-v3",
+      ward: 3,
+      createdBy: "local-preview",
+      createdAt: now - 1,
+      details: {
+        ...deathTemplate.details,
+        deathPlace: { bn: "রোহিতা · ওয়ার্ড ৩", en: "Rohita · Ward 3" },
+      },
+    },
+  ];
+}
+
 const publicActions: RoleAction[] = [
   { id: "reports", titleBn: "এলাকাভিত্তিক প্রতিবেদন", titleEn: "Area-wise report", descriptionBn: "প্রশাসনিক এলাকার সারসংক্ষেপ", descriptionEn: "Administrative area summaries", Icon: MapPinned },
   { id: "deadlines", titleBn: "সময়সীমা পর্যবেক্ষণ", titleEn: "Deadline monitoring", descriptionBn: "৩৬৫ দিনের সম্মতি ও সতর্কতা", descriptionEn: "365-day compliance and alerts", Icon: CalendarCheck2, filter: "urgent" },
@@ -301,10 +400,10 @@ const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district"
     { id: "death-list", titleBn: "মৃত্যু নিবন্ধনের আবেদন তালিকা দেখুন", titleEn: "View death registration application list", descriptionBn: "ওয়ার্ডের মৃত্যু আবেদন ও পরিদর্শন ছবি", descriptionEn: "Ward death applications and visit photos", Icon: FileCheck2, filter: "death" },
   ],
   admin: [
-    { id: "birth-review", titleBn: "জন্ম পর্যালোচনা", titleEn: "Birth review", descriptionBn: "জন্ম নিবন্ধনের আবেদন পর্যালোচনা করুন", descriptionEn: "Review birth registration applications", Icon: Baby, filter: "birth" },
-    { id: "death-review", titleBn: "মৃত্যু পর্যালোচনা", titleEn: "Death review", descriptionBn: "মৃত্যু নিবন্ধনের আবেদন পর্যালোচনা করুন", descriptionEn: "Review death registration applications", Icon: HeartPulse, filter: "death" },
-    { id: "birth-list", titleBn: "জন্ম আবেদনের তালিকা", titleEn: "Birth applications", descriptionBn: "জন্ম আবেদন দেখুন ও সিদ্ধান্ত নিন", descriptionEn: "View and process birth applications", Icon: FileText, filter: "birth" },
-    { id: "death-list", titleBn: "মৃত্যু আবেদনের তালিকা", titleEn: "Death applications", descriptionBn: "মৃত্যু আবেদন দেখুন ও সিদ্ধান্ত নিন", descriptionEn: "View and process death applications", Icon: FileCheck2, filter: "death" },
+    { id: "birth-list", titleBn: "জন্ম নিবন্ধনের আবেদন তালিকা", titleEn: "Birth Registration Application List", descriptionBn: "ইউনিয়নের সব ওয়ার্ডের জন্ম আবেদন ও প্রশাসনিক কার্যক্রম", descriptionEn: "Birth applications and administrative actions across all union wards", Icon: FileText, filter: "birth" },
+    { id: "death-list", titleBn: "মৃত্যু নিবন্ধনের আবেদন তালিকা", titleEn: "Death Registration Application List", descriptionBn: "ইউনিয়নের সব ওয়ার্ডের মৃত্যু আবেদন ও প্রশাসনিক কার্যক্রম", descriptionEn: "Death applications and administrative actions across all union wards", Icon: FileCheck2, filter: "death" },
+    { id: "legal-tracker", titleBn: "ইস্যুকৃত আইনি নোটিশ ট্র্যাকার", titleEn: "Issued Legal Notice Tracker", descriptionBn: "ধারা ৭(২)-এর নোটিশের খসড়া ও রেকর্ড", descriptionEn: "Section 7(2) notice drafts and records", Icon: ShieldAlert },
+    { id: "message-tracker", titleBn: "প্রেরিত বার্তা ও পরিদর্শন ট্র্যাকার", titleEn: "Messages & Inspection Tracker", descriptionBn: "শুভেচ্ছা, সমবেদনা ও মাঠ পরিদর্শনের তথ্য", descriptionEn: "Greetings, condolences, and field inspection details", Icon: MessageSquare },
     { id: "pending-cases", titleBn: "অপেক্ষমাণ আবেদন", titleEn: "Pending applications", descriptionBn: "পর্যালোচনার অপেক্ষায় থাকা কেস", descriptionEn: "Cases awaiting review", Icon: Inbox, filter: "pending" },
     { id: "progress-cases", titleBn: "চলমান কেস", titleEn: "Cases in progress", descriptionBn: "চলমান নিবন্ধন কার্যক্রম", descriptionEn: "Registration work in progress", Icon: Clock3, filter: "progress" },
     { id: "police-tasks", titleBn: "পুলিশ যাচাই", titleEn: "Police verification", descriptionBn: "ওয়ার্ড যাচাইয়ের জন্য পাঠানো কেস", descriptionEn: "Cases assigned for ward verification", Icon: UserRoundCheck, filter: "pending" },
@@ -407,17 +506,35 @@ function QuickAccessCard({
 
 export function RegistrationDashboard({
   role = "public",
+  localAdminPreview = false,
   initialAction,
   onActionDismiss,
 }: {
   role?: DashboardRole;
+  localAdminPreview?: boolean;
   initialAction?: "worker-report" | "feedback";
   onActionDismiss?: () => void;
 }) {
   const { state, L, n, user, demoMode, patchCase } = useApp();
+  const [localPreviewSeed] = useState(seedState);
+  const [clientReady, setClientReady] = useState(false);
+  useEffect(() => setClientReady(true), []);
+  const isLocalAdminPreview =
+    localAdminPreview &&
+    clientReady &&
+    import.meta.env.DEV &&
+    role === "admin" &&
+    !user &&
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
   const navigate = useNavigate();
   const { rows } = useCaseHelpers();
   const [editEntry, setEditEntry] = useState<RegCase | null>(null);
+  const [localPreviewCases, setLocalPreviewCases] = useState<RegCase[]>(() =>
+    createLocalAdminPreviewCases(localPreviewSeed.cases),
+  );
+  const [previewEditingCase, setPreviewEditingCase] = useState<RegCase | null>(null);
+  const [previewEditName, setPreviewEditName] = useState("");
   const [activeCard, setActiveCard] = useState<{ kind: "metric" | "action"; id: string } | null>(
     null,
   );
@@ -435,6 +552,30 @@ export function RegistrationDashboard({
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackSaving, setFeedbackSaving] = useState(false);
   const [feedbackLoginOpen, setFeedbackLoginOpen] = useState(false);
+  const [adminDraft, setAdminDraft] = useState<{
+    kind: "greeting" | "legal";
+    item: RegCase;
+    stage: "first" | "second" | "final";
+  } | null>(null);
+  const [adminDraftText, setAdminDraftText] = useState("");
+  const [adminSignatureProof, setAdminSignatureProof] = useState<File | null>(null);
+  const [adminRecords, setAdminRecords] = useState<AdminRecord[]>([]);
+  const [adminDraftSaving, setAdminDraftSaving] = useState(false);
+  useEffect(() => {
+    if (user?.role !== "admin" && !isLocalAdminPreview) return;
+    try {
+      setAdminRecords(
+        readAdminRecords().filter(
+          (record) =>
+            record.upazilaId === (user?.upazilaId ?? "manirampur") &&
+            record.unionId === (user?.unionId ?? "mn-rohita"),
+        ),
+      );
+    } catch (cause) {
+      console.error("Failed to load administrative records", cause);
+      toast.error(L("প্রশাসনিক রেকর্ড লোড করা যায়নি", "Could not load administrative records"));
+    }
+  }, [L, isLocalAdminPreview, user]);
   useEffect(() => {
     if (initialAction) setActiveCard({ kind: "action", id: initialAction });
   }, [initialAction]);
@@ -489,6 +630,7 @@ export function RegistrationDashboard({
   );
   const roleScopedCases = useMemo(
     () => {
+      if (isLocalAdminPreview) return localPreviewCases;
       if (!user) return roleConfig === "public" ? state.cases : [];
       if (demoMode && (user.role === "worker" || user.role === "police")) {
         return state.cases.filter(
@@ -500,7 +642,7 @@ export function RegistrationDashboard({
       }
       return scopedCases(state, user);
     },
-    [demoMode, roleConfig, state, user],
+    [demoMode, isLocalAdminPreview, localPreviewCases, roleConfig, state, user],
   );
   const filteredCases = useMemo(() => {
     return user && (user.role === "worker" || user.role === "police")
@@ -575,23 +717,27 @@ export function RegistrationDashboard({
     hasWardAggregate && wardMonthlyCounts
       ? { birth: wardMonthlyCounts.birth, death: wardMonthlyCounts.death }
       : localMonthlyCounts;
-  const assignedUpazila = user && state.upazilas.find((item) => item.id === user.upazilaId);
-  const assignedUnion = assignedUpazila?.unions.find((item) => item.id === user?.unionId);
+  const scopeUpazilaId = user?.upazilaId ?? (isLocalAdminPreview ? "manirampur" : undefined);
+  const scopeUnionId = user?.unionId ?? (isLocalAdminPreview ? "mn-rohita" : undefined);
+  const assignedUpazila = scopeUpazilaId
+    ? (isLocalAdminPreview ? localPreviewSeed.upazilas : state.upazilas).find((item) => item.id === scopeUpazilaId)
+    : undefined;
+  const assignedUnion = assignedUpazila?.unions.find((item) => item.id === scopeUnionId);
   const assignedWardCount = assignedUnion
     ? new Set(assignedUnion.villages.map((village) => village.ward)).size || 9
     : 9;
-  const scopedUpazilas = state.upazilas.filter((item) => {
+  const scopedUpazilas = (isLocalAdminPreview ? localPreviewSeed.upazilas : state.upazilas).filter((item) => {
     if (!user || user.role === "super") return true;
     if (user.role === "district") return item.districtEn === user.districtId;
     return item.id === user.upazilaId;
   });
   const selectedUnionCount = scopedUpazilas.reduce((count, item) => count + item.unions.length, 0);
   const monthlyTargetScale =
-    roleConfig !== "public" && !user
+    roleConfig !== "public" && !user && !isLocalAdminPreview
       ? 0
       : roleConfig === "uno" && user?.role === "uno"
       ? assignedUpazila?.unions.length ?? 1
-      : roleConfig === "admin" && user?.role === "admin"
+      : roleConfig === "admin" && (user?.role === "admin" || isLocalAdminPreview)
         ? 1
         : roleConfig === "worker" && user?.role === "worker"
           ? 1 / assignedWardCount
@@ -662,7 +808,9 @@ export function RegistrationDashboard({
         );
   const scopeUpazila = state.upazilas.find((item) => item.id === user?.upazilaId);
   const scopeUnion = scopeUpazila?.unions.find((item) => item.id === user?.unionId);
-  const scopeLabel = !user || user.role === "super"
+  const scopeLabel = isLocalAdminPreview
+    ? `${L("মণিরামপুর", "Manirampur")} · ${L("০১ নং রোহিতা", "01 No. Rohita")} · ${L("লোকাল নমুনা ডেটা", "Local mock data")}`
+    : !user || user.role === "super"
     ? L("জাতীয় পর্যায়", "National scope")
     : user.role === "district"
       ? `${scopeUpazila?.districtBn ?? user.districtId} ${L("জেলা", "District")}`
@@ -677,11 +825,11 @@ export function RegistrationDashboard({
   const quickAccessActions = actions.slice(0, 4);
   const isEntryCard = activeCard?.id === "birth-entry" || activeCard?.id === "death-entry";
   const formType: "birth" | "death" | null =
-    activeCard?.id === "birth-entry" || activeCard?.id === "birth-correction"
+    editEntry?.type ?? (activeCard?.id === "birth-entry" || activeCard?.id === "birth-correction"
       ? "birth"
       : activeCard?.id === "death-entry" || activeCard?.id === "death-correction"
         ? "death"
-        : null;
+        : null);
   const correctable = formType
     ? state.cases.filter((item) => {
         if (item.type !== formType || item.createdBy !== user?.id || item.status === "completed" || item.status === "rejected") return false;
@@ -713,6 +861,189 @@ export function RegistrationDashboard({
       toast.success(L("আবেদন বাতিল হয়েছে", "Application rejected"));
     }
   };
+  const openAdminDraft = (
+    kind: "greeting" | "legal",
+    item: RegCase,
+    stage: "first" | "second" | "final" = "first",
+  ) => {
+    if (user?.role !== "admin" && !isLocalAdminPreview) return;
+    const personName = L(item.name.bn, item.name.en);
+    const stageLabel = stage === "first" ? "১ম" : stage === "second" ? "২য়" : "চূড়ান্ত";
+    setAdminDraft({ kind, item, stage });
+    setAdminSignatureProof(null);
+    setAdminDraftText(
+      kind === "greeting"
+        ? item.type === "birth"
+          ? `${personName}-এর জন্ম উপলক্ষে শুভেচ্ছা।\\n\\nচেয়ারম্যান\\nইউনিয়ন পরিষদ`
+          : `${personName}-এর মৃত্যুতে গভীর সমবেদনা। শোকসন্তপ্ত পরিবারের প্রতি সমবেদনা জানাই।\\n\\nচেয়ারম্যান\\nইউনিয়ন পরিষদ`
+        : `${stageLabel} নোটিশ — জন্ম ও মৃত্যু নিবন্ধন আইন, ২০০৪-এর ধারা ৭(২) অনুসারে ${personName}-এর নিবন্ধন সংক্রান্ত প্রয়োজনীয় ব্যবস্থা গ্রহণের জন্য অনুরোধ করা হচ্ছে।`,
+    );
+  };
+  const saveAdminDraft = async () => {
+    if (
+      (user?.role !== "admin" && !isLocalAdminPreview) ||
+      (!user?.unionId && !isLocalAdminPreview) ||
+      !adminDraft ||
+      !adminDraftText.trim()
+    ) return;
+    setAdminDraftSaving(true);
+    try {
+      let signatureProofDataUrl: string | undefined;
+      if (adminSignatureProof) {
+        signatureProofDataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error("Could not read the signature proof file"));
+          reader.onload = () => {
+            if (typeof reader.result !== "string") {
+              reject(new Error("Signature proof did not produce a readable file"));
+              return;
+            }
+            resolve(reader.result);
+          };
+          reader.readAsDataURL(adminSignatureProof);
+        });
+      }
+      const stageTitle = adminDraft.stage === "first" ? "১ম" : adminDraft.stage === "second" ? "২য়" : "চূড়ান্ত";
+      const record: AdminRecord = {
+        id: crypto.randomUUID(),
+        caseId: adminDraft.item.id,
+        upazilaId: user?.upazilaId ?? "manirampur",
+        unionId: user?.unionId ?? "mn-rohita",
+        kind: adminDraft.kind,
+        title: adminDraft.kind === "greeting"
+          ? adminDraft.item.type === "birth" ? "শুভেচ্ছা বার্তা" : "সমবেদনা বার্তা"
+          : `${stageTitle} ধারা ৭(২) নোটিশ`,
+        text: adminDraftText.trim(),
+        createdAt: Date.now(),
+        ...(adminSignatureProof
+          ? {
+              signatureProofName: adminSignatureProof.name,
+              ...(signatureProofDataUrl ? { signatureProofDataUrl } : {}),
+            }
+          : {}),
+      };
+      const records = [...adminRecords, record];
+      localStorage.setItem(ADMIN_RECORDS_KEY, JSON.stringify(records));
+      setAdminRecords(records);
+      setAdminDraft(null);
+      setAdminDraftText("");
+      setAdminSignatureProof(null);
+      toast.success(L("খসড়াটি এই ব্রাউজারে সংরক্ষিত হয়েছে", "Draft saved in this browser"));
+    } catch (cause) {
+      console.error("Failed to save administrative draft", cause);
+      toast.error(cause instanceof Error ? cause.message : L("খসড়া সংরক্ষণ করা যায়নি", "Could not save the draft"));
+    } finally {
+      setAdminDraftSaving(false);
+    }
+  };
+  const toggleRegistered = async (item: RegCase) => {
+    if (user?.role !== "admin" && !isLocalAdminPreview) return;
+    if (item.status === "completed") {
+      if (isLocalAdminPreview) {
+        setLocalPreviewCases((current) => current.map((candidate) =>
+          candidate.id === item.id
+            ? { ...candidate, status: "progress", regNo: undefined, completedAt: undefined }
+            : candidate,
+        ));
+        toast.success(L("লোকাল নমুনা থেকে নিবন্ধিত অবস্থা সরানো হয়েছে", "Registered status removed from local mock data"));
+        return;
+      }
+      if (await patchCase(item.id, { status: "progress", regNo: "" })) {
+        toast.success(L("নিবন্ধিত অবস্থা প্রত্যাহার করা হয়েছে", "Registered status was removed"));
+      }
+      return;
+    }
+    const regNo = window.prompt(L("১৭ সংখ্যার নিবন্ধন নম্বর লিখুন", "Enter the 17-digit registration number"));
+    if (regNo === null) return;
+    if (!/^\d{17}$/.test(regNo.trim())) {
+      toast.error(L("নিবন্ধন নম্বরটি ১৭ সংখ্যার হতে হবে", "Registration number must contain exactly 17 digits"));
+      return;
+    }
+    if (isLocalAdminPreview) {
+      setLocalPreviewCases((current) => current.map((candidate) =>
+        candidate.id === item.id
+          ? { ...candidate, status: "completed", regNo: regNo.trim(), completedAt: Date.now() }
+          : candidate,
+      ));
+      toast.success(L("লোকাল নমুনা নিবন্ধিত হয়েছে · কোনো বাস্তব নোটিফিকেশন পাঠানো হয়নি", "Local mock marked registered · no real notification was sent"));
+      return;
+    }
+    if (await patchCase(item.id, { status: "completed", regNo: regNo.trim() })) {
+      toast.success(L("নিবন্ধিত হয়েছে · কর্মীদের পুশ নোটিফিকেশনটি মক", "Registered · field-staff push notification is mocked"));
+    }
+  };
+  const administrativeList = (user?.role === "admin" || isLocalAdminPreview) && applicationListType
+    ? {
+        cases: actionCases,
+        localPreview: isLocalAdminPreview,
+        onHome: dismissActiveCard,
+        onRegister: (item: RegCase) => void toggleRegistered(item),
+        actions: (item: RegCase, onReviewPhotos: () => void) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="whitespace-nowrap border-emerald-200 text-emerald-900 hover:bg-emerald-50"
+              >
+                {L("প্রশাসনিক কার্যক্রম", "Administrative actions")}
+                <ChevronDown className="ml-1 h-4 w-4" aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" className="w-60">
+              <DropdownMenuItem onSelect={() => openAdminDraft("greeting", item)}>
+                <MessageSquare className="text-emerald-700" />
+                {item.type === "birth" ? L("শুভেচ্ছা বার্তা", "Greeting message") : L("শোক বার্তা", "Condolence message")}
+              </DropdownMenuItem>
+              {([
+                ["first", L("১ম নোটিশ", "1st notice")],
+                ["second", L("২য় নোটিশ", "2nd notice")],
+                ["final", L("চূড়ান্ত নোটিশ", "Final notice")],
+              ] as const).map(([stage, label]) => (
+                <DropdownMenuItem key={stage} onSelect={() => openAdminDraft("legal", item, stage)}>
+                  <ShieldAlert className="text-amber-700" />
+                  {label}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={onReviewPhotos}>
+                <Eye />
+                {L("GPS ছবি দেখুন", "Review GPS photos")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={item.status === "completed" || item.status === "rejected"}
+                onSelect={() => {
+                  if (isLocalAdminPreview) {
+                    setPreviewEditingCase(item);
+                    setPreviewEditName(item.name.bn);
+                  } else {
+                    setEditEntry(item);
+                    setActiveCard({ kind: "action", id: item.type === "birth" ? "birth-list" : "death-list" });
+                  }
+                }}
+              >
+                <PencilLine />
+                {L("আবেদন সম্পাদনা", "Edit application")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => printPDF(item.type === "birth" ? L("জন্ম আবেদন ফর্ম", "Birth application form") : L("মৃত্যু আবেদন ফর্ম", "Death application form"), rows([item]))}>
+                <Printer />
+                {L("আবেদন ফর্ম প্রিন্ট", "Print application form")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ),
+        onEdit: (item: RegCase) => {
+          if (isLocalAdminPreview) {
+            setPreviewEditingCase(item);
+            setPreviewEditName(item.name.bn);
+          } else {
+            setEditEntry(item);
+            setActiveCard({ kind: "action", id: item.type === "birth" ? "birth-list" : "death-list" });
+          }
+        },
+      }
+    : undefined;
   const submitFeedback = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!user || !feedbackSubject.trim() || feedbackMessage.trim().length < 10) return;
@@ -809,6 +1140,20 @@ export function RegistrationDashboard({
 
   return (
     <section className="dashboard-content flex h-full min-h-0 flex-col overflow-y-auto bg-gradient-to-br from-slate-50 via-[#f3f7f8] to-teal-50/60 text-[#102a43]">
+      {applicationListType && roleConfig === "admin" && !editEntry ? (
+        <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-2 px-4 py-2 sm:px-6 lg:px-6">
+          {administrativeList ? (
+            <WorkerApplicationListPage
+              type={applicationListType}
+              administrative={administrativeList}
+            />
+          ) : (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              {L("এই তালিকা দেখতে অনুমোদিত প্রশাসনিক অ্যাকাউন্টে প্রবেশ করুন।", "Sign in with an authorized administrative account to view this list.")}
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-1 px-4 py-1 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-1.5 sm:px-6 sm:py-1.5 lg:px-8">
         <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
           <div className="flex min-h-0 flex-col justify-center">
@@ -846,17 +1191,6 @@ export function RegistrationDashboard({
           />
         </div>
 
-        {roleConfig === "admin" && assignedUpazila && assignedUnion && (
-          <UnionStatisticsPanel
-            upazila={assignedUpazila}
-            cases={roleScopedCases}
-            unions={[assignedUnion]}
-            selectedUnionId={assignedUnion.id}
-            showUnionFilter={false}
-            compact
-          />
-        )}
-
         <section className="shrink-0" aria-labelledby="quick-actions-heading">
           <div className="mb-1">
             <h2
@@ -882,15 +1216,16 @@ export function RegistrationDashboard({
           </div>
         </section>
       </div>
+      )}
       <Dialog
-        open={activeCard !== null}
+        open={activeCard !== null && !(applicationListType && roleConfig === "admin" && !editEntry)}
         onOpenChange={(open) => {
           if (!open) {
             dismissActiveCard();
           }
         }}
       >
-        <DialogContent className={`left-0 top-0 h-[100svh] max-h-[100svh] w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 bg-background sm:rounded-none ${formType ? "p-2 sm:p-3 lg:px-6" : "p-4 sm:p-8 lg:px-[max(2rem,calc((100vw-72rem)/2))]"}`}>
+        <DialogContent className={`left-0 top-0 h-[100svh] max-h-[100svh] w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 bg-background sm:rounded-none ${formType ? "p-2 sm:p-3 lg:px-6" : applicationListType && roleConfig === "admin" ? "p-4 sm:px-6 lg:px-6" : "p-4 sm:p-8 lg:px-[max(2rem,calc((100vw-72rem)/2))]"}`}>
           {currentCard && (
             <>
               <DialogHeader className={formType ? "sr-only" : "pr-7 text-left"}>
@@ -938,6 +1273,8 @@ export function RegistrationDashboard({
                     </div>
                   )}
                 </div>
+              ) : applicationListType && roleConfig === "admin" ? (
+                null
               ) : applicationListType ? (
                 <ApplicationList
                   type={applicationListType}
@@ -946,6 +1283,69 @@ export function RegistrationDashboard({
                   {...(user?.role === "worker" || user?.role === "police" ? { onNew: () => openCaseDialog("action", `${applicationListType}-entry`) } : {})}
                   onReject={rejectApplication}
                 />
+              ) : activeCard?.id === "legal-tracker" ? (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {L("এই ব্রাউজারে সংরক্ষিত ধারা ৭(২) নোটিশের খসড়া", "Section 7(2) notice drafts saved in this browser")}
+                  </p>
+                  {adminRecords.filter((record) => record.kind === "legal").length === 0 ? (
+                    <p className="rounded-lg border p-4 text-sm text-muted-foreground">{L("এখনও কোনো নোটিশের খসড়া নেই। আবেদন তালিকা থেকে নোটিশ তৈরি করুন।", "No notice drafts yet. Create one from an application list.")}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {adminRecords.filter((record) => record.kind === "legal").map((record) => {
+                        const relatedCase = roleScopedCases.find((item) => item.id === record.caseId);
+                        return (
+                          <article key={record.id} className="rounded-lg border border-amber-100 bg-amber-50/40 p-3">
+                            <div className="flex flex-wrap justify-between gap-2 text-sm">
+                              <strong>{record.title} · {relatedCase ? L(relatedCase.name.bn, relatedCase.name.en) : record.caseId}</strong>
+                              <span className="text-muted-foreground">{new Date(record.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <p className="mt-2 whitespace-pre-wrap text-sm">{record.text}</p>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : activeCard?.id === "message-tracker" ? (
+                <div className="space-y-4">
+                  <section className="space-y-2">
+                    <h3 className="font-semibold text-emerald-900">{L("সংরক্ষিত শুভেচ্ছা ও সমবেদনা বার্তা", "Saved greeting and condolence drafts")}</h3>
+                    {adminRecords.filter((record) => record.kind === "greeting").length === 0 ? (
+                      <p className="rounded-lg border p-3 text-sm text-muted-foreground">{L("এখনও কোনো বার্তার খসড়া নেই।", "No message drafts yet.")}</p>
+                    ) : adminRecords.filter((record) => record.kind === "greeting").map((record) => {
+                      const relatedCase = roleScopedCases.find((item) => item.id === record.caseId);
+                      return (
+                        <article key={record.id} className="rounded-lg border p-3">
+                          <div className="flex flex-wrap justify-between gap-2 text-sm">
+                            <strong>{record.title} · {relatedCase ? L(relatedCase.name.bn, relatedCase.name.en) : record.caseId}</strong>
+                            <span className="text-muted-foreground">{new Date(record.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap text-sm">{record.text}</p>
+                          {record.signatureProofName && <p className="mt-1 text-xs text-muted-foreground">{L("স্বাক্ষর প্রমাণ", "Signature proof")}: {record.signatureProofName}</p>}
+                        </article>
+                      );
+                    })}
+                  </section>
+                  <section className="space-y-2">
+                    <h3 className="font-semibold text-emerald-900">{L("GPS পরিদর্শনের রেকর্ড", "GPS inspection records")}</h3>
+                    {roleScopedCases.flatMap((item) =>
+                      item.files.filter((file) => file.fieldVisit).map((file, index) => (
+                        <article key={`${item.id}-${index}`} className="flex flex-wrap justify-between gap-2 rounded-lg border p-3 text-sm">
+                          <span>{L(item.name.bn, item.name.en)} · {file.name}</span>
+                          <span className="text-muted-foreground">
+                            {file.fieldVisit?.capturedAt}
+                            {file.fieldVisit?.latitude !== undefined && file.fieldVisit.longitude !== undefined
+                              ? ` · ${file.fieldVisit.latitude}, ${file.fieldVisit.longitude}`
+                              : ""}
+                          </span>
+                        </article>
+                      )),
+                    ).length === 0 && (
+                      <p className="rounded-lg border p-3 text-sm text-muted-foreground">{L("কোনো GPS পরিদর্শন সংরক্ষিত নেই।", "No GPS inspection records are available.")}</p>
+                    )}
+                  </section>
+                </div>
               ) : activeCard?.id === "worker-report" ? (
                 <div className="flex flex-wrap gap-2">
                   <Button onClick={() => downloadCSV(rows(actionCases), "registration-report.csv")}>
@@ -1122,6 +1522,138 @@ export function RegistrationDashboard({
                 )}
                 </div>
               )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={adminDraft !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAdminDraft(null);
+            setAdminSignatureProof(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90svh] max-w-2xl overflow-y-auto border-emerald-200">
+          {adminDraft && (
+            <>
+              <DialogHeader className="text-left">
+                <DialogTitle className="font-display text-xl text-emerald-950">
+                  {adminDraft.kind === "legal"
+                    ? L("ধারা ৭(২) আইনি নোটিশের খসড়া", "Section 7(2) legal notice draft")
+                    : adminDraft.item.type === "birth"
+                      ? L("শুভেচ্ছা বার্তা তৈরি করুন", "Create a greeting")
+                      : L("সমবেদনা বার্তা তৈরি করুন", "Create a condolence message")}
+                </DialogTitle>
+                <DialogDescription>
+                  {L("আবেদনকারী", "Applicant")}: {L(adminDraft.item.name.bn, adminDraft.item.name.en)}
+                  {" · "}
+                  {L("খসড়া ব্রাউজারে সংরক্ষিত হবে; কোনো বার্তা পাঠানো হবে না", "Draft is saved locally; no message will be sent")}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <Textarea
+                  aria-label={L("বার্তার খসড়া", "Draft message")}
+                  className="min-h-48"
+                  maxLength={5000}
+                  value={adminDraftText}
+                  onChange={(event) => setAdminDraftText(event.target.value)}
+                />
+                {adminDraft.kind === "greeting" && (
+                  <div className="space-y-2">
+                    <label htmlFor="chairman-signature-proof" className="text-sm font-semibold">
+                      {L("চেয়ারম্যানের স্বাক্ষর প্রমাণ (ঐচ্ছিক)", "Chairman signature proof (optional)")}
+                    </label>
+                    <Input
+                      id="chairman-signature-proof"
+                      type="file"
+                      accept="image/png,image/jpeg,application/pdf"
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0] ?? null;
+                        if (file && file.size > 1024 * 1024) {
+                          toast.error(L("ফাইলের আকার ১ MB-এর বেশি হতে পারবে না", "File must be 1 MB or smaller"));
+                          event.currentTarget.value = "";
+                          setAdminSignatureProof(null);
+                          return;
+                        }
+                        setAdminSignatureProof(file);
+                      }}
+                    />
+                    {adminSignatureProof && (
+                      <p className="text-xs text-muted-foreground">{adminSignatureProof.name}</p>
+                    )}
+                  </div>
+                )}
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => printPDF(
+                      adminDraft.kind === "legal" ? L("ধারা ৭(২) নোটিশ", "Section 7(2) notice") : L("বার্তার খসড়া", "Message draft"),
+                      [[L(adminDraft.item.name.bn, adminDraft.item.name.en), adminDraftText]],
+                    )}
+                  >
+                    <Printer className="mr-2 h-4 w-4" />{L("প্রিন্ট", "Print")}
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={!adminDraftText.trim() || adminDraftSaving}
+                    onClick={() => void saveAdminDraft()}
+                  >
+                    {adminDraftSaving ? L("সংরক্ষণ হচ্ছে…", "Saving…") : L("খসড়া সংরক্ষণ", "Save draft")}
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={previewEditingCase !== null}
+        onOpenChange={(open) => !open && setPreviewEditingCase(null)}
+      >
+        <DialogContent className="max-w-lg border-emerald-200">
+          {previewEditingCase && (
+            <>
+              <DialogHeader className="text-left">
+                <DialogTitle className="text-emerald-950">
+                  {L("নমুনা আবেদন সম্পাদনা", "Edit mock application")}
+                </DialogTitle>
+                <DialogDescription>
+                  {L("এই পরিবর্তন শুধু এই স্থানীয় প্রিভিউর নমুনা ডেটায় প্রযোজ্য হবে।", "Changes apply only to mock data in this local preview.")}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <label className="block space-y-1 text-sm font-medium" htmlFor="preview-applicant-name">
+                  {L("আবেদনকারীর নাম", "Applicant name")}
+                  <Input
+                    id="preview-applicant-name"
+                    value={previewEditName}
+                    onChange={(event) => setPreviewEditName(event.target.value)}
+                  />
+                </label>
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => setPreviewEditingCase(null)}>
+                    {L("বাতিল", "Cancel")}
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={!previewEditName.trim()}
+                    onClick={() => {
+                      setLocalPreviewCases((current) => current.map((item) =>
+                        item.id === previewEditingCase.id
+                          ? { ...item, name: { ...item.name, bn: previewEditName.trim() } }
+                          : item,
+                      ));
+                      setPreviewEditingCase(null);
+                      toast.success(L("নমুনা আবেদন আপডেট হয়েছে", "Mock application updated"));
+                    }}
+                  >
+                    {L("নমুনা সংরক্ষণ", "Save mock")}
+                  </Button>
+                </div>
+              </div>
             </>
           )}
         </DialogContent>
