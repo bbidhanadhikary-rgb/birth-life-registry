@@ -288,17 +288,19 @@ export function WorkerApplicationListPage({
               placeholder={L("নাম বা আবেদন নম্বর দিয়ে খুঁজুন", "Search by name or application number")}
             />
           </label>
-          {administrative && (
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0 whitespace-nowrap border-emerald-200 text-emerald-900 hover:bg-emerald-50"
-              onClick={administrative.onHome}
-            >
-              <Home className="mr-2 h-4 w-4" aria-hidden="true" />
-              {L("হোম পেজে ফিরে যান", "Back to home")}
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="outline"
+            className="shrink-0 whitespace-nowrap border-emerald-200 text-emerald-900 hover:bg-emerald-50"
+            onClick={() =>
+              administrative
+                ? administrative.onHome()
+                : void navigate({ to: "/", search: {} })
+            }
+          >
+            <Home className="mr-2 h-4 w-4" aria-hidden="true" />
+            {L("হোম পেজে ফিরে যান", "Back to home")}
+          </Button>
         </div>
       </header>
 
@@ -359,7 +361,7 @@ export function WorkerApplicationListPage({
                       search: { applicationId: item.id },
                     })}
                 administrativeActions={administrative?.actions(item, () => setSelectedAttachments(item))}
-                onRegister={administrative ? () => administrative.onRegister(item) : undefined}
+                {...(administrative ? { onRegister: () => administrative.onRegister(item) } : {})}
                 villageName={(() => {
                   const village = findVillage(item.villageId);
                   if (village) return L(village.v.bn, village.v.en);

@@ -20,10 +20,76 @@ type UpazilaAnnouncement = {
 const localDemoLoginAvailable =
   import.meta.env.DEV &&
   (!import.meta.env["VITE_SUPABASE_URL"] || !import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"]);
-const DEMO_CASES = "uert-demo-cases";
+export const MASTER_APPLICATIONS_KEY = "up_master_applications_v5";
+export const MASTER_APPLICATIONS_UPDATED_EVENT = "up-master-applications-updated";
+const LEGACY_DEMO_CASE_KEYS = [
+  "uert-demo-cases",
+  "health_worker_applications_v2",
+  "village_police_applications_v2",
+  "up_official_applications_v2",
+  "upazila_official_applications_v2",
+];
 const demoAttachmentPreviews = new Map<string, string>();
 export const getDemoAttachmentPreview = (caseId: string, fileIndex: number) =>
   demoAttachmentPreviews.get(`${caseId}:${fileIndex}`);
+
+function readDemoCases(key: string): RegCase[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = window.localStorage.getItem(key);
+    if (stored === null) return null;
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) throw new Error(`Stored applications in ${key} must be an array`);
+    const cases = parsed.filter(
+      (item): item is RegCase =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof item.id === "string" &&
+        typeof item.createdBy === "string" &&
+        (item.type === "birth" || item.type === "death") &&
+        Array.isArray(item.files) &&
+        Array.isArray(item.remarks),
+    );
+    if (cases.length !== parsed.length) console.warn(`Ignored invalid demo applications in ${key}`);
+    return cases;
+  } catch (cause) {
+    console.error(`Failed to read demo applications from ${key}`, cause);
+    return null;
+  }
+}
+
+export function readStoredRegCases(key: string): RegCase[] | null {
+  return readDemoCases(key);
+}
+
+export function readMasterRegCases(fallbackCases: RegCase[]): RegCase[] {
+  const storedCases = readDemoCases(MASTER_APPLICATIONS_KEY);
+  if (storedCases) return storedCases;
+  const casesById = new Map(fallbackCases.map((item) => [item.id, item]));
+  for (const key of LEGACY_DEMO_CASE_KEYS) {
+    for (const item of readDemoCases(key) ?? []) casesById.set(item.id, item);
+  }
+  return Array.from(casesById.values());
+}
+
+function writeDemoCases(key: string, cases: RegCase[]) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(cases));
+    return true;
+  } catch (cause) {
+    console.error(`Failed to save demo applications to ${key}`, cause);
+    toast.error("Could not save local demo applications");
+    return false;
+  }
+}
+
+export function writeMasterRegCases(cases: RegCase[]) {
+  if (!writeDemoCases(MASTER_APPLICATIONS_KEY, cases)) return false;
+  window.dispatchEvent(
+    new CustomEvent<RegCase[]>(MASTER_APPLICATIONS_UPDATED_EVENT, { detail: cases }),
+  );
+  return true;
+}
 
 function saveDemoAttachmentPreviews(caseId: string, files: File[]) {
   files.forEach((file, index) => {
@@ -136,16 +202,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const enterDemoLogin = useCallback((role: "worker" | "police" | "admin" | "uno") => {
     if (!localDemoLoginAvailable && !previewTestingAllowed()) return;
-    const demo = demoMode ? state : seedState();
-    if (!demoMode) {
-      try {
-        const saved = JSON.parse(localStorage.getItem(DEMO_CASES) || "null") as RegCase[] | null;
-        if (Array.isArray(saved)) demo.cases = [...saved, ...demo.cases.filter((c) => !saved.some((x) => x.id === c.id))];
-      } catch { /* ignore */ }
-    }
+    const demo = seedState();
     const demoUserIds = { worker: "u-w1", police: "u-p1", admin: "u-a1", uno: "u-uno" };
     const previewUser = demo.users.find((candidate) => candidate.id === demoUserIds[role]);
     if (!previewUser) throw new Error(`The seeded ${role} account is missing`);
+    demo.cases = readMasterRegCases(demo.cases).map((item) => ({
+      ...item,
+      files: item.files.map((file) => ({ ...file })),
+      remarks: item.remarks.map((remark) => ({ ...remark })),
+    }));
     const upazila = demo.upazilas.find((area) => area.id === previewUser.upazilaId);
     const union =
       upazila?.unions.find((area) => area.id === previewUser.unionId) ??
@@ -155,7 +220,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       throw new Error(`The seeded ${role} account's area is incomplete`);
     }
     const attendedAt = new Date().toISOString();
-    if (!demoMode) setState(demo);
+    setState(demo);
     setUser(previewUser);
     setMfa("ok");
     setEpiVisits(role === "worker" && union ? [
@@ -176,7 +241,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ] : []);
     setDemoMode(true);
     setAuthReady(true);
-  }, [demoMode, state]);
+  }, []);
 
   const loadData = useCallback(async () => {
     if (demoMode) return;
@@ -268,14 +333,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (prefsReady.current) { localStorage.setItem("uert-theme", dark ? "dark" : "light"); localStorage.setItem("uert-lang", lang); }
   }, [dark, lang]);
   useEffect(() => {
+    if (!demoMode || !user) return;
+    writeDemoCases(MASTER_APPLICATIONS_KEY, state.cases);
+  }, [demoMode, state.cases, user]);
+  useEffect(() => {
     if (!demoMode) return;
-    try {
-      localStorage.setItem(
-        DEMO_CASES,
-        JSON.stringify(state.cases.filter((c) => c.createdBy === "u-w1" || c.createdBy === "u-p1")),
+    const syncMasterCases = (cases: RegCase[] | null) => {
+      if (!cases) return;
+      setState((current) =>
+        JSON.stringify(current.cases) === JSON.stringify(cases)
+          ? current
+          : {
+              ...current,
+              cases: cases.map((item) => ({
+                ...item,
+                files: item.files.map((file) => ({ ...file })),
+                remarks: item.remarks.map((remark) => ({ ...remark })),
+              })),
+            },
       );
-    } catch { /* ignore */ }
-  }, [demoMode, state.cases]);
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === MASTER_APPLICATIONS_KEY) {
+        syncMasterCases(readDemoCases(MASTER_APPLICATIONS_KEY));
+      }
+    };
+    const onMasterUpdate = (event: Event) => {
+      syncMasterCases((event as CustomEvent<RegCase[]>).detail);
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(MASTER_APPLICATIONS_UPDATED_EVENT, onMasterUpdate);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(MASTER_APPLICATIONS_UPDATED_EVENT, onMasterUpdate);
+    };
+  }, [demoMode]);
   useEffect(() => { if (prefsReady.current) localStorage.setItem(QUEUE, JSON.stringify(pending)); }, [pending]);
 
   // Offline queue: flush when back online
@@ -490,8 +582,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       return null;
     },
     updateCase: async (id, correction) => {
-      if (!user || user.role !== "worker") {
-        toast.error(L("শুধু স্বাস্থ্যকর্মী তথ্য সংশোধন করতে পারবেন", "Only health workers can correct entries"));
+      if (!user || (user.role !== "worker" && user.role !== "police")) {
+        toast.error(
+          L(
+            "শুধু স্বাস্থ্যকর্মী বা গ্রাম পুলিশ তথ্য সংশোধন করতে পারবেন",
+            "Only health workers or village police can correct entries",
+          ),
+        );
         return false;
       }
       if ((correction.files?.length ?? 0) > MAX_CASE_FILES) {
@@ -503,7 +600,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return false;
       }
       const existing = state.cases.find((item) => item.id === id);
-      if (!existing || existing.createdBy !== user.id || existing.status === "completed" || existing.status === "rejected") {
+      const canCorrect = !!existing && (
+        user.role === "worker"
+          ? existing.createdBy === user.id
+          : existing.upazilaId === user.upazilaId &&
+            existing.unionId === user.unionId &&
+            existing.ward === user.ward
+      );
+      if (!existing || !canCorrect || existing.status === "completed" || existing.status === "rejected") {
         toast.error(L("এই এন্ট্রি আর সংশোধন করা যাবে না", "This entry can no longer be corrected"));
         return false;
       }

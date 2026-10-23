@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BookOpen, Headphones, Languages, LogIn, LogOut, Moon, Sun, Landmark, WifiOff } from "lucide-react";
@@ -18,8 +18,40 @@ export function Header() {
   const { user, L, lang, toggleLang, dark, toggleTheme, logout, online, demoLoginAvailable } = useApp();
   const [dlg, setDlg] = useState<null | "login" | "manual" | "support">(null);
   const nav = useNavigate();
+  const location = useRouterState({ select: (routerState) => routerState.location });
   const showStaffLinks = Boolean(user);
   const headerRef = useRef<HTMLElement>(null);
+  const routeSearch = location.search;
+  const previewRole =
+    typeof routeSearch === "object" && routeSearch !== null && "role" in routeSearch
+      ? routeSearch["role"]
+      : undefined;
+  const signedInRole = user
+    ? user.role === "super" || user.role === "district"
+      ? "uno"
+      : user.role === "worker"
+        ? "health_worker"
+        : user.role === "police"
+          ? "village_police"
+          : user.role === "admin"
+            ? "up_official"
+            : undefined
+    : undefined;
+  const pathRole = location.pathname.startsWith("/worker-applications/") ||
+    location.pathname === "/birth-entry" ||
+    location.pathname === "/death-entry"
+      ? "health_worker"
+      : location.pathname === "/monitoring"
+        ? "uno"
+        : undefined;
+  const activeRole =
+    pathRole ??
+    signedInRole ??
+    (typeof previewRole === "string"
+      ? previewRole
+      : location.pathname === "/"
+        ? "main"
+        : undefined);
 
   useEffect(() => {
     const header = headerRef.current;
@@ -55,20 +87,26 @@ export function Header() {
         <div className="w-full px-4 py-1.5 sm:px-6 lg:px-8">
           <div className="flex w-full flex-wrap items-center justify-between gap-x-1 gap-y-1">
             <div className="flex flex-wrap items-center gap-1">
-              {tabs.map(([role, bn, en]) => (
-                <Link
-                  key={en}
-                  to="/"
-                  search={() => (role ? { role } : {})}
-                  activeOptions={{ exact: true, includeSearch: true }}
-                  resetScroll={false}
-                  className="whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold sm:text-sm"
-                  inactiveProps={{ className: "text-emerald-50 hover:bg-emerald-700" }}
-                  activeProps={{ className: "bg-white text-emerald-900 hover:bg-white" }}
-                >
-                  {L(bn, en)}
-                </Link>
-              ))}
+              {tabs.map(([role, bn, en]) => {
+                const active = role === activeRole;
+                return (
+                  <Link
+                    key={en}
+                    to="/"
+                    search={() => (role ? { role } : {})}
+                    activeOptions={{ exact: true, includeSearch: true }}
+                    resetScroll={false}
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      active
+                        ? "whitespace-nowrap rounded-xl bg-white px-4 py-1.5 text-xs font-bold text-emerald-900 shadow-md hover:bg-white sm:text-sm"
+                        : "whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800/50 sm:text-sm"
+                    }
+                  >
+                    {L(bn, en)}
+                  </Link>
+                );
+              })}
             </div>
             {showStaffLinks && (
               <div className="ml-auto flex flex-wrap items-center gap-4">

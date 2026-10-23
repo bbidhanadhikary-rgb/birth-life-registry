@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
+﻿import { Fragment, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowUpRight,
@@ -35,7 +35,15 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { TARGET, type RegCase, type Role } from "@/lib/types";
-import { getDemoAttachmentPreview, scopedCases, useApp } from "@/lib/store";
+import {
+  getDemoAttachmentPreview,
+  MASTER_APPLICATIONS_KEY,
+  MASTER_APPLICATIONS_UPDATED_EVENT,
+  readMasterRegCases,
+  scopedCases,
+  useApp,
+  writeMasterRegCases,
+} from "@/lib/store";
 import { RegForm } from "@/components/dashboards/Worker";
 import { Button } from "@/components/ui/button";
 import {
@@ -116,14 +124,18 @@ function ApplicationList({
   type,
   cases,
   canReject,
+  canEdit,
   onNew,
   onReject,
+  onEdit,
 }: {
   type: "birth" | "death";
   cases: RegCase[];
   canReject: boolean;
+  canEdit: boolean;
   onNew?: () => void;
   onReject: (item: RegCase) => void;
+  onEdit: (item: RegCase) => void;
 }) {
   const { L, n, demoMode } = useApp();
   const { address, rows } = useCaseHelpers();
@@ -218,7 +230,17 @@ function ApplicationList({
         <table className="w-full min-w-[880px] border-collapse text-left text-sm">
           <thead className="bg-emerald-50 text-emerald-950">
             <tr>
-              {[L("ক্রমিক নং", "SL"), L("আবেদন নং", "App No"), L("নাম", "Name"), L("পিতার নাম", "Father's Name"), L("মাতার নাম", "Mother's Name"), L("সংযুক্তি", "Attachments"), L("অবস্থা", "Status"), L("কার্যক্রম", "Action")].map((heading) => <th key={heading} className="whitespace-nowrap border-b border-emerald-100 px-3 py-2.5 font-semibold">{heading}</th>)}
+              {[
+                L("ক্রমিক নং", "SL"),
+                L("আবেদন নং", "App No"),
+                L("নাম", "Name"),
+                L("পিতার নাম", "Father's Name"),
+                L("মাতার নাম", "Mother's Name"),
+                L("সংযুক্তি", "Attachments"),
+                L("অবস্থা", "Status"),
+                L("কার্যক্রম", "Action"),
+                ...(canEdit ? [L("সংশোধন করুন", "Edit")] : []),
+              ].map((heading) => <th key={heading} className="whitespace-nowrap border-b border-emerald-100 px-3 py-2.5 font-semibold">{heading}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -254,10 +276,24 @@ function ApplicationList({
                       )}
                     </div>
                   </td>
+                  {canEdit && (
+                    <td className="px-3 py-2.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 whitespace-nowrap border-amber-200 px-2 text-amber-900 hover:bg-amber-50"
+                        disabled={item.status === "completed" || item.status === "rejected"}
+                        onClick={() => onEdit(item)}
+                      >
+                        <PencilLine className="mr-1 h-3.5 w-3.5" />
+                        {L("সংশোধন করুন", "Edit")}
+                      </Button>
+                    </td>
+                  )}
                 </tr>
                 {expandedId === item.id && (
                   <tr className="border-b border-emerald-100 bg-emerald-50/60">
-                    <td colSpan={8} className="px-4 py-3 text-sm">
+                    <td colSpan={canEdit ? 9 : 8} className="px-4 py-3 text-sm">
                       <div className="grid gap-2 sm:grid-cols-3">
                         <span>{L("জন্ম তারিখ", "Date of birth")}: {item.dob}</span>
                         {item.dod && <span>{L("মৃত্যুর তারিখ", "Date of death")}: {item.dod}</span>}
@@ -305,7 +341,7 @@ function ApplicationList({
                 )}
               </Fragment>
             ))}
-            {!visible.length && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">{L("কোনো আবেদন পাওয়া যায়নি", "No applications found")}</td></tr>}
+            {!visible.length && <tr><td colSpan={canEdit ? 9 : 8} className="px-3 py-8 text-center text-muted-foreground">{L("কোনো আবেদন পাওয়া যায়নি", "No applications found")}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -332,7 +368,11 @@ function monthKey(timestamp: number) {
 
 function createLocalAdminPreviewCases(seedCases: RegCase[]) {
   const cases = seedCases.filter(
-    (item) => item.upazilaId === "manirampur" && item.unionId === "mn-rohita",
+    (item) =>
+      item.upazilaId === "manirampur" &&
+      item.unionId === "mn-rohita" &&
+      item.id !== "preview-birth-ward-2" &&
+      item.id !== "preview-death-ward-3",
   ).map((item) => ({
     ...item,
     details: {
@@ -346,9 +386,11 @@ function createLocalAdminPreviewCases(seedCases: RegCase[]) {
   const deathTemplate = cases.find((item) => item.type === "death");
   if (!birthTemplate || !deathTemplate) return cases;
   const now = Date.now();
+  const birthPreview = seedCases.find((item) => item.id === "preview-birth-ward-2");
+  const deathPreview = seedCases.find((item) => item.id === "preview-death-ward-3");
   return [
     ...cases,
-    {
+    birthPreview ?? {
       ...birthTemplate,
       id: "preview-birth-ward-2",
       name: { bn: "নমুনা জন্ম আবেদন - ওয়ার্ড ২", en: "Sample birth application - Ward 2" },
@@ -361,7 +403,7 @@ function createLocalAdminPreviewCases(seedCases: RegCase[]) {
         birthPlace: { bn: "রোহিতা · ওয়ার্ড ২", en: "Rohita · Ward 2" },
       },
     },
-    {
+    deathPreview ?? {
       ...deathTemplate,
       id: "preview-death-ward-3",
       name: { bn: "নমুনা মৃত্যু আবেদন - ওয়ার্ড ৩", en: "Sample death application - Ward 3" },
@@ -530,8 +572,15 @@ export function RegistrationDashboard({
   const navigate = useNavigate();
   const { rows } = useCaseHelpers();
   const [editEntry, setEditEntry] = useState<RegCase | null>(null);
-  const [localPreviewCases, setLocalPreviewCases] = useState<RegCase[]>(() =>
-    createLocalAdminPreviewCases(localPreviewSeed.cases),
+  const [masterPreviewCases, setMasterPreviewCases] = useState<RegCase[]>(
+    () => readMasterRegCases(localPreviewSeed.cases),
+  );
+  const [localPreviewCases, setLocalPreviewCases] = useState<RegCase[]>(
+    () => createLocalAdminPreviewCases(masterPreviewCases),
+  );
+  const baselineLocalPreviewCases = useMemo(
+    () => createLocalAdminPreviewCases(masterPreviewCases),
+    [masterPreviewCases],
   );
   const [previewEditingCase, setPreviewEditingCase] = useState<RegCase | null>(null);
   const [previewEditName, setPreviewEditName] = useState("");
@@ -561,6 +610,48 @@ export function RegistrationDashboard({
   const [adminSignatureProof, setAdminSignatureProof] = useState<File | null>(null);
   const [adminRecords, setAdminRecords] = useState<AdminRecord[]>([]);
   const [adminDraftSaving, setAdminDraftSaving] = useState(false);
+  useEffect(() => {
+    const refreshMasterCases = (cases: RegCase[] | null) => {
+      if (!cases) return;
+      setMasterPreviewCases((current) =>
+        JSON.stringify(current) === JSON.stringify(cases) ? current : cases,
+      );
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === MASTER_APPLICATIONS_KEY) {
+        const cases = readMasterRegCases(localPreviewSeed.cases);
+        refreshMasterCases(cases);
+        if (isLocalAdminPreview) setLocalPreviewCases(createLocalAdminPreviewCases(cases));
+      }
+    };
+    const onMasterUpdate = (event: Event) => {
+      refreshMasterCases((event as CustomEvent<RegCase[]>).detail);
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener(MASTER_APPLICATIONS_UPDATED_EVENT, onMasterUpdate);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(MASTER_APPLICATIONS_UPDATED_EVENT, onMasterUpdate);
+    };
+  }, [isLocalAdminPreview, localPreviewSeed.cases]);
+  useEffect(() => {
+    if (!isLocalAdminPreview) return;
+    const masterCases = readMasterRegCases(localPreviewSeed.cases);
+    const mergedCases = new Map(masterCases.map((item) => [item.id, item]));
+    const baselineById = new Map(baselineLocalPreviewCases.map((item) => [item.id, item]));
+    localPreviewCases.forEach((item) => {
+      const baseline = baselineById.get(item.id);
+      if (!baseline || JSON.stringify(item) !== JSON.stringify(baseline)) {
+        mergedCases.set(item.id, item);
+      }
+    });
+    writeMasterRegCases(Array.from(mergedCases.values()));
+  }, [
+    baselineLocalPreviewCases,
+    isLocalAdminPreview,
+    localPreviewCases,
+    localPreviewSeed.cases,
+  ]);
   useEffect(() => {
     if (user?.role !== "admin" && !isLocalAdminPreview) return;
     try {
@@ -631,7 +722,13 @@ export function RegistrationDashboard({
   const roleScopedCases = useMemo(
     () => {
       if (isLocalAdminPreview) return localPreviewCases;
-      if (!user) return roleConfig === "public" ? state.cases : [];
+      if (!user) {
+        return roleConfig === "public"
+          ? import.meta.env.DEV
+            ? masterPreviewCases
+            : state.cases
+          : [];
+      }
       if (demoMode && (user.role === "worker" || user.role === "police")) {
         return state.cases.filter(
           (item) =>
@@ -642,7 +739,7 @@ export function RegistrationDashboard({
       }
       return scopedCases(state, user);
     },
-    [demoMode, isLocalAdminPreview, localPreviewCases, roleConfig, state, user],
+    [demoMode, isLocalAdminPreview, localPreviewCases, masterPreviewCases, roleConfig, state, user],
   );
   const filteredCases = useMemo(() => {
     return user && (user.role === "worker" || user.role === "police")
@@ -1280,8 +1377,10 @@ export function RegistrationDashboard({
                   type={applicationListType}
                   cases={actionCases}
                   canReject={user?.role === "admin"}
+                  canEdit={user?.role === "police"}
                   {...(user?.role === "worker" || user?.role === "police" ? { onNew: () => openCaseDialog("action", `${applicationListType}-entry`) } : {})}
                   onReject={rejectApplication}
+                  onEdit={(item) => setEditEntry(item)}
                 />
               ) : activeCard?.id === "legal-tracker" ? (
                 <div className="space-y-3">

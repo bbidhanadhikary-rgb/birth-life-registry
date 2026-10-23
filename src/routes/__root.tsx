@@ -14,7 +14,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { StoreProvider } from "../lib/store";
+import { StoreProvider } from "@/lib/store";
 import { Header, RoleSwitcherBar } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { Toaster } from "sonner";
@@ -49,7 +49,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   }, [error]);
 
   return (
-    <StoreProvider>
+    <>
       <Header />
       <main className="box-border min-h-[calc(100svh-4rem)] bg-background pt-[var(--app-header-height,9rem)]">
         <div className="flex min-h-[calc(100svh-var(--app-header-height,9rem))] items-center justify-center px-4">
@@ -82,7 +82,7 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
       </main>
       <Footer compact />
       <Toaster richColors position="top-center" />
-    </StoreProvider>
+    </>
   );
 }
 
@@ -130,7 +130,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        {children}
+        <StoreProvider>{children}</StoreProvider>
         <Scripts />
       </body>
     </html>
@@ -152,21 +152,19 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <StoreProvider>
-        <Header />
-        <main
-          className={
-            dashboardViewport
-              ? "dashboard-viewport box-border flex min-h-0 flex-col pt-[var(--app-header-height,9rem)]"
-              : "box-border min-h-[calc(100svh-4rem)] pt-[var(--app-header-height,9rem)]"
-          }
-        >
-          <Outlet />
-        </main>
-        <Footer compact />
-        <RoleSwitcherBar />
-        <Toaster richColors position="top-center" />
-      </StoreProvider>
+      <Header />
+      <main
+        className={
+          dashboardViewport
+            ? "dashboard-viewport box-border flex min-h-0 flex-col pt-[var(--app-header-height,9rem)]"
+            : "box-border min-h-[calc(100svh-4rem)] pt-[var(--app-header-height,9rem)]"
+        }
+      >
+        <Outlet />
+      </main>
+      <Footer compact />
+      <RoleSwitcherBar />
+      <Toaster richColors position="top-center" />
     </QueryClientProvider>
   );
 }

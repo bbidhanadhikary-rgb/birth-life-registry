@@ -39,9 +39,9 @@ export const checkCaseDuplicate = createServerFn({ method: "POST" })
       !profile.upazila_id ||
       !profile.union_id ||
       profile.ward === null ||
-      !roles?.some((role) => role.role === "worker")
+      !roles?.some((role) => role.role === "worker" || role.role === "police")
     ) {
-      throw new Error("Only active health workers with an assigned area can check case duplicates");
+      throw new Error("Only active health workers or village police with an assigned area can check case duplicates");
     }
 
     const normalize = normalizeName;
