@@ -1,13 +1,117 @@
-import { useState } from "react";
-import { AlertTriangle, Download, FileText } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { AlertTriangle, Download, FileText, Plus, Save, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { scopedCases, useApp } from "@/lib/store";
 import { downloadCSV, printPDF } from "@/lib/report";
-import { TARGET, type Status } from "@/lib/types";
+import { TARGET, type Status, type Upazila, type Union, type Village } from "@/lib/types";
 import { PageTitle, Stat, monthCount, redFlags, useCaseHelpers } from "../shared";
 import { CaseReview } from "./CaseReview";
 import { UnionStatisticsPanel } from "./UnionStatisticsPanel";
+
+function VillageManager({ upazila, union }: { upazila: Upazila; union: Union }) {
+  const { L, saveUnionVillages } = useApp();
+  const [villages, setVillages] = useState(union.villages);
+  const [newVillage, setNewVillage] = useState({ bn: "", en: "", ward: "1", poBn: "", poEn: "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => setVillages(union.villages), [union.villages]);
+
+  const updateVillage = (id: string, patch: Partial<Village>) => {
+    setVillages((current) =>
+      current.map((village) => village.id === id ? { ...village, ...patch } : village),
+    );
+  };
+
+  const addVillage = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const ward = Number(newVillage.ward);
+    if (
+      !newVillage.bn.trim() ||
+      !newVillage.en.trim() ||
+      !newVillage.poBn.trim() ||
+      !newVillage.poEn.trim() ||
+      !Number.isInteger(ward) ||
+      ward < 1 ||
+      ward > 99
+    ) {
+      toast.error(L("সব গ্রামের তথ্য পূরণ করুন এবং ওয়ার্ড ১–৯৯-এর মধ্যে দিন", "Complete all village details and enter a ward from 1 to 99"));
+      return;
+    }
+    setVillages((current) => [
+      ...current,
+      {
+        id: crypto.randomUUID(),
+        bn: newVillage.bn.trim(),
+        en: newVillage.en.trim(),
+        ward,
+        poBn: newVillage.poBn.trim(),
+        poEn: newVillage.poEn.trim(),
+      },
+    ]);
+    setNewVillage({ bn: "", en: "", ward: "1", poBn: "", poEn: "" });
+  };
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      if (await saveUnionVillages(villages)) {
+        toast.success(L("গ্রাম ও ওয়ার্ডের তথ্য সংরক্ষিত হয়েছে", "Village and ward details saved"));
+      }
+    } catch (cause) {
+      console.error("Could not save union village setup", cause);
+      toast.error(L("গ্রাম ও ওয়ার্ডের তথ্য সংরক্ষণ করা যায়নি", "Could not save village and ward details"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="mb-6 rounded-xl border border-emerald-200 bg-card p-4">
+      <div className="mb-3">
+        <h2 className="text-lg font-bold text-emerald-950">{L("গ্রাম ও ওয়ার্ড ব্যবস্থাপনা", "Village & Ward Manager")}</h2>
+        <p className="text-sm text-muted-foreground">
+          {L(`${union.bn} · ${upazila.bn} উপজেলা · ${upazila.districtBn} জেলা`, `${union.en} · ${upazila.en} Upazila · ${upazila.districtEn} District`)}
+        </p>
+      </div>
+
+      <form onSubmit={addVillage} className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        <Input required value={newVillage.bn} maxLength={160} placeholder={L("গ্রামের নাম (বাংলা)", "Village name (Bangla)")} onChange={(event) => setNewVillage((current) => ({ ...current, bn: event.target.value }))} />
+        <Input required value={newVillage.en} maxLength={160} placeholder={L("গ্রামের নাম (ইংরেজি)", "Village name (English)")} onChange={(event) => setNewVillage((current) => ({ ...current, en: event.target.value }))} />
+        <Input required type="number" min={1} max={99} value={newVillage.ward} placeholder={L("ওয়ার্ড নং", "Ward no.")} onChange={(event) => setNewVillage((current) => ({ ...current, ward: event.target.value }))} />
+        <Input required value={newVillage.poBn} maxLength={160} placeholder={L("ডাকঘর (বাংলা)", "Post office (Bangla)")} onChange={(event) => setNewVillage((current) => ({ ...current, poBn: event.target.value }))} />
+        <div className="flex gap-2">
+          <Input required value={newVillage.poEn} maxLength={160} placeholder={L("ডাকঘর (ইংরেজি)", "Post office (English)")} onChange={(event) => setNewVillage((current) => ({ ...current, poEn: event.target.value }))} />
+          <Button type="submit" aria-label={L("গ্রাম যোগ করুন", "Add village")}><Plus className="h-4 w-4" /></Button>
+        </div>
+      </form>
+
+      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+        {villages.map((village) => (
+          <div key={village.id} className="grid gap-2 rounded-lg border border-border p-2 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_7rem_1fr_1fr_auto]">
+            <Input aria-label={L("গ্রামের নাম বাংলা", "Village name in Bangla")} value={village.bn} maxLength={160} onChange={(event) => updateVillage(village.id, { bn: event.target.value })} />
+            <Input aria-label={L("গ্রামের নাম ইংরেজি", "Village name in English")} value={village.en} maxLength={160} onChange={(event) => updateVillage(village.id, { en: event.target.value })} />
+            <Input aria-label={L("ওয়ার্ড নং", "Ward number")} type="number" min={1} max={99} value={village.ward} onChange={(event) => updateVillage(village.id, { ward: Number(event.target.value) })} />
+            <Input aria-label={L("ডাকঘর বাংলা", "Post office in Bangla")} value={village.poBn} maxLength={160} onChange={(event) => updateVillage(village.id, { poBn: event.target.value })} />
+            <Input aria-label={L("ডাকঘর ইংরেজি", "Post office in English")} value={village.poEn} maxLength={160} onChange={(event) => updateVillage(village.id, { poEn: event.target.value })} />
+            <Button type="button" variant="outline" aria-label={L("গ্রাম মুছুন", "Remove village")} onClick={() => setVillages((current) => current.filter((item) => item.id !== village.id))}>
+              <Trash2 className="h-4 w-4 text-red-700" />
+            </Button>
+          </div>
+        ))}
+        {villages.length === 0 && <p className="text-sm text-muted-foreground">{L("এখনও কোনো গ্রাম যোগ করা হয়নি", "No villages have been added yet")}</p>}
+      </div>
+
+      <div className="mt-3 flex justify-end">
+        <Button type="button" onClick={() => void save()} disabled={saving || villages.length === 0}>
+          <Save className="mr-2 h-4 w-4" />{saving ? L("সংরক্ষণ হচ্ছে…", "Saving…") : L("গ্রাম ও ওয়ার্ড সংরক্ষণ", "Save village setup")}
+        </Button>
+      </div>
+    </section>
+  );
+}
 
 export function AdminDashboard() {
   const { L, n, user, state } = useApp();
@@ -35,6 +139,7 @@ export function AdminDashboard() {
           </div>
         ))}
       </div>
+      <VillageManager upazila={up} union={un} />
       <UnionStatisticsPanel
         upazila={up}
         cases={cases}

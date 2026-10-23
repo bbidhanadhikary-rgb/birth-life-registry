@@ -63,6 +63,7 @@ interface Ctx {
   selectedUpazilaId: string | undefined;
   setSelectedUpazilaId: (id: string | undefined) => void;
   saveAnnouncement: (upazilaId: string, noticeBn: string, noticeEn: string, active: boolean) => Promise<boolean>;
+  saveUnionVillages: (villages: Village[]) => Promise<boolean>;
   epiVisits: EpiVisit[]; enterDemoLogin: (role: "worker" | "police" | "admin" | "uno") => void; addEpiVisit: (visit: NewEpiVisit) => Promise<string | null>;
   lang: Lang; toggleLang: () => void; L: (bn: string, en: string) => string; n: (v: number | string) => string;
   dark: boolean; toggleTheme: () => void;
@@ -330,6 +331,63 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         active,
         updated_by: user.id,
       }, { onConflict: "upazila_id" });
+      if (error) {
+        toast.error(error.message);
+        return false;
+      }
+      await loadData();
+      return true;
+    },
+    saveUnionVillages: async (villages) => {
+      if (!user || user.role !== "admin" || !user.unionId || mfa !== "ok") {
+        toast.error(L("শুধু নির্ধারিত ইউপি প্রশাসনিক কর্মকর্তা গ্রাম-ওয়ার্ডের তথ্য পরিবর্তন করতে পারবেন", "Only the assigned UP Administrative Officer can manage village and ward details"));
+        return false;
+      }
+      if (
+        villages.length < 1 ||
+        villages.length > 500 ||
+        villages.some((village) =>
+          !village.id.trim() ||
+          !village.bn.trim() ||
+          !village.en.trim() ||
+          !village.poBn.trim() ||
+          !village.poEn.trim() ||
+          !Number.isInteger(village.ward) ||
+          village.ward < 1 ||
+          village.ward > 99
+        ) ||
+        new Set(villages.map((village) => village.id)).size !== villages.length
+      ) {
+        toast.error(L("প্রতিটি গ্রামের বাংলা/ইংরেজি নাম, ডাকঘর, ১–৯৯ ওয়ার্ড এবং স্বতন্ত্র পরিচয় দিন", "Provide each village's Bangla/English names, post office, a ward from 1 to 99, and a unique ID"));
+        return false;
+      }
+      if (demoMode) {
+        setState((current) => ({
+          ...current,
+          upazilas: current.upazilas.map((area) =>
+            area.id !== user.upazilaId
+              ? area
+              : {
+                  ...area,
+                  unions: area.unions.map((union) =>
+                    union.id === user.unionId ? { ...union, villages } : union,
+                  ),
+                },
+          ),
+        }));
+        return true;
+      }
+      const { error } = await supabase.rpc("save_union_villages", {
+        _union_id: user.unionId,
+        _villages: villages.map(({ id, bn, en, ward, poBn, poEn }) => ({
+          id,
+          bn,
+          en,
+          ward,
+          poBn,
+          poEn,
+        })),
+      });
       if (error) {
         toast.error(error.message);
         return false;

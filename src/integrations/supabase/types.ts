@@ -599,6 +599,10 @@ export type Database = {
           death_total_count: number
         }[]
       }
+      save_union_villages: {
+        Args: { _union_id: string; _villages: Json }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
