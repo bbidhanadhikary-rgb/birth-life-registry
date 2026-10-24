@@ -63,6 +63,7 @@ import { downloadCSV, printPDF } from "@/lib/report";
 import { seedState } from "@/lib/seed";
 import { isPolicyReadOnlyRole, type PreviewRole } from "@/lib/dashboard-roles";
 import { simulateJurisdiction } from "@/lib/jurisdiction-simulation";
+import { getDhakaMonthYear } from "@/lib/monthly-targets";
 import {
   MonthlyProgressCard,
   type MonthlyProgressCounts,
@@ -605,6 +606,12 @@ export function RegistrationDashboard({
     birth: { pending: number; progress: number; completed: number; total: number };
     death: { pending: number; progress: number; completed: number; total: number };
   } | null>(null);
+  const [unionMonthlyTarget, setUnionMonthlyTarget] = useState<{
+    unionId: string;
+    monthYear: string;
+    birth: number;
+    death: number;
+  } | null>(null);
   const [feedbackCategory, setFeedbackCategory] = useState<"complaint" | "suggestion">("suggestion");
   const [feedbackSubject, setFeedbackSubject] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
@@ -676,6 +683,51 @@ export function RegistrationDashboard({
       toast.error(L("প্রশাসনিক রেকর্ড লোড করা যায়নি", "Could not load administrative records"));
     }
   }, [L, isLocalAdminPreview, user]);
+  useEffect(() => {
+    const unionId = user?.unionId;
+    if (!unionId || demoMode) {
+      setUnionMonthlyTarget(null);
+      return;
+    }
+
+    let active = true;
+    const monthYear = getDhakaMonthYear();
+    setUnionMonthlyTarget(null);
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("union_targets")
+          .select("union_id, month_year, birth_target, death_target")
+          .eq("union_id", unionId)
+          .eq("month_year", monthYear)
+          .maybeSingle();
+        if (!active) return;
+        if (error) {
+          console.error("Failed to load union monthly targets", error);
+          toast.error(L("ইউনিয়নের মাসিক লক্ষ্যমাত্রা লোড করা যায়নি", "Could not load union monthly targets"));
+        } else {
+          setUnionMonthlyTarget(
+            data
+              ? {
+                  unionId: data.union_id,
+                  monthYear: data.month_year,
+                  birth: data.birth_target,
+                  death: data.death_target,
+                }
+              : null,
+          );
+        }
+      } catch (error) {
+        if (!active) return;
+        console.error("Failed to load union monthly targets", error);
+        toast.error(L("ইউনিয়নের মাসিক লক্ষ্যমাত্রা লোড করা যায়নি", "Could not load union monthly targets"));
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [L, demoMode, user?.unionId]);
   useEffect(() => {
     if (initialAction) setActiveCard({ kind: "action", id: initialAction });
   }, [initialAction]);
@@ -889,9 +941,18 @@ export function RegistrationDashboard({
                 : roleConfig === "worker" || roleConfig === "police"
                   ? 1 / 9
                   : Math.max(1, selectedUnionCount));
+  const targetMonthYear = getDhakaMonthYear();
+  const activeUnionTarget =
+    roleConfig === "admin" &&
+    user?.role === "admin" &&
+    unionMonthlyTarget !== null &&
+    unionMonthlyTarget.unionId === user.unionId &&
+    unionMonthlyTarget.monthYear === targetMonthYear
+      ? unionMonthlyTarget
+      : null;
   const monthlyTargets = {
-    birth: Math.ceil(TARGET.birth * monthlyTargetScale),
-    death: Math.ceil(TARGET.death * monthlyTargetScale),
+    birth: activeUnionTarget?.birth ?? Math.ceil(TARGET.birth * monthlyTargetScale),
+    death: activeUnionTarget?.death ?? Math.ceil(TARGET.death * monthlyTargetScale),
   };
   const monthlyTarget = monthlyTargets.birth + monthlyTargets.death;
   const monthlyReceived =

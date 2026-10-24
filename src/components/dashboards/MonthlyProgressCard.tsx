@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useApp } from "@/lib/store";
 import { downloadCSV, printPDF } from "@/lib/report";
 import { filterAdvancedReport, type AdvancedReportFilters } from "@/lib/advanced-report";
+import { getCompletionPercent } from "@/lib/monthly-targets";
 import type { RegCase } from "@/lib/types";
 
 type CaseTypeCounts = {
@@ -132,7 +133,12 @@ export function MonthlyProgressCard({
   const submitted = counts.birth.pending + counts.death.pending;
   const inProgress = counts.birth.progress + counts.death.progress;
   const circumference = 2 * Math.PI * 88;
-  const completion = target ? Math.round((completed / target) * 100) : 0;
+  const completion = getCompletionPercent(
+    counts.birth.completed,
+    counts.death.completed,
+    targets.birth,
+    targets.death,
+  );
   const completionArc = (Math.min(completed, target) / Math.max(1, target)) * circumference;
   const statusDetails = (status: keyof CaseTypeCounts) => [
     L(

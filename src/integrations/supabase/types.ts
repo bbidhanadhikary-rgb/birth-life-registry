@@ -567,6 +567,33 @@ export type Database = {
         }
         Relationships: []
       }
+      union_targets: {
+        Row: {
+          birth_target: number
+          death_target: number
+          id: string
+          month_year: string
+          union_id: string
+          union_name: string
+        }
+        Insert: {
+          birth_target?: number
+          death_target?: number
+          id?: string
+          month_year: string
+          union_id: string
+          union_name: string
+        }
+        Update: {
+          birth_target?: number
+          death_target?: number
+          id?: string
+          month_year?: string
+          union_id?: string
+          union_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
