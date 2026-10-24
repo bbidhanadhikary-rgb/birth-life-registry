@@ -25,22 +25,22 @@ export function AnnouncementTicker() {
     <div
       className="border-t border-emerald-500 bg-emerald-700 text-white"
       role="region"
-      aria-label={L("সরকারি ঘোষণা", "Official announcement")}
+      aria-label={L("বিজ্ঞপ্তি", "Announcement")}
     >
-      <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-2 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-1.5 sm:px-6 lg:px-8">
         <Link
           to="/announcements"
-          aria-label={L("সব সরকারি বিজ্ঞপ্তি দেখুন", "View all official announcements")}
-          className="inline-flex shrink-0 items-center gap-2 rounded-md bg-white/15 px-2 py-1 text-xs font-semibold text-white transition hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          aria-label={L("সব বিজ্ঞপ্তি দেখুন", "View all announcements")}
+          className="inline-flex shrink-0 items-center gap-2 rounded-md bg-emerald-900/35 px-2.5 py-1 text-sm font-bold text-white transition hover:bg-emerald-900/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
           <Megaphone className="h-4 w-4" aria-hidden="true" />
-          <span>{L("সরকারি বিজ্ঞপ্তি", "Official notice")}</span>
+          <span>{L("বিজ্ঞপ্তি", "Notice")}</span>
         </Link>
-        <span className="shrink-0 text-xs text-emerald-50">
+        <span className="shrink-0 text-sm font-semibold text-white">
           {noticeArea ? L(noticeArea.bn, noticeArea.en) : L("সারা বাংলাদেশ", "Nationwide")}
         </span>
         <div className="announcement-viewport min-w-0 flex-1 overflow-hidden" aria-live="polite">
-          <div className="announcement-track whitespace-nowrap text-sm font-medium">
+          <div className="announcement-track whitespace-nowrap text-base font-semibold leading-snug text-white sm:text-lg">
             <span>{text}</span>
             <span className="mx-12" aria-hidden="true">
               {text}
@@ -49,7 +49,7 @@ export function AnnouncementTicker() {
         </div>
         <Link
           to="/announcements"
-          className="shrink-0 rounded px-2 py-1 text-xs font-semibold text-white underline-offset-2 hover:bg-white/15 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="shrink-0 rounded px-2 py-1 text-sm font-bold text-white underline-offset-2 hover:bg-white/15 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
           {L("সব নোটিশ", "All notices")}
         </Link>

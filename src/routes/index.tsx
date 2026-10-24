@@ -1,17 +1,33 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { RegistrationDashboard } from "@/components/dashboards/RegistrationDashboard";
+import { isPreviewRole, type PreviewRole } from "@/lib/dashboard-roles";
 import { useApp } from "@/lib/store";
 
-export const PREVIEW_ROLES = ["main", "health_worker", "village_police", "up_official", "uno"] as const;
-type PreviewRole = (typeof PREVIEW_ROLES)[number];
 const DASHBOARD_ACTIONS = ["worker-report", "feedback"] as const;
 type DashboardAction = (typeof DASHBOARD_ACTIONS)[number];
-const roleMap = { health_worker: "worker", village_police: "police", up_official: "admin", uno: "uno" } as const;
+const roleMap = {
+  health_worker: "worker",
+  village_police: "police",
+  up_official: "admin",
+  up_secretary: "admin",
+  up_chairman: "admin",
+  municipal_secretary: "admin",
+  city_zonal_officer: "admin",
+  municipal_executive_officer: "admin",
+  uno: "uno",
+  ddlg: "district",
+  dc: "district",
+  ddlg_dc: "district",
+  divisional_commissioner: "district",
+  addl_registrar_general: "super",
+  city_corporation_ceo: "admin",
+  registrar_general: "super",
+} as const satisfies Partial<Record<PreviewRole, "worker" | "police" | "admin" | "uno" | "district" | "super">>;
 
 export const Route = createFileRoute("/")({
   validateSearch: (s: Record<string, unknown>): { role?: PreviewRole; action?: DashboardAction } => ({
-    ...(PREVIEW_ROLES.includes(s["role"] as PreviewRole) && s["role"] !== "main"
-      ? { role: s["role"] as PreviewRole }
+    ...(isPreviewRole(s["role"]) && s["role"] !== "main"
+      ? { role: s["role"] }
       : {}),
     ...(DASHBOARD_ACTIONS.includes(s["action"] as DashboardAction)
       ? { action: s["action"] as DashboardAction }
@@ -48,6 +64,7 @@ function Index() {
       key={`${user?.id ?? "preview"}:${preview ?? "main"}:${role}`}
       role={role}
       localAdminPreview={localAdminPreview}
+      {...(preview ? { simulationRole: preview } : {})}
       {...(action ? { initialAction: action } : {})}
       onActionDismiss={() => {
         void navigate({

@@ -213,6 +213,8 @@ export function NationalDashboard() {
         counts={monthlyCounts}
         received={currentMonthCases.length}
         targets={monthlyTargets}
+        reportCases={visibleCases}
+        reportsEnabled={!!user && ["admin", "district", "uno", "super"].includes(user.role)}
         compact
       />
       <section
@@ -409,7 +411,7 @@ export function NationalDashboard() {
         <details className="shrink-0 rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <summary className="flex min-h-8 cursor-pointer list-none items-center gap-2 font-semibold">
             <Megaphone className="h-4 w-4 text-teal-800 dark:text-teal-300" />
-            {L("উপজেলার সরকারি বিজ্ঞপ্তি সম্পাদনা", "Manage Upazila announcement")}
+            {L("উপজেলার বিজ্ঞপ্তি সম্পাদনা", "Manage Upazila announcement")}
           </summary>
           <div className="mt-2 grid gap-2 md:grid-cols-2">
             <label className="space-y-1 text-sm font-medium">

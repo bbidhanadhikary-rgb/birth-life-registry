@@ -2,6 +2,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowUpRight,
+  Activity,
   Baby,
   CalendarCheck2,
   ChartNoAxesCombined,
@@ -21,6 +22,7 @@ import {
   Inbox,
   MapPinned,
   Megaphone,
+  MapPin,
   MessageSquare,
   MessageSquareWarning,
   PencilLine,
@@ -59,6 +61,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, useCaseHelpers } from "@/components/shared";
 import { downloadCSV, printPDF } from "@/lib/report";
 import { seedState } from "@/lib/seed";
+import { isPolicyReadOnlyRole, type PreviewRole } from "@/lib/dashboard-roles";
+import { simulateJurisdiction } from "@/lib/jurisdiction-simulation";
 import {
   MonthlyProgressCard,
   type MonthlyProgressCounts,
@@ -478,7 +482,7 @@ function QuickAccessCard({
   onActivate: () => void;
 }) {
   const className =
-    "role-action-card group flex min-h-[3.5rem] cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-left shadow-sm transition-all hover:scale-[1.02] hover:border-emerald-500 hover:bg-emerald-50/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 max-[360px]:min-h-12 max-[360px]:gap-1.5 max-[360px]:px-2 sm:min-h-[3.75rem] sm:gap-3 sm:px-4 max-sm:flex-col max-sm:justify-center max-sm:px-1 max-sm:py-1 max-sm:text-center";
+    "role-action-card group flex min-h-[3.5rem] cursor-pointer items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-1 text-left shadow-sm transition-all hover:scale-[1.02] hover:border-emerald-500 hover:bg-emerald-50/60 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 max-[360px]:min-h-12 max-[360px]:gap-1.5 max-[360px]:px-2 sm:min-h-[3.75rem] sm:gap-3 sm:px-4 max-sm:flex-col max-sm:justify-center max-sm:px-1 max-sm:py-1 max-sm:text-center";
   const content = (
     <>
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white transition-colors group-hover:bg-emerald-800 max-sm:hidden">
@@ -548,16 +552,20 @@ function QuickAccessCard({
 
 export function RegistrationDashboard({
   role = "public",
+  simulationRole,
   localAdminPreview = false,
   initialAction,
   onActionDismiss,
 }: {
   role?: DashboardRole;
+  simulationRole?: PreviewRole;
   localAdminPreview?: boolean;
   initialAction?: "worker-report" | "feedback";
   onActionDismiss?: () => void;
 }) {
   const { state, L, n, user, demoMode, patchCase } = useApp();
+  const simulationEnabled = import.meta.env.DEV && simulationRole !== undefined;
+  const readOnlyPolicyPanel = isPolicyReadOnlyRole(simulationRole);
   const [localPreviewSeed] = useState(seedState);
   const [clientReady, setClientReady] = useState(false);
   useEffect(() => setClientReady(true), []);
@@ -721,14 +729,18 @@ export function RegistrationDashboard({
   );
   const roleScopedCases = useMemo(
     () => {
-      if (isLocalAdminPreview) return localPreviewCases;
+      if (isLocalAdminPreview) {
+        return simulationEnabled ? masterPreviewCases : localPreviewCases;
+      }
       if (!user) {
+        if (simulationEnabled) return masterPreviewCases;
         return roleConfig === "public"
           ? import.meta.env.DEV
             ? masterPreviewCases
             : state.cases
           : [];
       }
+      if (demoMode && simulationEnabled) return state.cases;
       if (demoMode && (user.role === "worker" || user.role === "police")) {
         return state.cases.filter(
           (item) =>
@@ -739,13 +751,42 @@ export function RegistrationDashboard({
       }
       return scopedCases(state, user);
     },
-    [demoMode, isLocalAdminPreview, localPreviewCases, masterPreviewCases, roleConfig, state, user],
+    [demoMode, isLocalAdminPreview, localPreviewCases, masterPreviewCases, roleConfig, simulationEnabled, state, user],
+  );
+  const simulationUpazilas = useMemo(() => {
+    if (!simulationEnabled || !user || demoMode || user.role === "super") {
+      return state.upazilas;
+    }
+    const scoped = state.upazilas.filter((area) => {
+      if (user.role === "district") return area.districtEn === user.districtId;
+      return area.id === user.upazilaId;
+    });
+    if (user.role === "admin" || user.role === "worker" || user.role === "police") {
+      return scoped.map((area) => ({
+        ...area,
+        unions: area.unions.filter((union) => union.id === user.unionId),
+      }));
+    }
+    return scoped;
+  }, [demoMode, simulationEnabled, state.upazilas, user]);
+  const jurisdictionScope = useMemo(
+    () =>
+      simulationEnabled && simulationRole
+        ? simulateJurisdiction(
+            roleScopedCases,
+            simulationUpazilas,
+            simulationRole,
+            demoMode ? null : user,
+          )
+        : null,
+    [demoMode, roleScopedCases, simulationEnabled, simulationRole, simulationUpazilas, user],
   );
   const filteredCases = useMemo(() => {
+    if (jurisdictionScope) return jurisdictionScope.cases;
     return user && (user.role === "worker" || user.role === "police")
       ? roleScopedCases.filter((item) => item.ward === user.ward)
       : roleScopedCases;
-  }, [roleScopedCases, user]);
+  }, [jurisdictionScope, roleScopedCases, user]);
   const currentMonth = monthKey(Date.now());
   const monthCases = filteredCases.filter((item) => monthKey(item.createdAt) === currentMonth);
   useEffect(() => {
@@ -797,7 +838,8 @@ export function RegistrationDashboard({
       active = false;
     };
   }, [L, demoMode, user]);
-  const hasWardAggregate = !demoMode && (user?.role === "worker" || user?.role === "police");
+  const hasWardAggregate =
+    !simulationEnabled && !demoMode && (user?.role === "worker" || user?.role === "police");
   const localMonthlyCounts: MonthlyProgressCounts = {
     birth: {
       pending: monthCases.filter((item) => item.type === "birth" && item.status === "pending").length,
@@ -830,21 +872,22 @@ export function RegistrationDashboard({
   });
   const selectedUnionCount = scopedUpazilas.reduce((count, item) => count + item.unions.length, 0);
   const monthlyTargetScale =
-    roleConfig !== "public" && !user && !isLocalAdminPreview
+    jurisdictionScope?.targetScale ??
+    (roleConfig !== "public" && !user && !isLocalAdminPreview
       ? 0
       : roleConfig === "uno" && user?.role === "uno"
-      ? assignedUpazila?.unions.length ?? 1
-      : roleConfig === "admin" && (user?.role === "admin" || isLocalAdminPreview)
-        ? 1
-        : roleConfig === "worker" && user?.role === "worker"
-          ? 1 / assignedWardCount
-          : roleConfig === "police" && user?.role === "police"
+        ? assignedUpazila?.unions.length ?? 1
+        : roleConfig === "admin" && (user?.role === "admin" || isLocalAdminPreview)
+          ? 1
+          : roleConfig === "worker" && user?.role === "worker"
             ? 1 / assignedWardCount
-            : roleConfig === "uno"
-              ? Math.max(1, selectedUnionCount)
-              : roleConfig === "worker" || roleConfig === "police"
-                ? 1 / 9
-                : Math.max(1, selectedUnionCount);
+            : roleConfig === "police" && user?.role === "police"
+              ? 1 / assignedWardCount
+              : roleConfig === "uno"
+                ? Math.max(1, selectedUnionCount)
+                : roleConfig === "worker" || roleConfig === "police"
+                  ? 1 / 9
+                  : Math.max(1, selectedUnionCount));
   const monthlyTargets = {
     birth: Math.ceil(TARGET.birth * monthlyTargetScale),
     death: Math.ceil(TARGET.death * monthlyTargetScale),
@@ -905,7 +948,9 @@ export function RegistrationDashboard({
         );
   const scopeUpazila = state.upazilas.find((item) => item.id === user?.upazilaId);
   const scopeUnion = scopeUpazila?.unions.find((item) => item.id === user?.unionId);
-  const scopeLabel = isLocalAdminPreview
+  const scopeLabel = jurisdictionScope
+    ? `${L(jurisdictionScope.labelBn, jurisdictionScope.labelEn)} · ${L("ডেভেলপমেন্ট সিমুলেশন", "Development simulation")}`
+    : isLocalAdminPreview
     ? `${L("মণিরামপুর", "Manirampur")} · ${L("০১ নং রোহিতা", "01 No. Rohita")} · ${L("লোকাল নমুনা ডেটা", "Local mock data")}`
     : !user || user.role === "super"
     ? L("জাতীয় পর্যায়", "National scope")
@@ -942,6 +987,13 @@ export function RegistrationDashboard({
   };
   const closeDialog = dismissActiveCard;
   const openCaseDialog = (kind: "metric" | "action", id: string) => {
+    if (
+      readOnlyPolicyPanel &&
+      kind === "action" &&
+      !["worker-report", "feedback"].includes(id)
+    ) {
+      return;
+    }
     if (roleConfig === "worker" && (id === "birth-list" || id === "death-list")) {
       void navigate({
         to: "/worker-applications/$type",
@@ -952,6 +1004,7 @@ export function RegistrationDashboard({
     setActiveCard({ kind, id });
   };
   const rejectApplication = async (item: RegCase) => {
+    if (readOnlyPolicyPanel) return;
     if (user?.role !== "admin") return;
     if (!window.confirm(L("এই আবেদনটি বাতিল করবেন?", "Reject this application?"))) return;
     if (await patchCase(item.id, { status: "rejected" })) {
@@ -963,6 +1016,7 @@ export function RegistrationDashboard({
     item: RegCase,
     stage: "first" | "second" | "final" = "first",
   ) => {
+    if (readOnlyPolicyPanel) return;
     if (user?.role !== "admin" && !isLocalAdminPreview) return;
     const personName = L(item.name.bn, item.name.en);
     const stageLabel = stage === "first" ? "১ম" : stage === "second" ? "২য়" : "চূড়ান্ত";
@@ -978,6 +1032,7 @@ export function RegistrationDashboard({
   };
   const saveAdminDraft = async () => {
     if (
+      readOnlyPolicyPanel ||
       (user?.role !== "admin" && !isLocalAdminPreview) ||
       (!user?.unionId && !isLocalAdminPreview) ||
       !adminDraft ||
@@ -1034,6 +1089,7 @@ export function RegistrationDashboard({
     }
   };
   const toggleRegistered = async (item: RegCase) => {
+    if (readOnlyPolicyPanel) return;
     if (user?.role !== "admin" && !isLocalAdminPreview) return;
     if (item.status === "completed") {
       if (isLocalAdminPreview) {
@@ -1254,9 +1310,16 @@ export function RegistrationDashboard({
       <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-1 px-4 py-1 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-1.5 sm:px-6 sm:py-1.5 lg:px-8">
         <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
           <div className="flex min-h-0 flex-col justify-center">
-            <span className="mb-1 inline-flex w-fit items-center gap-2 rounded-full border border-teal-700/15 bg-white px-3 py-1 text-xs font-semibold text-teal-800 shadow-[0_0_18px_-8px_rgba(13,148,136,0.55)] max-[360px]:mb-1">
-              <span className="h-2 w-2 rounded-full bg-teal-500" aria-hidden="true" />
-              {L("জাতীয় প্রশাসনিক অগ্রগতি", "National administrative progress")}
+            <span className="mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-100 via-white to-slate-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base">
+              <MapPin
+                aria-hidden="true"
+                className="h-5 w-5 shrink-0 text-emerald-700 sm:h-6 sm:w-6"
+              />
+              <span className="min-w-0">
+                {jurisdictionScope
+                  ? L(jurisdictionScope.labelBn, jurisdictionScope.labelEn)
+                  : scopeLabel || L("জাতীয় পর্যায়", "National scope")}
+              </span>
             </span>
             <h1 className="max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
               ই-নিবন্ধন ট্র্যাকার
@@ -1270,12 +1333,36 @@ export function RegistrationDashboard({
                 "A system to ensure birth and death registration within 365 days",
               )}
             </p>
+            {readOnlyPolicyPanel && (
+              <p className="mt-2 w-fit rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-900">
+                {L("(নীতিমালা ও পর্যবেক্ষণ প্যানেল)", "(Policy & Oversight Panel)")}
+              </p>
+            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white/90 px-2.5 py-1 text-[11px] font-bold text-emerald-800 shadow-sm sm:text-xs">
+                <Activity className="h-3.5 w-3.5" aria-hidden="true" />
+                {L("লাইভ সিস্টেম আপডেট", "Live system updates")}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-white/75 px-2.5 py-1 text-[11px] font-semibold text-slate-700 sm:text-xs">
+                {L(`${n(filteredCases.length)}টি রেকর্ড পর্যবেক্ষণে`, `${n(filteredCases.length)} records monitored`)}
+              </span>
+              {jurisdictionScope && (
+                <span className="rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-bold text-violet-800 shadow-sm sm:text-xs">
+                  {L("ডেভেলপমেন্ট সিমুলেশন", "Development simulation")}
+                </span>
+              )}
+            </div>
           </div>
 
           <MonthlyProgressCard
             counts={monthlyCounts}
             received={monthlyReceived}
             targets={monthlyTargets}
+            reportCases={filteredCases}
+            reportsEnabled={
+              isLocalAdminPreview ||
+              !!user && ["admin", "district", "uno", "super"].includes(user.role)
+            }
             featured
             {...(hasWardAggregate && !wardMonthlyCounts
               ? {
@@ -1288,7 +1375,7 @@ export function RegistrationDashboard({
           />
         </div>
 
-        <section className="shrink-0" aria-labelledby="quick-actions-heading">
+        {!readOnlyPolicyPanel && <section className="shrink-0" aria-labelledby="quick-actions-heading">
           <div className="mb-1">
             <h2
               id="quick-actions-heading"
@@ -1311,7 +1398,7 @@ export function RegistrationDashboard({
               />
             ))}
           </div>
-        </section>
+        </section>}
       </div>
       )}
       <Dialog

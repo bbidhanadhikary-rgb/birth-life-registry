@@ -1,7 +1,27 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { BookOpen, Headphones, Languages, LogIn, LogOut, Moon, Sun, Landmark, WifiOff } from "lucide-react";
+import {
+  Award,
+  BookOpen,
+  Building2,
+  ChartNoAxesCombined,
+  ChevronDown,
+  FileText,
+  Headphones,
+  HeartPulse,
+  Home,
+  Languages,
+  LogIn,
+  LogOut,
+  MessageSquareWarning,
+  Moon,
+  MapPinned,
+  ShieldCheck,
+  Sun,
+  Landmark,
+  WifiOff,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +30,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { roleLabel, useApp } from "@/lib/store";
+import {
+  EXECUTIVE_PREVIEW_ROLES,
+  isPreviewRole,
+  type ExecutivePreviewRole,
+  type PreviewRole,
+} from "@/lib/dashboard-roles";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { passwordSignIn, requestPasswordReset, sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth.functions";
@@ -29,19 +55,25 @@ export function Header() {
     enterDemoLogin,
   } = useApp();
   const [dlg, setDlg] = useState<null | "login" | "manual" | "support">(null);
+  const [isExecutiveMenuOpen, setIsExecutiveMenuOpen] = useState(false);
   const nav = useNavigate();
   const location = useRouterState({ select: (routerState) => routerState.location });
   const headerRef = useRef<HTMLElement>(null);
+  const executiveMenuRef = useRef<HTMLDivElement>(null);
   const routeSearch = location.search;
   const previewRole =
     typeof routeSearch === "object" && routeSearch !== null && "role" in routeSearch
       ? routeSearch["role"]
       : undefined;
   const selectedPreviewRole =
-    typeof previewRole === "string" && previewRole.trim() ? previewRole : undefined;
+    isPreviewRole(previewRole) && previewRole !== "main" ? previewRole : undefined;
   const signedInRole = user
-    ? user.role === "super" || user.role === "district"
-      ? "uno"
+    ? user.role === "super"
+      ? "registrar_general"
+      : user.role === "district"
+        ? "ddlg_dc"
+        : user.role === "uno"
+          ? "uno"
       : user.role === "worker"
         ? "health_worker"
         : user.role === "police"
@@ -60,14 +92,46 @@ export function Header() {
   const isRootDashboard =
     location.pathname === "/" || location.pathname === "" || location.pathname === "/index";
   const isMainActive =
-    isRootDashboard && (!selectedPreviewRole || selectedPreviewRole === "main");
-  const activeRole =
-    pathRole ??
-    (isRootDashboard
-      ? selectedPreviewRole && selectedPreviewRole !== "main"
-        ? selectedPreviewRole
-        : "main"
-      : signedInRole ?? selectedPreviewRole);
+    isRootDashboard && !selectedPreviewRole;
+  const [currentRole, setCurrentRole] = useState<PreviewRole>(
+    selectedPreviewRole ?? signedInRole ?? "main",
+  );
+  const activeRole = pathRole ?? currentRole;
+  const isExecutiveRole = (role: string | undefined): role is ExecutivePreviewRole =>
+    role !== undefined &&
+    EXECUTIVE_PREVIEW_ROLES.some((executiveRole) => executiveRole === role);
+  const executiveActive = isExecutiveRole(activeRole);
+
+  useEffect(() => {
+    if (selectedPreviewRole) {
+      setCurrentRole(selectedPreviewRole);
+    } else if (isRootDashboard) {
+      setCurrentRole(signedInRole ?? "main");
+    } else if (pathRole) {
+      setCurrentRole(pathRole);
+    }
+  }, [isRootDashboard, pathRole, selectedPreviewRole, signedInRole]);
+
+  useEffect(() => {
+    if (!isExecutiveMenuOpen) return;
+    const closeOnOutsideMouseDown = (event: MouseEvent) => {
+      if (
+        event.target instanceof Node &&
+        !executiveMenuRef.current?.contains(event.target)
+      ) {
+        setIsExecutiveMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsExecutiveMenuOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideMouseDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideMouseDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isExecutiveMenuOpen]);
 
   useEffect(() => {
     const header = headerRef.current;
@@ -90,24 +154,28 @@ export function Header() {
   }, []);
 
   const tabs = [
-    [undefined, "মেইন ড্যাশবোর্ড", "Main Dashboard"],
-    ["health_worker", "স্বাস্থ্যকর্মী", "Health Worker"],
-    ["village_police", "গ্রাম পুলিশ", "Village Police"],
-    ["up_official", "ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer"],
-    ["uno", "উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Monitoring Panel"],
+    { role: undefined, previewRole: "main", bn: "মেইন ড্যাশবোর্ড", en: "Main Dashboard", Icon: Home },
+    { role: "health_worker", previewRole: "health_worker", bn: "স্বাস্থ্যকর্মী", en: "Health Worker", Icon: HeartPulse },
+    { role: "village_police", previewRole: "village_police", bn: "গ্রাম পুলিশ", en: "Village Police", Icon: ShieldCheck },
+    { role: "up_secretary", previewRole: "up_secretary", bn: "ইউপি প্রশাসনিক কর্মকর্তা", en: "UP Administrative Officer", Icon: Landmark },
   ] as const;
-  const navigateToDashboardTab = (role: (typeof tabs)[number][0]) => {
+  const navigateToDashboardTab = (
+    role: (typeof tabs)[number]["role"],
+    preview: (typeof tabs)[number]["previewRole"],
+  ) => {
+    setCurrentRole(preview);
+    setIsExecutiveMenuOpen(false);
     if (demoLoginAvailable && role) {
       const demoRole =
         role === "health_worker"
           ? "worker"
           : role === "village_police"
             ? "police"
-            : role === "up_official"
+            : role === "up_secretary"
               ? "admin"
               : "uno";
       enterDemoLogin(demoRole);
-      void nav({ to: "/dashboard" });
+      void nav({ to: "/", search: { role: preview } });
       return;
     }
     if (demoLoginAvailable && !role && demoMode) {
@@ -116,6 +184,32 @@ export function Header() {
     }
     void nav({ to: "/", search: role ? { role } : {} });
   };
+  const executiveRoles = [
+    { role: "municipal_executive_officer", bn: "পৌর নির্বাহী কর্মকর্তা", en: "Pourashava Executive Officer (PEO)", Icon: Landmark },
+    { role: "uno", bn: "উপজেলা নির্বাহী অফিসার - UNO", en: "Upazila Nirbahi Officer - UNO", Icon: Building2 },
+    { role: "ddlg", bn: "উপপরিচালক, স্থানীয় সরকার - DDLG", en: "Deputy Director, Local Government - DDLG", Icon: MapPinned },
+    { role: "dc", bn: "জেলা প্রশাসক - DC", en: "District Commissioner - DC", Icon: MapPinned },
+    { role: "addl_registrar_general", bn: "অতিরিক্ত রেজিস্ট্রার জেনারেল", en: "Additional Registrar General", Icon: Award },
+    { role: "city_corporation_ceo", bn: "সিটি কর্পোরেশনের প্রধান নির্বাহী কর্মকর্তা", en: "City Corporation Chief Executive Officer - CEO", Icon: Building2 },
+    { role: "divisional_commissioner", bn: "বিভাগীয় কমিশনার", en: "Divisional Commissioner", Icon: ChartNoAxesCombined },
+    { role: "registrar_general", bn: "রেজিস্ট্রার জেনারেল", en: "Registrar General", Icon: ShieldCheck },
+  ] as const;
+  const demoRoleForExecutive: Record<ExecutivePreviewRole, "admin" | "uno"> = {
+    municipal_executive_officer: "admin",
+    uno: "uno",
+    ddlg: "uno",
+    dc: "uno",
+    addl_registrar_general: "uno",
+    city_corporation_ceo: "admin",
+    divisional_commissioner: "uno",
+    registrar_general: "uno",
+  };
+  const navigateToExecutiveRole = (role: ExecutivePreviewRole) => {
+    setCurrentRole(role);
+    setIsExecutiveMenuOpen(false);
+    if (demoLoginAvailable) enterDemoLogin(demoRoleForExecutive[role]);
+    void nav({ to: "/", search: { role } });
+  };
 
   return (
     <header ref={headerRef} className="fixed inset-x-0 top-0 z-50 border-b border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-sm">
@@ -123,8 +217,10 @@ export function Header() {
         <div className="w-full px-4 py-1.5 sm:px-6 lg:px-8">
           <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:gap-x-4 lg:gap-x-6">
-              {tabs.map(([role, bn, en]) => {
-                const active = role === undefined ? isMainActive : role === activeRole;
+              {tabs.map(({ role, previewRole: tabPreviewRole, bn, en, Icon }) => {
+                const active = role === undefined
+                  ? isMainActive
+                  : tabPreviewRole === activeRole;
                 return (
                   <Link
                     key={en}
@@ -135,32 +231,92 @@ export function Header() {
                     aria-current={active ? "page" : undefined}
                     onClick={(event) => {
                       event.preventDefault();
-                      navigateToDashboardTab(role);
+                      navigateToDashboardTab(role, tabPreviewRole);
                     }}
                     className={
                       active
-                        ? "whitespace-nowrap rounded-xl bg-white px-4 py-1.5 text-xs font-bold text-emerald-900 shadow-md hover:bg-white sm:text-sm"
-                        : "whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800/50 sm:text-sm"
+                        ? "relative inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-white/15 px-3 py-2 text-xs font-bold text-white shadow-inner ring-1 ring-white/20 backdrop-blur-md after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-emerald-200 sm:text-sm"
+                        : "inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:backdrop-blur-md sm:text-sm"
                     }
                   >
+                    <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
                     {L(bn, en)}
                   </Link>
                 );
               })}
+              <div ref={executiveMenuRef} className="relative">
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={isExecutiveMenuOpen}
+                  aria-controls="executive-panel-menu"
+                  onClick={() => setIsExecutiveMenuOpen((open) => !open)}
+                  className={`relative inline-flex items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold transition-all duration-200 sm:text-sm ${
+                    executiveActive || isExecutiveMenuOpen
+                      ? "bg-white/15 font-bold text-white shadow-inner ring-1 ring-white/20 backdrop-blur-md after:absolute after:inset-x-3 after:-bottom-1 after:h-0.5 after:rounded-full after:bg-emerald-200"
+                      : "text-white hover:bg-white/10 hover:backdrop-blur-md"
+                  }`}
+                >
+                  <ChartNoAxesCombined aria-hidden="true" className="h-4 w-4 shrink-0" />
+                  {L("উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Panel")}
+                  <ChevronDown
+                    aria-hidden="true"
+                    className={`h-4 w-4 transition-transform duration-200 ${isExecutiveMenuOpen ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {isExecutiveMenuOpen && (
+                  <div
+                    id="executive-panel-menu"
+                    role="menu"
+                    aria-label={L("উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Panel")}
+                    className="absolute left-0 top-full z-50 mt-2 w-72 rounded-xl border border-emerald-100 bg-white/95 p-2 text-slate-900 shadow-2xl backdrop-blur-md sm:left-auto sm:right-0"
+                  >
+                    <p className="px-3 py-2 text-xs font-semibold text-slate-500">
+                      {L(
+                        "প্যানেল নির্বাচন · প্রবেশাধিকার অ্যাকাউন্ট অনুযায়ী",
+                        "Select a panel · access remains account-based",
+                      )}
+                    </p>
+                    {executiveRoles.map(({ role, bn, en, Icon }) => {
+                      const active = activeRole === role;
+                      return (
+                        <button
+                          key={role}
+                          type="button"
+                          role="menuitem"
+                          aria-current={active ? "page" : undefined}
+                          onClick={() => navigateToExecutiveRole(role)}
+                          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+                            active
+                              ? "bg-emerald-100 font-bold text-emerald-950"
+                              : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-900"
+                          }`}
+                        >
+                          <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-emerald-700" />
+                          <span className="min-w-0 flex-1">{L(bn, en)}</span>
+                          {active && <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-600" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-4">
+            <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
               <Link
                 to="/"
                 search={(previous) => ({ ...previous, action: "worker-report" })}
-                className="shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800/50 sm:text-sm"
+                className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:backdrop-blur-md sm:text-sm"
               >
+                <FileText aria-hidden="true" className="h-4 w-4 shrink-0" />
                 {L("রিপোর্ট", "Reports")}
               </Link>
               <Link
                 to="/"
                 search={(previous) => ({ ...previous, action: "feedback" })}
-                className="shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800/50 sm:text-sm"
+                className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-xs font-semibold text-white transition-all duration-200 hover:bg-white/10 hover:backdrop-blur-md sm:text-sm"
               >
+                <MessageSquareWarning aria-hidden="true" className="h-4 w-4 shrink-0" />
                 {L("অভিযোগ ও পরামর্শ", "Complaints and feedback")}
               </Link>
             </div>
@@ -396,7 +552,7 @@ function ManualDialog({ open, onClose }: { open: boolean; onClose: () => void })
     [L("প্রশাসনিক কর্মকর্তা", "Administrative Officer"), [
       L("ইউনিয়নের সব আবেদন দেখুন, মন্তব্য ও অবস্থা হালনাগাদ করুন", "Review union cases, add remarks, update status"),
       L("গ্রাম পুলিশকে যাচাইয়ের কাজ দিন", "Assign verification to Village Police"),
-      L("সরকারি নিবন্ধন নম্বর দিয়ে কেস সম্পন্ন করুন", "Close cases with the Government Registration Number"),
+      L("নিবন্ধন নম্বর দিয়ে কেস সম্পন্ন করুন", "Close cases with the registration number"),
     ]],
     [L("গ্রাম পুলিশ", "Village Police"), [
       L("নির্ধারিত বাড়ির তালিকা দেখুন", "See assigned houses"),

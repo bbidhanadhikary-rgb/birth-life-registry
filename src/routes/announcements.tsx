@@ -6,7 +6,7 @@ export const Route = createFileRoute("/announcements")({
   head: () => ({
     meta: [
       { title: "Announcements — E-Registration Tracker" },
-      { name: "description", content: "Official birth and death registration notices." },
+      { name: "description", content: "Birth and death registration notices." },
     ],
   }),
   component: AnnouncementsPage,
@@ -35,7 +35,7 @@ function AnnouncementsPage() {
           </span>
           <div>
             <p className="text-sm font-semibold text-emerald-800">
-              {L("সরকারি ঘোষণা", "Official announcements")}
+              {L("জরুরি ঘোষণা", "Announcements")}
             </p>
             <h1 className="font-display text-2xl font-bold text-slate-900 sm:text-3xl">
               {L("জরুরি ঘোষণা ও নোটিশ বোর্ড", "Emergency announcements and notice board")}
@@ -63,7 +63,7 @@ function AnnouncementsPage() {
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-emerald-900">
-                      {area ? L(area.bn, area.en) : L("সরকারি দপ্তর", "Government office")}
+                      {area ? L(area.bn, area.en) : L("দপ্তর", "Office")}
                     </span>
                     {!notice.active && (
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">

@@ -25,7 +25,7 @@ export function CaseReview({
 
   const setStatus = async (s: Status) => {
     if (s === "completed") {
-      if (!/^\d{17}$/.test(regNo)) { toast.error(L("সম্পন্ন করতে ১৭ অঙ্কের সরকারি নিবন্ধন নম্বর দিন", "Enter the 17-digit Govt. Registration Number to complete")); return; }
+      if (!/^\d{17}$/.test(regNo)) { toast.error(L("সম্পন্ন করতে ১৭ অঙ্কের নিবন্ধন নম্বর দিন", "Enter the 17-digit registration number to complete")); return; }
       if (!(await patchCase(c.id, { status: s, regNo }))) return;
     } else if (!(await patchCase(c.id, { status: s }))) return;
     toast.success(L("অবস্থা হালনাগাদ হয়েছে", "Status updated"));
@@ -80,13 +80,13 @@ export function CaseReview({
           </Select>
           {dedicatedCompletion && c.status !== "completed" && c.status !== "rejected" ? (
             <>
-              <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("সরকারি নিবন্ধন নং (১৭ অঙ্ক)", "Govt. Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} />
+              <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("নিবন্ধন নং (১৭ অঙ্ক)", "Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} />
               <Button className="bg-emerald-800 text-white hover:bg-emerald-900" onClick={() => setStatus("completed")}>
                 {L("বিডিআরআইএস-এ সম্পন্ন হিসেবে চিহ্নিত করুন", "Mark as Completed (BDRIS Status Done)")}
               </Button>
             </>
           ) : (
-            <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("সরকারি নিবন্ধন নং (১৭ অঙ্ক)", "Govt. Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} />
+            <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("নিবন্ধন নং (১৭ অঙ্ক)", "Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} />
           )}
           {!c.police && c.status !== "completed" && c.status !== "rejected" && (
             <Button variant="outline" onClick={async () => { if (!(await patchCase(c.id, { police: { epiCard: false, parentNid: false, collected: false }, status: "progress" }))) return; toast.success(L("গ্রাম পুলিশকে কাজ দেওয়া হয়েছে", "Task sent to Village Police")); }}>
