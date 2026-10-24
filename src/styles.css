@@ -129,8 +129,24 @@
   }
 }
 
+.monthly-remaining-pulse {
+  animation: monthly-remaining-pulse 5s ease-in-out infinite;
+}
+
+@keyframes monthly-remaining-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.25;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .announcement-track {
+  .announcement-track,
+  .monthly-remaining-pulse {
     animation: none;
   }
 }

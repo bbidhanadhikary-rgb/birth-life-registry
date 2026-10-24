@@ -15,17 +15,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { passwordSignIn, requestPasswordReset, sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth.functions";
 
 export function Header() {
-  const { user, L, lang, toggleLang, dark, toggleTheme, logout, online, demoLoginAvailable } = useApp();
+  const {
+    user,
+    L,
+    lang,
+    toggleLang,
+    dark,
+    toggleTheme,
+    logout,
+    online,
+    demoLoginAvailable,
+    demoMode,
+    enterDemoLogin,
+  } = useApp();
   const [dlg, setDlg] = useState<null | "login" | "manual" | "support">(null);
   const nav = useNavigate();
   const location = useRouterState({ select: (routerState) => routerState.location });
-  const showStaffLinks = Boolean(user);
   const headerRef = useRef<HTMLElement>(null);
   const routeSearch = location.search;
   const previewRole =
     typeof routeSearch === "object" && routeSearch !== null && "role" in routeSearch
       ? routeSearch["role"]
       : undefined;
+  const selectedPreviewRole =
+    typeof previewRole === "string" && previewRole.trim() ? previewRole : undefined;
   const signedInRole = user
     ? user.role === "super" || user.role === "district"
       ? "uno"
@@ -44,14 +57,17 @@ export function Header() {
       : location.pathname === "/monitoring"
         ? "uno"
         : undefined;
+  const isRootDashboard =
+    location.pathname === "/" || location.pathname === "" || location.pathname === "/index";
+  const isMainActive =
+    isRootDashboard && (!selectedPreviewRole || selectedPreviewRole === "main");
   const activeRole =
     pathRole ??
-    signedInRole ??
-    (typeof previewRole === "string"
-      ? previewRole
-      : location.pathname === "/"
-        ? "main"
-        : undefined);
+    (isRootDashboard
+      ? selectedPreviewRole && selectedPreviewRole !== "main"
+        ? selectedPreviewRole
+        : "main"
+      : signedInRole ?? selectedPreviewRole);
 
   useEffect(() => {
     const header = headerRef.current;
@@ -80,15 +96,35 @@ export function Header() {
     ["up_official", "ইউপি প্রশাসনিক কর্মকর্তা", "UP Administrative Officer"],
     ["uno", "উচ্চপর্যায়ের নির্বাহী প্যানেল", "Executive Monitoring Panel"],
   ] as const;
+  const navigateToDashboardTab = (role: (typeof tabs)[number][0]) => {
+    if (demoLoginAvailable && role) {
+      const demoRole =
+        role === "health_worker"
+          ? "worker"
+          : role === "village_police"
+            ? "police"
+            : role === "up_official"
+              ? "admin"
+              : "uno";
+      enterDemoLogin(demoRole);
+      void nav({ to: "/dashboard" });
+      return;
+    }
+    if (demoLoginAvailable && !role && demoMode) {
+      void logout().then(() => nav({ to: "/", search: {} }));
+      return;
+    }
+    void nav({ to: "/", search: role ? { role } : {} });
+  };
 
   return (
     <header ref={headerRef} className="fixed inset-x-0 top-0 z-50 border-b border-emerald-700 bg-gradient-to-r from-[#70c158] to-[#5cb84b] text-white shadow-sm">
       <nav aria-label={L("ড্যাশবোর্ড নির্বাচন", "Dashboard switcher")} className="bg-emerald-900/90">
         <div className="w-full px-4 py-1.5 sm:px-6 lg:px-8">
-          <div className="flex w-full flex-wrap items-center justify-between gap-x-1 gap-y-1">
-            <div className="flex flex-wrap items-center gap-1">
+          <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 sm:gap-x-4 lg:gap-x-6">
               {tabs.map(([role, bn, en]) => {
-                const active = role === activeRole;
+                const active = role === undefined ? isMainActive : role === activeRole;
                 return (
                   <Link
                     key={en}
@@ -97,6 +133,10 @@ export function Header() {
                     activeOptions={{ exact: true, includeSearch: true }}
                     resetScroll={false}
                     aria-current={active ? "page" : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      navigateToDashboardTab(role);
+                    }}
                     className={
                       active
                         ? "whitespace-nowrap rounded-xl bg-white px-4 py-1.5 text-xs font-bold text-emerald-900 shadow-md hover:bg-white sm:text-sm"
@@ -108,24 +148,22 @@ export function Header() {
                 );
               })}
             </div>
-            {showStaffLinks && (
-              <div className="ml-auto flex flex-wrap items-center gap-4">
-                <Link
-                  to="/"
-                  search={(previous) => ({ ...previous, action: "worker-report" })}
-                  className="shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-emerald-50 hover:bg-emerald-700 sm:text-sm"
-                >
-                  {L("রিপোর্ট", "Reports")}
-                </Link>
-                <Link
-                  to="/"
-                  search={(previous) => ({ ...previous, action: "feedback" })}
-                  className="shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-emerald-50 hover:bg-emerald-700 sm:text-sm"
-                >
-                  {L("অভিযোগ ও পরামর্শ", "Complaints and feedback")}
-                </Link>
-              </div>
-            )}
+            <div className="ml-auto flex shrink-0 items-center gap-3 sm:gap-4">
+              <Link
+                to="/"
+                search={(previous) => ({ ...previous, action: "worker-report" })}
+                className="shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800/50 sm:text-sm"
+              >
+                {L("রিপোর্ট", "Reports")}
+              </Link>
+              <Link
+                to="/"
+                search={(previous) => ({ ...previous, action: "feedback" })}
+                className="shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800/50 sm:text-sm"
+              >
+                {L("অভিযোগ ও পরামর্শ", "Complaints and feedback")}
+              </Link>
+            </div>
           </div>
         </div>
       </nav>
