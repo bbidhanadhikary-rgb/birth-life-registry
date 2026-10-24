@@ -87,9 +87,16 @@
   display: flex;
   width: max-content;
   animation: announcement-marquee 28s linear infinite;
+  will-change: transform;
 }
 
-.announcement-viewport:hover .announcement-track {
+.announcement-item {
+  flex: none;
+  padding-inline-end: 3rem;
+}
+
+.announcement-viewport:hover .announcement-track,
+.announcement-viewport:focus-within .announcement-track {
   animation-play-state: paused;
 }
 

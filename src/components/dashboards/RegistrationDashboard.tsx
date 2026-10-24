@@ -710,7 +710,7 @@ export function RegistrationDashboard({
     },
   ];
   const roleConfig = role === "super" || role === "district" ? "uno" : role;
-  const roleActionItems = roleConfig === "public"
+  const roleActionItems = readOnlyPolicyPanel || roleConfig === "public"
     ? publicActions
     : [
         ...roleActions[roleConfig],
@@ -1380,7 +1380,7 @@ export function RegistrationDashboard({
           />
         </div>
 
-        {!readOnlyPolicyPanel && <section className="shrink-0" aria-labelledby="quick-actions-heading">
+        <section className="shrink-0" aria-labelledby="quick-actions-heading">
           <div className="mb-1">
             <h2
               id="quick-actions-heading"
@@ -1403,8 +1403,7 @@ export function RegistrationDashboard({
               />
             ))}
           </div>
-        </section>}
-        {canViewWardKpis && <WardKpiPanel cases={filteredCases} />}
+        </section>
       </div>
       )}
       <Dialog
@@ -1539,13 +1538,16 @@ export function RegistrationDashboard({
                   </section>
                 </div>
               ) : activeCard?.id === "worker-report" ? (
-                <div className="flex flex-wrap gap-2">
-                  <Button onClick={() => downloadCSV(rows(actionCases), "registration-report.csv")}>
-                    <Download className="mr-2 h-4 w-4" />{L("CSV ডাউনলোড", "Download CSV")}
-                  </Button>
-                  <Button variant="outline" onClick={() => printPDF(L("নিবন্ধন প্রতিবেদন", "Registration report"), rows(actionCases))}>
-                    <FileText className="mr-2 h-4 w-4" />{L("PDF / প্রিন্ট", "PDF / Print")}
-                  </Button>
+                <div className="space-y-4">
+                  {canViewWardKpis && <WardKpiPanel cases={actionCases} />}
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => downloadCSV(rows(actionCases), "registration-report.csv")}>
+                      <Download className="mr-2 h-4 w-4" />{L("CSV ডাউনলোড", "Download CSV")}
+                    </Button>
+                    <Button variant="outline" onClick={() => printPDF(L("নিবন্ধন প্রতিবেদন", "Registration report"), rows(actionCases))}>
+                      <FileText className="mr-2 h-4 w-4" />{L("PDF / প্রিন্ট", "PDF / Print")}
+                    </Button>
+                  </div>
                 </div>
               ) : activeCard?.id === "feedback" ? (
                 !user ? (

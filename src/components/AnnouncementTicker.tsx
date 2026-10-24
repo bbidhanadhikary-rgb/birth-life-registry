@@ -27,7 +27,7 @@ export function AnnouncementTicker() {
       role="region"
       aria-label={L("বিজ্ঞপ্তি", "Announcement")}
     >
-      <div className="mx-auto flex w-full max-w-none items-center gap-3 px-4 py-1.5 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-none items-center gap-2 px-2 py-1.5 sm:gap-3 sm:px-6 lg:px-8">
         <Link
           to="/announcements"
           aria-label={L("সব বিজ্ঞপ্তি দেখুন", "View all announcements")}
@@ -36,20 +36,26 @@ export function AnnouncementTicker() {
           <Megaphone className="h-4 w-4" aria-hidden="true" />
           <span>{L("বিজ্ঞপ্তি", "Notice")}</span>
         </Link>
-        <span className="shrink-0 text-sm font-semibold text-white">
+        <span className="hidden shrink-0 text-sm font-semibold text-white min-[420px]:inline">
           {noticeArea ? L(noticeArea.bn, noticeArea.en) : L("সারা বাংলাদেশ", "Nationwide")}
         </span>
-        <div className="announcement-viewport min-w-0 flex-1 overflow-hidden" aria-live="polite">
+        <div
+          className="announcement-viewport min-w-0 flex-1 overflow-hidden rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          aria-label={text}
+          aria-live="polite"
+          role="group"
+          tabIndex={0}
+        >
           <div className="announcement-track whitespace-nowrap text-base font-semibold leading-snug text-white sm:text-lg">
-            <span>{text}</span>
-            <span className="mx-12" aria-hidden="true">
+            <span className="announcement-item">{text}</span>
+            <span className="announcement-item" aria-hidden="true">
               {text}
             </span>
           </div>
         </div>
         <Link
           to="/announcements"
-          className="shrink-0 rounded px-2 py-1 text-sm font-bold text-white underline-offset-2 hover:bg-white/15 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          className="shrink-0 rounded px-1.5 py-1 text-xs font-bold text-white underline-offset-2 hover:bg-white/15 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:px-2 sm:text-sm"
         >
           {L("সব নোটিশ", "All notices")}
         </Link>
