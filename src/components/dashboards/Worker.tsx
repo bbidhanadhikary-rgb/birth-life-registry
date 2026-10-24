@@ -39,6 +39,7 @@ import { useCaseHelpers } from "@/components/shared";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { compressImage } from "@/lib/compress-image";
+import { isValidBrn, isValidNid, normalizeBdDigits } from "@/lib/bd-identifiers";
 import { checkCaseDuplicate } from "@/lib/case.functions";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { downloadCSV, printPDF } from "@/lib/report";
@@ -356,7 +357,7 @@ export function RegForm({
   onCancel?: () => void;
   onEdit?: () => void;
 }) {
-  const { L, n, user, state, addCase, updateCase, demoMode, enterDemoLogin } = useApp();
+  const { L, n, user, state, addCase, updateCase, demoMode, online, enterDemoLogin } = useApp();
   const checkForDuplicate = useServerFn(checkCaseDuplicate);
   const upazila = user ? state.upazilas.find((area) => area.id === user.upazilaId) : undefined;
   const union = upazila?.unions.find((area) => area.id === user?.unionId);
@@ -829,11 +830,11 @@ export function RegForm({
       setError(L("আবেদনকারীর নাম ও সম্পর্ক পূরণ করুন", "Enter the applicant's name and relationship"));
       return;
     }
-    if (type === "death" && !/^(\d{10}|\d{13}|\d{17})$/.test(nid)) {
+    if (!isValidNid(nid)) {
       setError(
         L(
-          "NID/জন্ম নিবন্ধন নম্বর ১০, ১৩ বা ১৭ অঙ্কের হতে হবে",
-          "NID/BRN must be 10, 13 or 17 digits",
+          "NID ১০, ১৩ বা ১৭ অঙ্কের হতে হবে",
+          "NID must contain 10, 13 or 17 digits",
         ),
       );
       return;
@@ -859,7 +860,7 @@ export function RegForm({
       );
       return;
     }
-    if ((fatherBrn && !/^\d{17}$/.test(fatherBrn)) || (motherBrn && !/^\d{17}$/.test(motherBrn))) {
+    if ((fatherBrn && !isValidBrn(fatherBrn)) || (motherBrn && !isValidBrn(motherBrn))) {
       setError(L("পিতা/মাতার জন্ম নিবন্ধন নম্বর ১৭ অঙ্কের হতে হবে", "Father's/mother's BRN must be exactly 17 digits"));
       return;
     }
@@ -1068,6 +1069,19 @@ export function RegForm({
         <p className={`${type === "birth" ? "text-xs" : "text-sm"} text-slate-500`}>
           {type === "birth" ? "Birth Registration Application" : "Death Registration Application"}
         </p>
+        {!online && (
+          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-950" role="status">
+            {L(
+              "অফলাইন: খসড়া এই ডিভাইসে সংরক্ষিত হবে। জমা দেওয়া ফাইলবিহীন আবেদন সংযোগ ফিরলে সিঙ্ক হবে।",
+              "Offline: this draft is saved on this device. Submitted applications without files will sync when connection returns.",
+            )}
+          </p>
+        )}
+        {online && (
+          <p className="mt-1 text-[11px] font-medium text-emerald-800" role="status">
+            {L("খসড়া স্বয়ংক্রিয়ভাবে এই ডিভাইসে সংরক্ষিত", "Draft autosaves on this device")}
+          </p>
+        )}
       </div>
 
       {type === "birth" ? (
@@ -1124,8 +1138,14 @@ export function RegForm({
             <BiField label="মাতার নাম" labelEn="Mother's Name" value={mother} onChange={setMother} required compact />
             <FormRow labelBn="পিতা ও মাতার জন্ম নিবন্ধন নং" labelEn="Parent's Birth Registration Numbers" compact>
               <div className="grid grid-cols-2 gap-1.5">
-                <Input className="h-10 px-2 text-sm md:text-sm placeholder:text-xs" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="পিতার BRN" aria-label="পিতার জন্ম নিবন্ধন নম্বর / Father's BRN" aria-invalid={fatherBrn.length > 0 && fatherBrn.length !== 17} value={fatherBrn} onChange={(event) => setFatherBrn(event.target.value.replace(/\D/g, "").slice(0, 17))} />
-                <Input className="h-10 px-2 text-sm md:text-sm placeholder:text-xs" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="মাতার BRN" aria-label="মাতার জন্ম নিবন্ধন নম্বর / Mother's BRN" aria-invalid={motherBrn.length > 0 && motherBrn.length !== 17} value={motherBrn} onChange={(event) => setMotherBrn(event.target.value.replace(/\D/g, "").slice(0, 17))} />
+                <div>
+                  <Input className="h-10 px-2 text-sm md:text-sm placeholder:text-xs" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="পিতার BRN" aria-label="পিতার জন্ম নিবন্ধন নম্বর / Father's BRN" aria-invalid={fatherBrn.length > 0 && !isValidBrn(fatherBrn)} value={fatherBrn} onChange={(event) => setFatherBrn(normalizeBdDigits(event.target.value).replace(/\D/g, "").slice(0, 17))} />
+                  {fatherBrn.length > 0 && !isValidBrn(fatherBrn) && <p className="mt-1 text-[10px] font-medium text-red-700">{L("BRN ১৭ অঙ্কের হতে হবে", "BRN must be 17 digits")}</p>}
+                </div>
+                <div>
+                  <Input className="h-10 px-2 text-sm md:text-sm placeholder:text-xs" autoComplete="off" inputMode="numeric" maxLength={17} placeholder="মাতার BRN" aria-label="মাতার জন্ম নিবন্ধন নম্বর / Mother's BRN" aria-invalid={motherBrn.length > 0 && !isValidBrn(motherBrn)} value={motherBrn} onChange={(event) => setMotherBrn(normalizeBdDigits(event.target.value).replace(/\D/g, "").slice(0, 17))} />
+                  {motherBrn.length > 0 && !isValidBrn(motherBrn) && <p className="mt-1 text-[10px] font-medium text-red-700">{L("BRN ১৭ অঙ্কের হতে হবে", "BRN must be 17 digits")}</p>}
+                </div>
               </div>
             </FormRow>
             {attachmentFields}
@@ -1228,10 +1248,15 @@ export function RegForm({
                 placeholder="১০, ১৩ বা ১৭ অঙ্ক / 10, 13 or 17 digits"
                 required
                 value={nid}
-                onChange={(event) =>
-                  setNid(normalizeBengaliDigits(event.target.value).replace(/\D/g, "").slice(0, 17))
-                }
+                aria-invalid={nid.length > 0 && !isValidNid(nid)}
+                aria-describedby="nid-validation"
+                onChange={(event) => setNid(normalizeBdDigits(event.target.value).replace(/\D/g, "").slice(0, 17))}
               />
+              {nid.length > 0 && !isValidNid(nid) && (
+                <p id="nid-validation" className="mt-1 text-xs font-medium text-red-700" role="alert">
+                  {L("NID ১০, ১৩ বা ১৭ অঙ্কের হতে হবে", "NID must contain 10, 13 or 17 digits")}
+                </p>
+              )}
             </FormRow>
             <FormRow labelBn="মোবাইল নম্বর" labelEn="Mobile Number" required compact><Input className="h-11 text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormRow>
           </div>

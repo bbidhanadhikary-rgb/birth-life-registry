@@ -69,6 +69,7 @@ import {
 } from "@/components/dashboards/MonthlyProgressCard";
 import { LoginDialog } from "@/components/Header";
 import { WorkerApplicationListPage } from "@/components/modules/WorkerApplicationListPage";
+import { WardKpiPanel } from "@/components/dashboards/WardKpiPanel";
 
 type DashboardRole = Role | "public";
 type ActionFilter = "birth" | "death" | "pending" | "progress" | "completed" | "urgent";
@@ -963,6 +964,10 @@ export function RegistrationDashboard({
             ? L(`ওয়ার্ড ${user.ward}`, `Ward ${user.ward}`)
             : null,
         ].filter(Boolean).join(" · ");
+  const canViewWardKpis =
+    simulationEnabled ||
+    isLocalAdminPreview ||
+    (!!user && ["admin", "district", "uno", "super"].includes(user.role));
 
   const quickAccessActions = actions.slice(0, 4);
   const isEntryCard = activeCard?.id === "birth-entry" || activeCard?.id === "death-entry";
@@ -1399,6 +1404,7 @@ export function RegistrationDashboard({
             ))}
           </div>
         </section>}
+        {canViewWardKpis && <WardKpiPanel cases={filteredCases} />}
       </div>
       )}
       <Dialog

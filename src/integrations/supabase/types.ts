@@ -573,6 +573,19 @@ export type Database = {
     }
     Functions: {
       administrative_area_slug: { Args: { value: string }; Returns: string }
+      case_history: {
+        Args: { p_case_id: string }
+        Returns: {
+          action: string
+          at: string
+          client_hint: string | null
+          id: number
+          role: string | null
+          status_from: string | null
+          status_to: string | null
+          user_id: string | null
+        }[]
+      }
       current_district: { Args: never; Returns: string }
       current_union: { Args: never; Returns: string }
       current_upazila: { Args: never; Returns: string }

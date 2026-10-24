@@ -195,6 +195,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [lang, setLang] = useState<Lang>("bn");
   const [dark, setDark] = useState(false);
   const [pending, setPending] = useState<any[]>([]);
+  const syncAttemptSignature = useRef("");
+  const syncingOfflineQueue = useRef(false);
   const prefsReady = useRef(false);
 
   const L = useCallback((bn: string, en: string) => (lang === "bn" ? bn : en), [lang]);
@@ -370,18 +372,48 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [demoMode]);
   useEffect(() => { if (prefsReady.current) localStorage.setItem(QUEUE, JSON.stringify(pending)); }, [pending]);
 
-  // Offline queue: flush when back online
+  // Explicitly submitted offline cases are synced when their owning account reconnects.
   useEffect(() => {
     if (demoMode || !online || !user || (user.role !== "worker" && user.role !== "police") || !pending.length) return;
+    const signature = `${user.id}:${pending.map((row) => String(row.id)).sort().join(",")}`;
+    if (syncingOfflineQueue.current || syncAttemptSignature.current === signature) return;
+    syncAttemptSignature.current = signature;
+    syncingOfflineQueue.current = true;
     (async () => {
-      const left: any[] = [];
-      for (const row of pending) {
-        const { error } = await supabase.from("cases").insert(row);
-        if (error && error.code !== "23505") left.push(row);
+      const left: any[] = pending.filter((row) => row.created_by !== user.id);
+      const ownedRows = pending.filter((row) => row.created_by === user.id);
+      let synced = 0;
+      let firstSyncError: string | undefined;
+      try {
+        for (const row of ownedRows) {
+          const { error } = await supabase.from("cases").insert(row);
+          if (error?.code === "23505") {
+            synced += 1;
+          } else if (error) {
+            left.push(row);
+            firstSyncError ??= error.message;
+          } else {
+            synced += 1;
+          }
+        }
+      } finally {
+        syncingOfflineQueue.current = false;
       }
-      const synced = pending.length - left.length;
-      setPending(left);
-      if (synced) { toast.success(L(`${n(synced)}টি অফলাইন এন্ট্রি সিঙ্ক হয়েছে`, `${synced} offline entries synced`)); void loadData(); }
+      if (synced || left.length !== pending.length) {
+        syncAttemptSignature.current =
+          `${user.id}:${left.map((row) => String(row.id)).sort().join(",")}`;
+        setPending(left);
+      }
+      if (synced) {
+        toast.success(L(`${n(synced)}টি অফলাইন এন্ট্রি সিঙ্ক হয়েছে`, `${synced} offline entries synced`));
+        void loadData();
+      }
+      if (firstSyncError) {
+        console.error("Some offline applications could not be synced", firstSyncError);
+        toast.error(
+          L("কিছু অফলাইন আবেদন সিঙ্ক হয়নি। সংযোগ যাচাই করে পরে আবার চেষ্টা করুন।", "Some offline applications were not synced. Check the connection and try again later."),
+        );
+      }
     })();
   }, [demoMode, online, user, pending, L, n, loadData]);
 

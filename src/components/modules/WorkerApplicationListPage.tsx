@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { CheckCheck, Eye, FileText, Filter, Home, Paperclip, Pencil, Printer } from "lucide-react";
+import { CheckCheck, Clock3, Eye, FileText, Filter, Home, Paperclip, Pencil, Printer } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -21,10 +21,21 @@ import {
 import { StatusBadge, useCaseHelpers } from "@/components/shared";
 import { supabase } from "@/integrations/supabase/client";
 import { getDemoAttachmentPreview, scopedCases, useApp } from "@/lib/store";
+import { roleLabel } from "@/lib/store";
 import type { RegCase } from "@/lib/types";
 
 type StatusFilter = "all" | "pending" | "progress" | "completed" | "issue" | "corrected";
 type AttachmentPreview = { url: string; mimeType?: string };
+type CaseAuditEntry = {
+  id: number;
+  action: string;
+  at: string;
+  client_hint: string | null;
+  role: string | null;
+  status_from: string | null;
+  status_to: string | null;
+  user_id: string | null;
+};
 export type AdministrativeApplicationListOptions = {
   cases: RegCase[];
   actions: (item: RegCase, onReviewPhotos: () => void) => ReactNode;
@@ -49,7 +60,7 @@ export function WorkerApplicationListPage({
   type: "birth" | "death";
   administrative?: AdministrativeApplicationListOptions;
 }) {
-  const { L, n, user, state, findVillage, demoMode } = useApp();
+  const { L, n, user, state, findVillage, demoMode, lang } = useApp();
   const navigate = useNavigate();
   const { address, date } = useCaseHelpers();
   const [search, setSearch] = useState("");
@@ -57,11 +68,46 @@ export function WorkerApplicationListPage({
   const pageSize = 10;
   const [page, setPage] = useState(1);
   const [selectedApplication, setSelectedApplication] = useState<RegCase | null>(null);
+  const [caseAuditHistory, setCaseAuditHistory] = useState<CaseAuditEntry[]>([]);
+  const [auditHistoryLoading, setAuditHistoryLoading] = useState(false);
+  const [auditHistoryError, setAuditHistoryError] = useState("");
   const [selectedAttachments, setSelectedAttachments] = useState<RegCase | null>(null);
   const [attachmentPreviews, setAttachmentPreviews] = useState<(AttachmentPreview | undefined)[]>(
     [],
   );
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedApplication) {
+      setCaseAuditHistory([]);
+      setAuditHistoryError("");
+      return;
+    }
+    if (demoMode) {
+      setCaseAuditHistory([]);
+      setAuditHistoryError("");
+      return;
+    }
+    let cancelled = false;
+    setAuditHistoryLoading(true);
+    setAuditHistoryError("");
+    void supabase
+      .rpc("case_history", { p_case_id: selectedApplication.id })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.error("Could not load case audit history", error);
+          setAuditHistoryError(error.message);
+          setCaseAuditHistory([]);
+        } else {
+          setCaseAuditHistory(data ?? []);
+        }
+        setAuditHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [demoMode, selectedApplication]);
 
   useEffect(() => {
     if (!selectedAttachments) {
@@ -447,10 +493,15 @@ export function WorkerApplicationListPage({
               </DialogHeader>
               <ApplicationDetails
                 item={selectedApplication}
+                auditHistory={caseAuditHistory}
+                auditHistoryLoading={auditHistoryLoading}
+                auditHistoryError={auditHistoryError}
+                actorUsers={state.users}
                 address={address}
                 date={date}
                 L={L}
                 n={n}
+                lang={lang}
               />
             </>
           )}
@@ -842,43 +893,210 @@ function ApplicationRow({
 
 function ApplicationDetails({
   item,
+  auditHistory,
+  auditHistoryLoading,
+  auditHistoryError,
+  actorUsers,
   address,
   date,
   L,
   n,
+  lang,
 }: {
   item: RegCase;
+  auditHistory: CaseAuditEntry[];
+  auditHistoryLoading: boolean;
+  auditHistoryError: string;
+  actorUsers: ReturnType<typeof useApp>["state"]["users"];
   address: (item: RegCase) => string;
   date: (timestamp: number) => string;
   L: (bn: string, en: string) => string;
   n: (value: number | string) => string;
+  lang: "bn" | "en";
 }) {
   return (
-    <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-      <Detail label={L("আবেদন নম্বর", "Application ID")} value={item.id} />
-      <Detail label={L("অবস্থা", "Status")} value={<StatusBadge s={item.status} />} />
-      <Detail label={L("জন্ম তারিখ", "Date of birth")} value={date(Date.parse(item.dob))} />
-      <Detail
-        label={L("লিঙ্গ", "Gender")}
-        value={
-          { male: L("পুরুষ", "Male"), female: L("নারী", "Female"), other: L("অন্যান্য", "Other") }[
-            item.gender
-          ]
-        }
+    <div className="space-y-5">
+      <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+        <Detail label={L("আবেদন নম্বর", "Application ID")} value={item.id} />
+        <Detail label={L("অবস্থা", "Status")} value={<StatusBadge s={item.status} />} />
+        <Detail label={L("জন্ম তারিখ", "Date of birth")} value={date(Date.parse(item.dob))} />
+        <Detail
+          label={L("লিঙ্গ", "Gender")}
+          value={
+            { male: L("পুরুষ", "Male"), female: L("নারী", "Female"), other: L("অন্যান্য", "Other") }[
+              item.gender
+            ]
+          }
+        />
+        <Detail label={L("পিতার নাম", "Father's name")} value={L(item.father.bn, item.father.en)} />
+        <Detail label={L("মাতার নাম", "Mother's name")} value={L(item.mother.bn, item.mother.en)} />
+        <Detail label={L("NID / BRN", "NID / BRN")} value={item.nid || "—"} />
+        <Detail label={L("মোবাইল", "Mobile")} value={item.parentMobile ?? "—"} />
+        <Detail label={L("ওয়ার্ড", "Ward")} value={n(item.ward)} />
+        <Detail label={L("জমার তারিখ", "Submitted")} value={date(item.createdAt)} />
+        <div className="sm:col-span-2">
+          <dt className="text-xs font-semibold text-muted-foreground">
+            {L("সম্পূর্ণ ঠিকানা", "Full address")}
+          </dt>
+          <dd className="mt-1 text-sm font-medium">{address(item) || "—"}</dd>
+        </div>
+      </dl>
+      <CaseHistoryTimeline
+        item={item}
+        auditHistory={auditHistory}
+        auditHistoryLoading={auditHistoryLoading}
+        auditHistoryError={auditHistoryError}
+        actorUsers={actorUsers}
+        L={L}
+        lang={lang}
       />
-      <Detail label={L("পিতার নাম", "Father's name")} value={L(item.father.bn, item.father.en)} />
-      <Detail label={L("মাতার নাম", "Mother's name")} value={L(item.mother.bn, item.mother.en)} />
-      <Detail label={L("NID / BRN", "NID / BRN")} value={item.nid || "—"} />
-      <Detail label={L("মোবাইল", "Mobile")} value={item.parentMobile ?? "—"} />
-      <Detail label={L("ওয়ার্ড", "Ward")} value={n(item.ward)} />
-      <Detail label={L("জমার তারিখ", "Submitted")} value={date(item.createdAt)} />
-      <div className="sm:col-span-2">
-        <dt className="text-xs font-semibold text-muted-foreground">
-          {L("সম্পূর্ণ ঠিকানা", "Full address")}
-        </dt>
-        <dd className="mt-1 text-sm font-medium">{address(item) || "—"}</dd>
-      </div>
-    </dl>
+    </div>
+  );
+}
+
+function CaseHistoryTimeline({
+  item,
+  auditHistory,
+  auditHistoryLoading,
+  auditHistoryError,
+  actorUsers,
+  L,
+  lang,
+}: {
+  item: RegCase;
+  auditHistory: CaseAuditEntry[];
+  auditHistoryLoading: boolean;
+  auditHistoryError: string;
+  actorUsers: ReturnType<typeof useApp>["state"]["users"];
+  L: (bn: string, en: string) => string;
+  lang: "bn" | "en";
+}) {
+  const actorName = (userId: string | null) => {
+    const actor = actorUsers.find((candidate) => candidate.id === userId);
+    return actor ? L(actor.name.bn, actor.name.en) : L("অফিসার", "Officer");
+  };
+  const events = auditHistory.map((event) => {
+    const auditRole = event.role ?? undefined;
+    let title = L("রেকর্ড হালনাগাদ", "Record updated");
+    let description = "";
+    if (event.action.startsWith("create:")) {
+      title = L("মাঠপর্যায়ের তথ্য সংগ্রহ", "Field data collected");
+    } else if (event.action === "remark") {
+      title = L("অফিস প্রি-চেক / মন্তব্য", "Office pre-check / comment");
+      description = L(
+        `${auditRole ? roleLabel(auditRole, L) : L("অফিসার", "Officer")} মন্তব্য যুক্ত করেছেন`,
+        `${auditRole ? roleLabel(auditRole, L) : L("Officer", "Officer")} added a remark`,
+      );
+    } else if (event.action === "update") {
+      if (event.status_to) {
+        const nextStatus = event.status_to;
+        const statusLabel = (status: string) =>
+          ({
+            pending: L("অপেক্ষমাণ", "Pending"),
+            progress: L("প্রক্রিয়াধীন", "In progress"),
+            completed: L("সম্পন্ন", "Completed"),
+            rejected: L("বাতিল", "Rejected"),
+          })[status] ?? status;
+        title =
+          nextStatus === "completed"
+            ? L("সফলভাবে নিবন্ধিত", "Successfully registered")
+            : nextStatus === "progress"
+              ? L("অফিস যাচাই চলছে", "Office verification in progress")
+              : nextStatus === "rejected"
+                ? L("আবেদন বাতিল", "Application rejected")
+                : L("বিডিআরআইএস এন্ট্রি অপেক্ষমাণ", "BDRIS entry pending");
+        if (event.status_from && event.status_from !== nextStatus) {
+          description = `${statusLabel(event.status_from)} → ${statusLabel(nextStatus)}`;
+        }
+      }
+    }
+    const role = auditRole ?? actorUsers.find((candidate) => candidate.id === event.user_id)?.role;
+    return {
+      id: String(event.id),
+      at: Date.parse(event.at),
+      title,
+      description,
+      actor: `${actorName(event.user_id)}${role ? ` · ${roleLabel(role, L)}` : ""}`,
+      clientHint: event.client_hint ?? "",
+    };
+  });
+  if (events.length === 0) {
+    events.push({
+      id: `created-${item.id}`,
+      at: item.createdAt,
+      title: L("মাঠপর্যায়ের তথ্য সংগ্রহ", "Field data collected"),
+      description: "",
+      actor: L("রেকর্ড স্রষ্টা", "Record creator"),
+      clientHint: "",
+    });
+    for (const [index, remark] of item.remarks.entries()) {
+      events.push({
+        id: `remark-${item.id}-${index}`,
+        at: remark.at,
+        title: L("অফিস প্রি-চেক / মন্তব্য", "Office pre-check / comment"),
+        description: remark.text,
+        actor: roleLabel(remark.role, L),
+        clientHint: "",
+      });
+    }
+    if (item.status === "completed" && item.completedAt) {
+      events.push({
+        id: `completed-${item.id}`,
+        at: item.completedAt,
+        title: L("সফলভাবে নিবন্ধিত", "Successfully registered"),
+        description: item.regNo ? `${L("নিবন্ধন নং", "Registration no.")}: ${item.regNo}` : "",
+        actor: L("নিবন্ধনকারী কর্মকর্তা", "Registering officer"),
+        clientHint: "",
+      });
+    }
+  }
+  events.sort((left, right) => left.at - right.at);
+
+  return (
+    <section className="border-t border-emerald-100 pt-4" aria-labelledby="case-history-heading">
+      <h3 id="case-history-heading" className="flex items-center gap-2 font-semibold text-emerald-950">
+        <Clock3 className="h-4 w-4" aria-hidden="true" />
+        {L("আবেদনের কার্যক্রমের ইতিহাস", "Application activity timeline")}
+      </h3>
+      {auditHistoryLoading && (
+        <p className="mt-2 text-xs text-slate-600" role="status">
+          {L("ইতিহাস লোড হচ্ছে…", "Loading history…")}
+        </p>
+      )}
+      {auditHistoryError && (
+        <p className="mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-950" role="status">
+          {L(
+            "সার্ভার অডিট লগ পাওয়া যায়নি; প্রদর্শিত ইতিহাসে রেকর্ডে থাকা তথ্যই দেখানো হচ্ছে।",
+            "Server audit log is unavailable; only history available on this record is shown.",
+          )}
+        </p>
+      )}
+      <ol className="mt-3 space-y-3">
+        {events.map((event, index) => (
+          <li key={event.id} className="relative flex gap-3 pl-1">
+            {index < events.length - 1 && (
+              <span className="absolute bottom-[-0.9rem] left-[0.45rem] top-4 w-px bg-emerald-200" aria-hidden="true" />
+            )}
+            <span className="relative z-10 mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-600 ring-2 ring-white" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900">{event.title}</p>
+              {event.description && <p className="break-words text-xs text-slate-700">{event.description}</p>}
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                {new Date(event.at).toLocaleString(lang === "bn" ? "bn-BD" : "en-US")}
+                {" · "}{event.actor}
+                {event.clientHint && ` · ${event.clientHint}`}
+              </p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-3 text-[10px] text-slate-500">
+        {L(
+          "আইপি ঠিকানা ও ডিভাইস শনাক্তকারী সংরক্ষণ করা হয় না।",
+          "IP addresses and device identifiers are not stored.",
+        )}
+      </p>
+    </section>
   );
 }
 
