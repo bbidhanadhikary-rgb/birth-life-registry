@@ -20,9 +20,9 @@ const modules: { to: string; labelBn: string; labelEn: string; roles: readonly R
   { to: "/correction-log", labelBn: "সংশোধন লগ", labelEn: "Correction log", roles: ["super"] },
   {
     to: "/monitoring",
-    labelBn: "নির্বাহী পর্যবেক্ষণ",
-    labelEn: "Executive monitoring",
-    roles: ["uno", "district", "super"],
+    labelBn: "নোটিশ ও পর্যবেক্ষণ",
+    labelEn: "Notices & monitoring",
+    roles: ["worker", "admin", "police", "uno", "district", "super"],
   },
 ] as const;
 

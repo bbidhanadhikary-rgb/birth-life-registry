@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DashboardGate } from "@/components/dashboards/DashboardGate";
-import { NationalDashboard } from "@/components/dashboards/NationalDashboard";
-import { ModuleNavigation } from "@/components/modules/ModuleNavigation";
+import { MonitoringWorkspace } from "@/components/dashboards/MonitoringWorkspace";
 import { useApp } from "@/lib/store";
 
 export const Route = createFileRoute("/monitoring")({
@@ -16,19 +15,13 @@ export const Route = createFileRoute("/monitoring")({
 
 function MonitoringRoute() {
   const { L, user } = useApp();
-  const canMonitor = user && ["uno", "district", "super"].includes(user.role);
+  const canMonitor = user && ["worker", "admin", "police", "uno", "district", "super"].includes(user.role);
   return (
-    <DashboardGate fitViewport developmentPreviewRole="uno">
+    <DashboardGate fitViewport flushViewport workerLayout={false} developmentPreviewRole="uno">
       {canMonitor ? (
-        <div className="monitoring-dashboard flex h-full min-h-0 flex-col">
-          <div className="shrink-0">
-            <ModuleNavigation />
-          </div>
-          <NationalDashboard />
-        </div>
+        <MonitoringWorkspace />
       ) : (
         <main className="mx-auto w-full max-w-none px-4 py-6 sm:px-6 lg:px-8">
-          <ModuleNavigation />
           <p className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
             {L(
               "এই পর্যবেক্ষণ পাতা উচ্চপর্যায়ের কর্মকর্তাদের জন্য সীমাবদ্ধ।",

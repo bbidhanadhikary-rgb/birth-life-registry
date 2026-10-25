@@ -19,6 +19,8 @@ import { getCaseDeadline } from "@/lib/compliance";
 import { roleLabel, scopedCases, useApp } from "@/lib/store";
 import { TARGET, type Role, type Upazila } from "@/lib/types";
 import { MonthlyProgressCard } from "@/components/dashboards/MonthlyProgressCard";
+import { WardKpiPanel } from "@/components/dashboards/WardKpiPanel";
+import { MonitoringTargetEntry } from "@/components/dashboards/MonitoringTargetEntry";
 
 type DashboardSection = "unions" | "compliance" | "alerts" | "records" | "users";
 
@@ -43,6 +45,7 @@ export function NationalDashboard() {
   const [noticeEn, setNoticeEn] = useState("");
   const [noticeActive, setNoticeActive] = useState(true);
   const [savingNotice, setSavingNotice] = useState(false);
+  const [submittedTargets, setSubmittedTargets] = useState<{ birth: number; death: number } | null>(null);
 
   const selectableUpazilas = useMemo(() => {
     if (!user) return [];
@@ -109,10 +112,11 @@ export function NationalDashboard() {
     },
   };
   const completedThisMonth = monthlyCounts.birth.completed + monthlyCounts.death.completed;
-  const monthlyTargets = {
+  const defaultMonthlyTargets = {
     birth: Math.ceil(effectiveUnions * TARGET.birth),
     death: Math.ceil(effectiveUnions * TARGET.death),
   };
+  const monthlyTargets = submittedTargets ?? defaultMonthlyTargets;
   const monthlyTarget = monthlyTargets.birth + monthlyTargets.death;
   const targetPercent = monthlyTarget
     ? Math.round((completedThisMonth / monthlyTarget) * 100)
@@ -193,7 +197,7 @@ export function NationalDashboard() {
   };
 
   return (
-    <div className="national-dashboard mx-auto flex h-full min-h-0 w-full max-w-none flex-1 flex-col gap-2 px-4 py-2 sm:px-6 lg:px-8">
+    <div className="national-dashboard mx-auto flex h-full min-h-0 w-full max-w-none flex-1 flex-col gap-2 overflow-y-auto px-4 py-2 sm:px-6 lg:px-8">
       <div className="flex shrink-0 flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-teal-800 dark:text-teal-300">
@@ -217,6 +221,7 @@ export function NationalDashboard() {
         reportsEnabled={!!user && ["admin", "district", "uno", "super"].includes(user.role)}
         compact
       />
+      <MonitoringTargetEntry onSubmittedTargets={setSubmittedTargets} />
       <section
         className="grid shrink-0 grid-cols-2 gap-2 xl:grid-cols-4"
         aria-label={L("মূল সূচক", "Key indicators")}
@@ -257,6 +262,7 @@ export function NationalDashboard() {
           icon={<Check className="h-4 w-4" />}
         />
       </section>
+      <WardKpiPanel cases={visibleCases} />
 
       <div className="grid min-h-0 flex-1 gap-2 lg:grid-cols-[1.15fr_0.85fr]">
         <section className="min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-sm dark:border-slate-700 dark:bg-slate-900">

@@ -25,7 +25,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AnnouncementTicker } from "@/components/AnnouncementTicker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -368,7 +367,6 @@ export function Header() {
           <Button size="sm" className="h-11 shrink-0 bg-emerald-900 px-4 text-base font-bold text-white shadow-md shadow-emerald-950/20 hover:bg-emerald-950 max-[400px]:h-9 max-[400px]:px-2 max-[400px]:text-sm" onClick={() => setDlg("login")}><LogIn className="mr-2 h-6 w-6 max-[400px]:mr-0 max-[400px]:h-5 max-[400px]:w-5" /><span className="max-[360px]:sr-only">{L("লগইন", "Login")}</span></Button>
         )}
       </div>
-      <AnnouncementTicker />
       <LoginDialog open={dlg === "login"} onClose={() => setDlg(null)} />
       <ManualDialog open={dlg === "manual"} onClose={() => setDlg(null)} />
       <SupportDialog open={dlg === "support"} onClose={() => setDlg(null)} />

@@ -127,6 +127,41 @@
       "when": 1792870000000,
       "tag": "0017_union_targets",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792900000000,
+      "tag": "0018_union_target_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792910000000,
+      "tag": "0019_monitoring_entry_pages",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1792920000000,
+      "tag": "0020_monitoring_entry_page_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792930000000,
+      "tag": "0021_monitoring_notices",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792940000000,
+      "tag": "0022_global_notice_read_scope",
+      "breakpoints": true
     }
   ]
 }

@@ -80,7 +80,9 @@ type RoleAction = {
   titleEn: string;
   descriptionBn: string;
   descriptionEn: string;
-  Icon: typeof MapPinned;
+  Icon?: typeof MapPinned;
+  icon?: string;
+  link?: "/monitoring";
   filter?: ActionFilter;
 };
 type AdminRecord = {
@@ -425,12 +427,13 @@ function createLocalAdminPreviewCases(seedCases: RegCase[]) {
   ];
 }
 
-const publicActions: RoleAction[] = [
+const executiveQuickAccessActions: RoleAction[] = [
   { id: "reports", titleBn: "এলাকাভিত্তিক প্রতিবেদন", titleEn: "Area-wise report", descriptionBn: "প্রশাসনিক এলাকার সারসংক্ষেপ", descriptionEn: "Administrative area summaries", Icon: MapPinned },
   { id: "deadlines", titleBn: "সময়সীমা পর্যবেক্ষণ", titleEn: "Deadline monitoring", descriptionBn: "৩৬৫ দিনের সম্মতি ও সতর্কতা", descriptionEn: "365-day compliance and alerts", Icon: CalendarCheck2, filter: "urgent" },
-  { id: "worker-report", titleBn: "রিপোর্ট", titleEn: "Reports", descriptionBn: "সকল ধরনের প্রতিবেদন দেখুন", descriptionEn: "View all types of reports", Icon: FileText },
+  { id: "smart-monitoring", titleBn: "স্মার্ট মনিটরিং সিস্টেম", titleEn: "Smart Monitoring System", descriptionBn: "সার্বিক অগ্রগতি, টার্গেট ও ডেটা মনিটরিং", descriptionEn: "Overall progress, targets, and data monitoring", icon: "📊", link: "/monitoring" },
   { id: "feedback", titleBn: "অভিযোগ জানান বা পরামর্শ দিন", titleEn: "Submit complaint or suggestion", descriptionBn: "আইসিটি সহায়তা ও পরামর্শ দিন", descriptionEn: "Request ICT support or share a suggestion", Icon: MessageSquare },
 ];
+const publicActions = executiveQuickAccessActions.filter((item) => item.id !== "smart-monitoring");
 
 const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district">, RoleAction[]> = {
   worker: [
@@ -462,6 +465,7 @@ const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district"
   uno: [
     { id: "upazila-progress", titleBn: "উপজেলা অগ্রগতি", titleEn: "Upazila progress", descriptionBn: "সামগ্রিক নিবন্ধন অগ্রগতি দেখুন", descriptionEn: "Review overall registration progress", Icon: MapPinned },
     { id: "upazila-births", titleBn: "জন্ম নিবন্ধন", titleEn: "Birth registrations", descriptionBn: "উপজেলার জন্ম নিবন্ধনের কেস", descriptionEn: "Birth registration cases across the upazila", Icon: Baby, filter: "birth" },
+    { id: "smart-monitoring", titleBn: "স্মার্ট মনিটরিং সিস্টেম", titleEn: "Smart Monitoring System", descriptionBn: "সার্বিক অগ্রগতি, টার্গেট ও ডেটা মনিটরিং", descriptionEn: "Overall progress, targets, and data monitoring", Icon: ChartNoAxesCombined },
     { id: "upazila-deaths", titleBn: "মৃত্যু নিবন্ধন", titleEn: "Death registrations", descriptionBn: "উপজেলার মৃত্যু নিবন্ধনের কেস", descriptionEn: "Death registration cases across the upazila", Icon: HeartPulse, filter: "death" },
     { id: "birth-list", titleBn: "জন্ম আবেদনের তালিকা", titleEn: "Birth applications", descriptionBn: "উপজেলার জন্ম আবেদন দেখুন", descriptionEn: "View upazila birth applications", Icon: FileText, filter: "birth" },
     { id: "death-list", titleBn: "মৃত্যু আবেদনের তালিকা", titleEn: "Death applications", descriptionBn: "উপজেলার মৃত্যু আবেদন দেখুন", descriptionEn: "View upazila death applications", Icon: FileCheck2, filter: "death" },
@@ -479,7 +483,14 @@ function QuickAccessCard({
   publicDashboard,
   onActivate,
 }: {
-  item: { id: string; title: string; description: string; Icon: RoleAction["Icon"] };
+  item: {
+    id: string;
+    title: string;
+    description: string;
+    Icon?: RoleAction["Icon"];
+    icon?: string;
+    link?: RoleAction["link"];
+  };
   publicDashboard: boolean;
   onActivate: () => void;
 }) {
@@ -488,7 +499,11 @@ function QuickAccessCard({
   const content = (
     <>
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-700 text-white transition-colors group-hover:bg-emerald-800 max-sm:hidden">
-        <item.Icon className="h-4 w-4" aria-hidden="true" />
+        {item.icon ? (
+          <span className="text-xl leading-none" aria-hidden="true">{item.icon}</span>
+        ) : item.Icon ? (
+          <item.Icon className="h-4 w-4" aria-hidden="true" />
+        ) : null}
       </span>
       <span className="flex-1 max-sm:w-full">
         <span className="flex items-start gap-1 text-xs font-bold text-[#102a43] sm:text-sm max-sm:justify-center max-sm:text-[10px]">
@@ -501,6 +516,14 @@ function QuickAccessCard({
       </span>
     </>
   );
+
+  if (item.link) {
+    return (
+      <Link to={item.link} className={className}>
+        {content}
+      </Link>
+    );
+  }
 
   if (publicDashboard) {
     switch (item.id) {
@@ -700,6 +723,7 @@ export function RegistrationDashboard({
           .select("union_id, month_year, birth_target, death_target")
           .eq("union_id", unionId)
           .eq("month_year", monthYear)
+          .eq("status", "submitted")
           .maybeSingle();
         if (!active) return;
         if (error) {
@@ -762,6 +786,7 @@ export function RegistrationDashboard({
     },
   ];
   const roleConfig = role === "super" || role === "district" ? "uno" : role;
+  const isExecutiveQuickAccess = role === "uno" || role === "district" || role === "super";
   const roleActionItems = readOnlyPolicyPanel || roleConfig === "public"
     ? publicActions
     : [
@@ -774,6 +799,13 @@ export function RegistrationDashboard({
             ]),
       ];
   const actions = roleActionItems.map(
+    ({ titleBn, titleEn, descriptionBn, descriptionEn, ...action }) => ({
+      ...action,
+      title: L(titleBn, titleEn),
+      description: L(descriptionBn, descriptionEn),
+    }),
+  );
+  const executiveQuickAccessItems = executiveQuickAccessActions.map(
     ({ titleBn, titleEn, descriptionBn, descriptionEn, ...action }) => ({
       ...action,
       title: L(titleBn, titleEn),
@@ -1030,7 +1062,9 @@ export function RegistrationDashboard({
     isLocalAdminPreview ||
     (!!user && ["admin", "district", "uno", "super"].includes(user.role));
 
-  const quickAccessActions = actions.slice(0, 4);
+  const quickAccessActions = isExecutiveQuickAccess
+    ? executiveQuickAccessItems
+    : actions.filter((action) => action.id !== "worker-report").slice(0, 4);
   const isEntryCard = activeCard?.id === "birth-entry" || activeCard?.id === "death-entry";
   const formType: "birth" | "death" | null =
     editEntry?.type ?? (activeCard?.id === "birth-entry" || activeCard?.id === "birth-correction"
@@ -1455,11 +1489,18 @@ export function RegistrationDashboard({
               "grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4"
             }
           >
-            {quickAccessActions.map(({ id, title, description, Icon }) => (
+            {quickAccessActions.map(({ id, title, description, Icon, icon, link }) => (
               <QuickAccessCard
                 key={id}
-                item={{ id, title, description, Icon }}
-                publicDashboard={roleConfig === "public"}
+                item={{
+                  id,
+                  title,
+                  description,
+                  ...(Icon ? { Icon } : {}),
+                  ...(icon ? { icon } : {}),
+                  ...(link ? { link } : {}),
+                }}
+                publicDashboard={roleConfig === "public" || isExecutiveQuickAccess}
                 onActivate={() => openCaseDialog("action", id)}
               />
             ))}

@@ -573,6 +573,8 @@ export type Database = {
           death_target: number
           id: string
           month_year: string
+          status: string
+          updated_at: string
           union_id: string
           union_name: string
         }
@@ -581,6 +583,8 @@ export type Database = {
           death_target?: number
           id?: string
           month_year: string
+          status?: string
+          updated_at?: string
           union_id: string
           union_name: string
         }
@@ -589,8 +593,76 @@ export type Database = {
           death_target?: number
           id?: string
           month_year?: string
+          status?: string
+          updated_at?: string
           union_id?: string
           union_name?: string
+        }
+        Relationships: []
+      }
+      monitoring_entry_pages: {
+        Row: {
+          created_at: string
+          entries: Json
+          id: string
+          owner_id: string
+          page_number: number
+          page_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entries?: Json
+          id?: string
+          owner_id: string
+          page_number: number
+          page_type?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entries?: Json
+          id?: string
+          owner_id?: string
+          page_number?: number
+          page_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      monitoring_notices: {
+        Row: {
+          author_id: string
+          body: string
+          id: string
+          kind: string
+          published_at: string
+          title: string
+          union_id: string | null
+          upazila_id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          id?: string
+          kind?: string
+          published_at?: string
+          title: string
+          union_id?: string | null
+          upazila_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          id?: string
+          kind?: string
+          published_at?: string
+          title?: string
+          union_id?: string | null
+          upazila_id?: string
         }
         Relationships: []
       }
