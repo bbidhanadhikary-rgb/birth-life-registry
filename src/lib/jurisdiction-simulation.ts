@@ -18,6 +18,7 @@ export type JurisdictionSimulation = {
   targetScale: number;
   labelBn: string;
   labelEn: string;
+  unionId?: string;
 };
 
 const MOCK_ASSIGNMENTS = {
@@ -63,6 +64,7 @@ export function simulateJurisdiction(
   let targetScale = 0;
   let labelBn = "জাতীয় পর্যায়";
   let labelEn = "Nationwide";
+  let unionIdForLabel: string | undefined;
 
   switch (role) {
     case "village_police": {
@@ -94,6 +96,7 @@ export function simulateJurisdiction(
       const unionId = user?.unionId ?? fallbackUnion?.id ?? MOCK_ASSIGNMENTS.unionCode;
       selectedCases = sourceCases.filter((item) => item.unionId === unionId);
       targetScale = 1;
+      unionIdForLabel = unionId;
       const union = unionLocations.find((location) => location.union.id === unionId)?.union;
       labelBn = union?.bn ?? `ইউনিয়ন ${unionId}`;
       labelEn = union?.en ?? `Union ${unionId}`;
@@ -216,5 +219,12 @@ export function simulateJurisdiction(
       break;
   }
 
-  return { cases: selectedCases, level, targetScale, labelBn, labelEn };
+  return {
+    cases: selectedCases,
+    level,
+    targetScale,
+    labelBn,
+    labelEn,
+    ...(unionIdForLabel ? { unionId: unionIdForLabel } : {}),
+  };
 }

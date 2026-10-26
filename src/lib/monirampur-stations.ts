@@ -1,0 +1,53 @@
+import type { Union } from "@/lib/types";
+
+export type StationType = "union" | "paurashava";
+export type MonirampurStationDefinition = {
+  id: string;
+  bn: string;
+  en: string;
+  type: StationType;
+};
+export type Station = Union & { type: StationType };
+
+export const MONIRAMPUR_STATIONS = [
+  { id: "mn-pourashava", bn: "মণিরামপুর পৌরসভা", en: "Manirampur Pourashava", type: "paurashava" },
+  { id: "mn-rohita", bn: "০১ নং রোহিতা", en: "01 No. Rohita", type: "union" },
+  { id: "mn-kashimnagar", bn: "০২ নং কাশিমনগর", en: "02 No. Kashimnagar", type: "union" },
+  { id: "mn-bhojgati", bn: "০৩ নং ভোজগাতি", en: "03 No. Bhojgati", type: "union" },
+  { id: "mn-dhakuria", bn: "০৪ নং ঢাকুরিয়া", en: "04 No. Dhakuria", type: "union" },
+  { id: "mn-haridaskati", bn: "০৫ নং হরিদাসকাটি", en: "05 No. Haridaskati", type: "union" },
+  { id: "mn-manirampur", bn: "০৬ নং মণিরামপুর", en: "06 No. Manirampur", type: "union" },
+  { id: "mn-khedapara", bn: "০৭ নং খেদাপাড়া", en: "07 No. Khedapara", type: "union" },
+  { id: "mn-hariharnagar", bn: "০৮ নং হরিহরনগর", en: "08 No. Hariharnagar", type: "union" },
+  { id: "mn-jhanpa", bn: "০৯ নং ঝাঁপা", en: "09 No. Jhanpa", type: "union" },
+  { id: "mn-moshmimnagar", bn: "১০ নং মশ্বিমনগর", en: "10 No. Moshmimnagar", type: "union" },
+  { id: "mn-chaluahati", bn: "১১ নং চালুয়াহাটি", en: "11 No. Chaluahati", type: "union" },
+  { id: "mn-shyamkur", bn: "১২ নং শ্যামকুড়", en: "12 No. Shyamkur", type: "union" },
+  { id: "mn-khanpur", bn: "১৩ নং খানপুর", en: "13 No. Khanpur", type: "union" },
+  { id: "mn-durbadanga", bn: "১৪ নং দুর্বাডাঙ্গা", en: "14 No. Durbadanga", type: "union" },
+  { id: "mn-kultia", bn: "১৫ নং কুলটিয়া", en: "15 No. Kultia", type: "union" },
+  { id: "mn-nehalpur", bn: "১৬ নং নেহালপুর", en: "16 No. Nehalpur", type: "union" },
+  { id: "mn-monoharpur", bn: "১৭ নং মনোহরপুর", en: "17 No. Monoharpur", type: "union" },
+] as const satisfies readonly MonirampurStationDefinition[];
+
+export function getStationsForUpazila(upazilaId: string, unions: Union[]): Station[] {
+  if (upazilaId !== "manirampur") {
+    return unions.map((union) => ({
+      ...union,
+      type:
+        /pourashava|municipality/i.test(`${union.id} ${union.en}`) || union.bn.includes("পৌরসভা")
+          ? "paurashava"
+          : "union",
+    }));
+  }
+
+  return MONIRAMPUR_STATIONS.map((station) => {
+    const existing = unions.find((union) => union.id === station.id);
+    return {
+      ...(existing ?? { id: station.id, villages: [] }),
+      bn: station.bn,
+      en: station.en,
+      type: station.type,
+    };
+  });
+}

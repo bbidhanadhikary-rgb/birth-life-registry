@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { getDhakaMonthYear } from "@/lib/monthly-targets";
 import { useApp } from "@/lib/store";
 import { TARGET } from "@/lib/types";
+import { getStationsForUpazila } from "@/lib/monirampur-stations";
 import {
   loadUpazilaRegistrationTargets,
   saveUpazilaRegistrationTargets,
@@ -103,7 +104,8 @@ export function MonitoringTargetEntry({
         grouped.set(record.union_id, target);
       }
 
-      const nextRows = upazila.unions.map((union) => {
+      const stations = getStationsForUpazila(upazila.id, upazila.unions);
+      const nextRows = stations.map((union) => {
         const targets = grouped.get(union.id);
         const draft = targets?.draft;
         const submitted = targets?.submitted;
@@ -119,7 +121,7 @@ export function MonitoringTargetEntry({
           death: String(latest?.death_target ?? TARGET.death),
         };
       });
-      const submittedTotals = upazila.unions.reduce(
+      const submittedTotals = stations.reduce(
         (totals, union) => {
           const submitted = grouped.get(union.id)?.submitted;
           totals.birth += submitted?.birth_target ?? 0;

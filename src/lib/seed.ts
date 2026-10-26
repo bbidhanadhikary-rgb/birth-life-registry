@@ -1,25 +1,9 @@
 import type { AppState, Union, Upazila, RegCase } from "./types";
+import { MONIRAMPUR_STATIONS } from "./monirampur-stations";
 
-const MANIRAMPUR: [string, string, string][] = [
-  ["pourashava", "মণিরামপুর পৌরসভা", "Manirampur Pourashava"],
-  ["rohita", "০১ নং রোহিতা", "01 No. Rohita"],
-  ["kashimnagar", "০২ নং কাশিমনগর", "02 No. Kashimnagar"],
-  ["bhojgati", "০৩ নং ভোজগাতি", "03 No. Bhojgati"],
-  ["dhakuria", "০৪ নং ঢাকুরিয়া", "04 No. Dhakuria"],
-  ["haridaskati", "০৫ নং হরিদাসকাটি", "05 No. Haridaskati"],
-  ["manirampur", "০৬ নং মণিরামপুর", "06 No. Manirampur"],
-  ["khedapara", "০৭ নং খেদাপাড়া", "07 No. Khedapara"],
-  ["hariharnagar", "০৮ নং হরিহরনগর", "08 No. Hariharnagar"],
-  ["jhanpa", "০৯ নং ঝাঁপা", "09 No. Jhanpa"],
-  ["moshmimnagar", "১০ নং মশ্বিমনগর", "10 No. Moshmimnagar"],
-  ["chaluahati", "১১ নং চালুয়াহাটি", "11 No. Chaluahati"],
-  ["shyamkur", "১২ নং শ্যামকুড়", "12 No. Shyamkur"],
-  ["khanpur", "১৩ নং খানপুর", "13 No. Khanpur"],
-  ["durbadanga", "১৪ নং দুর্বাডাঙ্গা", "14 No. Durbadanga"],
-  ["kultia", "১৫ নং কুলটিয়া", "15 No. Kultia"],
-  ["nehalpur", "১৬ নং নেহালপুর", "16 No. Nehalpur"],
-  ["monoharpur", "১৭ নং মনোহরপুর", "17 No. Monoharpur"],
-];
+const MANIRAMPUR: [string, string, string][] = MONIRAMPUR_STATIONS.map(
+  ({ id, bn, en }) => [id.replace(/^mn-/, ""), bn, en],
+);
 
 const stripBn = (s: string) => s.replace(/^.*নং\s*/, "");
 const stripEn = (s: string) => s.replace(/^\d+ No\.\s*/, "");

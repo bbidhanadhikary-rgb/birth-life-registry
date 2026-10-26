@@ -6,7 +6,6 @@ export const Route = createFileRoute("/death-registration")({
   validateSearch: (search: Record<string, unknown>) => ({
     applicationId:
       typeof search["applicationId"] === "string" ? search["applicationId"] : undefined,
-    ...(search["role"] === "health_worker" ? { role: "health_worker" as const } : {}),
   }),
   head: () => ({
     meta: [
@@ -18,10 +17,10 @@ export const Route = createFileRoute("/death-registration")({
 });
 
 function DeathRegistrationRoute() {
-  const { applicationId, role } = Route.useSearch();
+  const { applicationId } = Route.useSearch();
   return (
     <DashboardGate workerLayout={false}>
-      <EntryFormPage type="death" applicationId={applicationId} role={role} />
+      <EntryFormPage type="death" applicationId={applicationId} />
     </DashboardGate>
   );
 }

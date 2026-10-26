@@ -7,7 +7,7 @@ import { formatUnionBadgeName } from "@/lib/union-label";
 
 const viewableRoles = ["worker", "admin", "police", "uno", "district", "super"] as const;
 
-export function UnionOverview({ unionId }: { unionId?: string }) {
+export function UnionOverview({ unionId }: { unionId: string | undefined }) {
   const { L, n, state, user } = useApp();
   const upazila = state.upazilas.find((area) => area.unions.some((union) => union.id === unionId));
   const union = upazila?.unions.find((area) => area.id === unionId);

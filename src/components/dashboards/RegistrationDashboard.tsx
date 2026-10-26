@@ -37,7 +37,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { TARGET, type RegCase, type Role } from "@/lib/types";
-import { formatUnionBadgeName } from "@/lib/union-label";
+import { formatUnionBadgeName, getUnionLabel } from "@/lib/union-label";
 import {
   getDemoAttachmentPreview,
   MASTER_APPLICATIONS_KEY,
@@ -1033,8 +1033,26 @@ export function RegistrationDashboard({
         );
   const scopeUpazila = state.upazilas.find((item) => item.id === user?.upazilaId);
   const scopeUnion = scopeUpazila?.unions.find((item) => item.id === user?.unionId);
+  const badgeUnionId = jurisdictionScope?.level === "union"
+    ? jurisdictionScope.unionId
+    : assignedUnion?.id;
+  const badgeUnionLocation = badgeUnionId
+    ? state.upazilas
+        .map((upazila) => ({
+          upazila,
+          union: upazila.unions.find((item) => item.id === badgeUnionId),
+        }))
+        .find((location) => location.union)
+    : undefined;
+  const unionBadgeLabel = badgeUnionId
+    ? badgeUnionLocation?.union
+      ? formatUnionBadgeName(badgeUnionLocation.union, badgeUnionLocation.upazila.unions)
+      : getUnionLabel(badgeUnionId)
+    : undefined;
   const scopeLabel = jurisdictionScope
-    ? `${L(jurisdictionScope.labelBn, jurisdictionScope.labelEn)} · ${L("ডেভেলপমেন্ট সিমুলেশন", "Development simulation")}`
+    ? jurisdictionScope.level === "union" && unionBadgeLabel
+      ? `${unionBadgeLabel} · ${L("ডেভেলপমেন্ট সিমুলেশন", "Development simulation")}`
+      : `${L(jurisdictionScope.labelBn, jurisdictionScope.labelEn)} · ${L("ডেভেলপমেন্ট সিমুলেশন", "Development simulation")}`
     : isLocalAdminPreview
     ? `${L("মণিরামপুর", "Manirampur")} · ${L("০১ নং রোহিতা", "01 No. Rohita")} · ${L("লোকাল নমুনা ডেটা", "Local mock data")}`
     : !user || user.role === "super"
@@ -1048,9 +1066,6 @@ export function RegistrationDashboard({
             ? L(`ওয়ার্ড ${user.ward}`, `Ward ${user.ward}`)
             : null,
         ].filter(Boolean).join(" · ");
-  const unionBadgeLabel = assignedUnion
-    ? formatUnionBadgeName(assignedUnion, assignedUpazila?.unions ?? [])
-    : undefined;
   const canViewWardKpis =
     simulationEnabled ||
     isLocalAdminPreview ||
@@ -1404,12 +1419,15 @@ export function RegistrationDashboard({
       <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-1 px-4 py-1 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-1.5 sm:px-6 sm:py-1.5 lg:px-8">
         <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
           <div className="flex min-h-0 flex-col justify-center">
-            {assignedUnion && unionBadgeLabel && !jurisdictionScope ? (
+            {badgeUnionId && unionBadgeLabel ? (
               <Link
                 to="/monitoring/union-details"
-                search={{ unionId: assignedUnion.id }}
-                aria-label={L(`${unionBadgeLabel} এর বিস্তারিত দেখুন`, `View details for ${assignedUnion.en}`)}
-                className="group mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-300 bg-gradient-to-r from-emerald-100 via-white to-teal-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 transition duration-200 ease-out hover:scale-105 hover:border-teal-400 hover:from-lime-100 hover:via-emerald-50 hover:to-cyan-100 hover:text-teal-950 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:scale-100 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base"
+                search={{ unionId: badgeUnionId }}
+                aria-label={L(
+                  `${unionBadgeLabel} এর বিস্তারিত দেখুন`,
+                  `View details for ${badgeUnionLocation?.union?.en ?? badgeUnionId}`,
+                )}
+                className="group mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-300 bg-gradient-to-r from-emerald-100 via-white to-teal-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 transition duration-200 ease-out hover:scale-105 hover:border-teal-400 hover:from-lime-100 hover:via-emerald-50 hover:to-cyan-100 hover:text-teal-950 hover:shadow-lg active:-translate-y-0.5 active:scale-105 active:border-teal-500 active:from-lime-100 active:to-cyan-100 active:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:translate-y-0 motion-reduce:active:scale-100 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base"
               >
                 <MapPin
                   aria-hidden="true"
@@ -1432,7 +1450,21 @@ export function RegistrationDashboard({
               </span>
             )}
             <h1 className="max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
-              ই-নিবন্ধন ট্র্যাকার
+              {badgeUnionId ? (
+                <Link
+                  to="/monitoring/union-details"
+                  search={{ unionId: badgeUnionId }}
+                  aria-label={L(
+                    `${unionBadgeLabel ?? "ইউনিয়ন পরিষদ"} এর সারসংক্ষেপ দেখুন`,
+                    `View ${badgeUnionLocation?.union?.en ?? badgeUnionId} overview`,
+                  )}
+                  className="inline-block rounded-sm transition-colors duration-200 hover:text-emerald-700 hover:drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 motion-reduce:transition-none"
+                >
+                  ই-নিবন্ধন ট্র্যাকার
+                </Link>
+              ) : (
+                "ই-নিবন্ধন ট্র্যাকার"
+              )}
             </h1>
             <p className="mt-1 max-w-3xl text-xs font-semibold leading-snug text-teal-800 max-[360px]:text-[11px] sm:text-sm lg:text-base">
               Birth &amp; Death Registration 365-Day Compliance System

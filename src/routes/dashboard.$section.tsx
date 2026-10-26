@@ -14,6 +14,7 @@ import {
   sameAdministrativeName,
 } from "@/lib/geography";
 import { scopedCases, useApp } from "@/lib/store";
+import { getStationsForUpazila } from "@/lib/monirampur-stations";
 import type { RegCase, Role, Upazila } from "@/lib/types";
 
 const roleDashboards = {
@@ -144,7 +145,9 @@ function DashboardSectionContent({ section }: { section: string }) {
     ),
   );
   const reportUnions = matchingRegisteredUpazilas.flatMap((upazila) =>
-    upazila.unions.filter((union) => user.role !== "admin" || union.id === user.unionId),
+    getStationsForUpazila(upazila.id, upazila.unions).filter(
+      (station) => user.role !== "admin" || station.id === user.unionId,
+    ),
   );
   const selectedRegisteredUnion = selectedGeographicUnion
     ? reportUnions.find(
@@ -167,9 +170,10 @@ function DashboardSectionContent({ section }: { section: string }) {
       : areaFilters.division !== "all"
         ? divisionOptions.find((area) => area.id === areaFilters.division)?.en
         : undefined);
-  const reportUpazila = matchingRegisteredUpazilas.length
+  const reportUpazilaSource = matchingRegisteredUpazilas[0];
+  const reportUpazila = reportUpazilaSource
     ? {
-        ...matchingRegisteredUpazilas[0],
+        ...reportUpazilaSource,
         id: "area-report",
         bn: reportAreaLabel ?? L("জাতীয় পর্যায়", "National"),
         en: reportAreaLabelEn ?? L("জাতীয় পর্যায়", "National"),
@@ -188,7 +192,7 @@ function DashboardSectionContent({ section }: { section: string }) {
         id: `district:${user.districtId}`,
         bn: districtSource.districtBn,
         en: districtSource.districtEn,
-        unions: districtUpazilas.flatMap((up) => up.unions),
+        unions: districtUpazilas.flatMap((up) => getStationsForUpazila(up.id, up.unions)),
       }
     : undefined;
   const upazila =
@@ -199,8 +203,10 @@ function DashboardSectionContent({ section }: { section: string }) {
         : state.upazilas.find((up) => up.id === user.upazilaId);
   const areas = upazila
     ? user.role === "admin"
-      ? upazila.unions.filter((union) => union.id === user.unionId)
-      : upazila.unions
+      ? getStationsForUpazila(upazila.id, upazila.unions).filter(
+          (station) => station.id === user.unionId,
+        )
+      : getStationsForUpazila(upazila.id, upazila.unions)
     : [];
   const upazilaCases =
     user.role === "super" && upazila ? cases.filter((c) => c.upazilaId === upazila.id) : cases;

@@ -174,6 +174,7 @@ export type Database = {
           created_at: string
           created_by: string
           details: Json
+          district_id: string
           dob: string
           dod: string | null
           father_bn: string
@@ -191,6 +192,7 @@ export type Database = {
           police_task: Json | null
           reg_no: string | null
           sms_sent: boolean
+          station_id: string
           status: string
           type: string
           union_id: string
@@ -207,6 +209,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           details?: Json
+          district_id?: string
           dob: string
           dod?: string | null
           father_bn: string
@@ -224,6 +227,7 @@ export type Database = {
           police_task?: Json | null
           reg_no?: string | null
           sms_sent?: boolean
+          station_id?: string
           status?: string
           type: string
           union_id: string
@@ -240,6 +244,7 @@ export type Database = {
           created_at?: string
           created_by?: string
           details?: Json
+          district_id?: string
           dob?: string
           dod?: string | null
           father_bn?: string
@@ -257,6 +262,7 @@ export type Database = {
           police_task?: Json | null
           reg_no?: string | null
           sms_sent?: boolean
+          station_id?: string
           status?: string
           type?: string
           union_id?: string
@@ -264,7 +270,22 @@ export type Database = {
           village_id?: string
           ward?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "cases_district_id_fkey"
+            columns: ["district_id"]
+            isOneToOne: false
+            referencedRelation: "administrative_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cases_station_scope_fkey"
+            columns: ["upazila_id", "station_id"]
+            isOneToOne: false
+            referencedRelation: "administrative_stations"
+            referencedColumns: ["upazila_id", "station_id"]
+          },
+        ]
       }
       support_requests: {
         Row: {
@@ -431,6 +452,7 @@ export type Database = {
           mobile: string | null
           name_bn: string
           name_en: string
+          station_id: string | null
           union_id: string | null
           upazila_id: string | null
           ward: number | null
@@ -444,6 +466,7 @@ export type Database = {
           mobile?: string | null
           name_bn: string
           name_en: string
+          station_id?: string | null
           union_id?: string | null
           upazila_id?: string | null
           ward?: number | null
@@ -457,13 +480,63 @@ export type Database = {
           mobile?: string | null
           name_bn?: string
           name_en?: string
+          station_id?: string | null
           union_id?: string | null
           upazila_id?: string | null
           ward?: number | null
         }
         Relationships: [
           {
+            foreignKeyName: "profiles_station_scope_fkey"
+            columns: ["upazila_id", "station_id"]
+            isOneToOne: false
+            referencedRelation: "administrative_stations"
+            referencedColumns: ["upazila_id", "station_id"]
+          },
+          {
             foreignKeyName: "profiles_upazila_id_fkey"
+            columns: ["upazila_id"]
+            isOneToOne: false
+            referencedRelation: "upazilas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      administrative_stations: {
+        Row: {
+          district_id: string
+          name_bn: string
+          name_en: string
+          station_id: string
+          station_type: string
+          upazila_id: string
+        }
+        Insert: {
+          district_id: string
+          name_bn: string
+          name_en: string
+          station_id: string
+          station_type: string
+          upazila_id: string
+        }
+        Update: {
+          district_id?: string
+          name_bn?: string
+          name_en?: string
+          station_id?: string
+          station_type?: string
+          upazila_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "administrative_stations_district_id_fkey"
+            columns: ["district_id"]
+            isOneToOne: false
+            referencedRelation: "administrative_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "administrative_stations_upazila_id_fkey"
             columns: ["upazila_id"]
             isOneToOne: false
             referencedRelation: "upazilas"

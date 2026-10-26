@@ -9,6 +9,7 @@ import { TARGET } from "@/lib/types";
 import { PageTitle, Stat, monthCount, redFlags, useCaseHelpers } from "../shared";
 import { CaseReview } from "./CaseReview";
 import { MonitoringTargetEntry } from "./MonitoringTargetEntry";
+import { getStationsForUpazila } from "@/lib/monirampur-stations";
 
 export function UnoDashboard() {
   const { L, n, user, state } = useApp();
@@ -16,8 +17,9 @@ export function UnoDashboard() {
   const [unionId, setUnionId] = useState("all");
   const cases = scopedCases(state, user);
   const up = state.upazilas.find((u) => u.id === user!.upazilaId)!;
+  const stations = getStationsForUpazila(up.id, up.unions);
   const flags = redFlags(state, up.id);
-  const data = up.unions.map((u) => {
+  const data = stations.map((u) => {
     const cs = cases.filter((c) => c.unionId === u.id);
     return { name: L(u.bn, u.en).replace(/^(\S+ (নং|No\.) )/, ""), births: monthCount(cs, "birth"), deaths: monthCount(cs, "death"), flagged: flags.some((f) => f.unionId === u.id) };
   });
@@ -25,7 +27,7 @@ export function UnoDashboard() {
 
   return (
     <>
-      <PageTitle title={L(`${up.bn} উপজেলা — মাস্টার ভিউ`, `${up.en} Upazila — Master View`)} sub={L(`${up.districtBn} · ${n(up.unions.length)}টি ইউনিয়ন/পৌরসভা`, `${up.districtEn} · ${up.unions.length} unions/municipality`)}
+      <PageTitle title={L(`${up.bn} উপজেলা — মাস্টার ভিউ`, `${up.en} Upazila — Master View`)} sub={L(`${up.districtBn} · ${n(stations.length)}টি ইউনিয়ন/পৌরসভা`, `${up.districtEn} · ${stations.length} unions/municipality`)}
         actions={<>
           <Button variant="outline" onClick={() => downloadCSV(rows(cases), "master-report.csv")}><Download className="mr-1 h-4 w-4" />{L("মাস্টার রিপোর্ট", "Master Report")}</Button>
           <Button variant="outline" onClick={() => printPDF(`Master Report — ${up.en}`, rows(cases))}><FileText className="mr-1 h-4 w-4" />PDF</Button>
@@ -34,8 +36,8 @@ export function UnoDashboard() {
         <MonitoringTargetEntry />
       </div>
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label={L("এ মাসে জন্ম", "Births this month")} value={`${n(monthCount(cases, "birth"))} / ${n(TARGET.birth * up.unions.length)}`} />
-        <Stat label={L("এ মাসে মৃত্যু", "Deaths this month")} value={`${n(monthCount(cases, "death"))} / ${n(TARGET.death * up.unions.length)}`} />
+        <Stat label={L("এ মাসে জন্ম", "Births this month")} value={`${n(monthCount(cases, "birth"))} / ${n(TARGET.birth * stations.length)}`} />
+        <Stat label={L("এ মাসে মৃত্যু", "Deaths this month")} value={`${n(monthCount(cases, "death"))} / ${n(TARGET.death * stations.length)}`} />
         <Stat label={L("সম্পন্ন", "Completed")} value={n(cases.filter((c) => c.status === "completed").length)} />
         <Stat label={L("লাল চিহ্নিত", "Red flags")} value={n(flags.length)} tone={flags.length ? "danger" : undefined} />
       </div>
@@ -70,7 +72,7 @@ export function UnoDashboard() {
           <SelectTrigger className="w-64"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{L("সব ইউনিয়ন", "All unions")}</SelectItem>
-            {up.unions.map((u) => <SelectItem key={u.id} value={u.id}>{L(u.bn, u.en)}</SelectItem>)}
+            {stations.map((u) => <SelectItem key={u.id} value={u.id}>{L(u.bn, u.en)}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

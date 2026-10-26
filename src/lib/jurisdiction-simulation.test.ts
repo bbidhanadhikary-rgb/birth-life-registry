@@ -45,6 +45,8 @@ describe("simulateJurisdiction", () => {
     const municipality = simulateJurisdiction(seed.cases, seed.upazilas, "municipal_secretary", null);
 
     expect(union.cases.every((item) => item.unionId === "mn-rohita")).toBe(true);
+    expect(union.unionId).toBe("mn-rohita");
+    expect(municipality.unionId).toBeUndefined();
     expect(municipality.cases.length).toBe(1);
     expect(municipality.cases.every((item) => item.unionId.includes("pourashava"))).toBe(true);
   });

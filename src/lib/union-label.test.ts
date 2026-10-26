@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seedState } from "./seed";
-import { formatUnionBadgeName } from "./union-label";
+import { formatUnionBadgeName, getUnionLabel } from "./union-label";
 
 describe("union badge labels", () => {
   const upazila = seedState().upazilas.find((area) => area.id === "manirampur")!;
@@ -11,11 +11,20 @@ describe("union badge labels", () => {
 
     expect(formatUnionBadgeName(rohita, upazila.unions)).toBe("০১ নং রোহিতা ইউনিয়ন পরিষদ");
     expect(formatUnionBadgeName(dhakuria, upazila.unions)).toBe("০৪ নং ঢাকুরিয়া ইউনিয়ন পরিষদ");
+    expect(getUnionLabel("mn-rohita")).toBe("০১ নং রোহিতা ইউনিয়ন পরিষদ");
+    expect(getUnionLabel("mn-dhakuria")).toBe("০৪ নং ঢাকুরিয়া ইউনিয়ন পরিষদ");
   });
 
   it("keeps municipal areas labeled as municipalities", () => {
     const pourashava = upazila.unions.find((union) => union.id === "mn-pourashava")!;
 
     expect(formatUnionBadgeName(pourashava, upazila.unions)).toBe("মণিরামপুর পৌরসভা");
+  });
+
+  it("never falls back to showing an ID-shaped name", () => {
+    const rohita = upazila.unions.find((union) => union.id === "mn-rohita")!;
+    const mislabeledUnion = { ...rohita, id: "other-rohita", bn: "other-rohita" };
+
+    expect(formatUnionBadgeName(mislabeledUnion, upazila.unions)).toBe("ইউনিয়ন পরিষদ");
   });
 });
