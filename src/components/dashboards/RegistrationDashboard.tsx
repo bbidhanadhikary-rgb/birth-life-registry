@@ -36,7 +36,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
-import { TARGET, type RegCase, type Role, type Union } from "@/lib/types";
+import { TARGET, type RegCase, type Role } from "@/lib/types";
+import { formatUnionBadgeName } from "@/lib/union-label";
 import {
   getDemoAttachmentPreview,
   MASTER_APPLICATIONS_KEY,
@@ -100,25 +101,6 @@ type AdminRecord = {
 };
 
 const ADMIN_RECORDS_KEY = "uert-admin-records";
-const banglaDigits = (value: number) =>
-  String(value).replace(/\d/g, (digit) => "০১২৩৪৫৬৭৮৯"[Number(digit)] ?? digit);
-
-function unionBadgeName(union: Union, unions: Union[]) {
-  const name = union.bn.trim();
-  if (/পৌরসভা$/.test(name) || /pourashava|municipality/i.test(`${union.id} ${union.en}`)) {
-    return /পৌরসভা$/.test(name) ? name : `${name} পৌরসভা`;
-  }
-
-  const numberedName = /^(?:[০-৯]+|[0-9]+)\s*নং\s*/.test(name)
-    ? name.replace(/^([0-9]+)/, (digits) => banglaDigits(Number(digits)))
-    : `${banglaDigits(
-        unions
-          .filter((item) => !/পৌরসভা$/.test(item.bn) && !/pourashava|municipality/i.test(`${item.id} ${item.en}`))
-          .findIndex((item) => item.id === union.id) + 1,
-      )} নং ${name}`;
-
-  return `${numberedName.replace(/\s*ইউনিয়ন(?: পরিষদ)?$/, "")} ইউনিয়ন পরিষদ`;
-}
 
 function readAdminRecords(): AdminRecord[] {
   const stored = localStorage.getItem(ADMIN_RECORDS_KEY);
@@ -1067,7 +1049,7 @@ export function RegistrationDashboard({
             : null,
         ].filter(Boolean).join(" · ");
   const unionBadgeLabel = assignedUnion
-    ? unionBadgeName(assignedUnion, assignedUpazila?.unions ?? [])
+    ? formatUnionBadgeName(assignedUnion, assignedUpazila?.unions ?? [])
     : undefined;
   const canViewWardKpis =
     simulationEnabled ||

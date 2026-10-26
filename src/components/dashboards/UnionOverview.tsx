@@ -3,14 +3,13 @@ import { ArrowLeft, Building2, MapPinned } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageTitle, Stat } from "@/components/shared";
 import { useApp } from "@/lib/store";
+import { formatUnionBadgeName } from "@/lib/union-label";
 
 const viewableRoles = ["worker", "admin", "police", "uno", "district", "super"] as const;
 
 export function UnionOverview({ unionId }: { unionId?: string }) {
   const { L, n, state, user } = useApp();
-  const upazila = state.upazilas.find((area) =>
-    area.unions.some((union) => union.id === unionId),
-  );
+  const upazila = state.upazilas.find((area) => area.unions.some((union) => union.id === unionId));
   const union = upazila?.unions.find((area) => area.id === unionId);
   const canView =
     !!user &&
@@ -57,9 +56,7 @@ export function UnionOverview({ unionId }: { unionId?: string }) {
   ] as const;
   const isMunicipality =
     /pourashava|municipality/i.test(`${union.id} ${union.en}`) || union.bn.includes("পৌরসভা");
-  const placeName = isMunicipality
-    ? union.bn
-    : `${union.bn.replace(/\s*ইউনিয়ন(?: পরিষদ)?$/, "")} ইউনিয়ন পরিষদ`;
+  const placeName = formatUnionBadgeName(union, upazila.unions);
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
@@ -92,12 +89,15 @@ export function UnionOverview({ unionId }: { unionId?: string }) {
             )}
           </span>
           <div>
-            <h2 id="union-profile-title" className="font-display text-lg font-bold text-emerald-950">
+            <h2
+              id="union-profile-title"
+              className="font-display text-lg font-bold text-emerald-950"
+            >
               {placeName}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {L("উপজেলা", "Upazila")}: {L(upazila.bn, upazila.en)} ·{" "}
-              {L("জেলা", "District")}: {L(upazila.districtBn, upazila.districtEn)}
+              {L("উপজেলা", "Upazila")}: {L(upazila.bn, upazila.en)} · {L("জেলা", "District")}:{" "}
+              {L(upazila.districtBn, upazila.districtEn)}
             </p>
             <p className="mt-2 text-sm font-medium text-emerald-900">
               {n(wardCount)} {L("টি ওয়ার্ড", "wards")} · {n(union.villages.length)}{" "}
