@@ -54,6 +54,10 @@ The public landing page's bilingual geographic filters provide five levels: divi
 - `/correction-log` — super-admin-only field-level audit history; database row-level security and MFA remain authoritative.
 - `/monitoring` — executive compliance monitoring and UNO notice publishing.
 
+## Monthly registration targets
+
+Monthly birth and death targets are stored in `registration_targets`, keyed by Upazila, union/municipality, month, and draft/submitted status. UNOs can edit the full union list for their assigned Upazila from their dashboard; saving is performed by authenticated server functions, and database RLS plus the MFA gate enforce the same scope independently. Union-secretary dashboards load only the submitted target for the signed-in secretary's assigned union and current Bangladesh month. Their progress card compares those targets with that union's monthly registration cases.
+
 ## Build with Lovable
 
 Continue developing this project in the [Lovable editor](https://lovable.dev/projects/39cec6a2-955c-4059-b4fc-6b11d67c973a).

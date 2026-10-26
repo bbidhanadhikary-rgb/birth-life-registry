@@ -162,6 +162,13 @@
       "when": 1792940000000,
       "tag": "0022_global_notice_read_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792950000000,
+      "tag": "0023_registration_targets",
+      "breakpoints": true
     }
   ]
 }

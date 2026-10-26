@@ -567,7 +567,7 @@ export type Database = {
         }
         Relationships: []
       }
-      union_targets: {
+      registration_targets: {
         Row: {
           birth_target: number
           death_target: number
@@ -577,6 +577,7 @@ export type Database = {
           updated_at: string
           union_id: string
           union_name: string
+          upazila_id: string
         }
         Insert: {
           birth_target?: number
@@ -587,6 +588,7 @@ export type Database = {
           updated_at?: string
           union_id: string
           union_name: string
+          upazila_id: string
         }
         Update: {
           birth_target?: number
@@ -597,8 +599,17 @@ export type Database = {
           updated_at?: string
           union_id?: string
           union_name?: string
+          upazila_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "registration_targets_upazila_id_fkey"
+            columns: ["upazila_id"]
+            isOneToOne: false
+            referencedRelation: "upazilas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       monitoring_entry_pages: {
         Row: {

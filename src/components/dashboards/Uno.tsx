@@ -8,6 +8,7 @@ import { downloadCSV, printPDF } from "@/lib/report";
 import { TARGET } from "@/lib/types";
 import { PageTitle, Stat, monthCount, redFlags, useCaseHelpers } from "../shared";
 import { CaseReview } from "./CaseReview";
+import { MonitoringTargetEntry } from "./MonitoringTargetEntry";
 
 export function UnoDashboard() {
   const { L, n, user, state } = useApp();
@@ -29,6 +30,9 @@ export function UnoDashboard() {
           <Button variant="outline" onClick={() => downloadCSV(rows(cases), "master-report.csv")}><Download className="mr-1 h-4 w-4" />{L("মাস্টার রিপোর্ট", "Master Report")}</Button>
           <Button variant="outline" onClick={() => printPDF(`Master Report — ${up.en}`, rows(cases))}><FileText className="mr-1 h-4 w-4" />PDF</Button>
         </>} />
+      <div className="mb-6">
+        <MonitoringTargetEntry />
+      </div>
       <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label={L("এ মাসে জন্ম", "Births this month")} value={`${n(monthCount(cases, "birth"))} / ${n(TARGET.birth * up.unions.length)}`} />
         <Stat label={L("এ মাসে মৃত্যু", "Deaths this month")} value={`${n(monthCount(cases, "death"))} / ${n(TARGET.death * up.unions.length)}`} />

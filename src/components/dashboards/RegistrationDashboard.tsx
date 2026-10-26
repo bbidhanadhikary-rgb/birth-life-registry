@@ -36,7 +36,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
-import { TARGET, type RegCase, type Role } from "@/lib/types";
+import { TARGET, type RegCase, type Role, type Union } from "@/lib/types";
 import {
   getDemoAttachmentPreview,
   MASTER_APPLICATIONS_KEY,
@@ -64,6 +64,7 @@ import { seedState } from "@/lib/seed";
 import { isPolicyReadOnlyRole, type PreviewRole } from "@/lib/dashboard-roles";
 import { simulateJurisdiction } from "@/lib/jurisdiction-simulation";
 import { getDhakaMonthYear } from "@/lib/monthly-targets";
+import { loadSecretaryRegistrationTarget } from "@/lib/registration-targets.functions";
 import {
   MonthlyProgressCard,
   type MonthlyProgressCounts,
@@ -99,6 +100,25 @@ type AdminRecord = {
 };
 
 const ADMIN_RECORDS_KEY = "uert-admin-records";
+const banglaDigits = (value: number) =>
+  String(value).replace(/\d/g, (digit) => "০১২৩৪৫৬৭৮৯"[Number(digit)] ?? digit);
+
+function unionBadgeName(union: Union, unions: Union[]) {
+  const name = union.bn.trim();
+  if (/পৌরসভা$/.test(name) || /pourashava|municipality/i.test(`${union.id} ${union.en}`)) {
+    return /পৌরসভা$/.test(name) ? name : `${name} পৌরসভা`;
+  }
+
+  const numberedName = /^(?:[০-৯]+|[0-9]+)\s*নং\s*/.test(name)
+    ? name.replace(/^([0-9]+)/, (digits) => banglaDigits(Number(digits)))
+    : `${banglaDigits(
+        unions
+          .filter((item) => !/পৌরসভা$/.test(item.bn) && !/pourashava|municipality/i.test(`${item.id} ${item.en}`))
+          .findIndex((item) => item.id === union.id) + 1,
+      )} নং ${name}`;
+
+  return `${numberedName.replace(/\s*ইউনিয়ন(?: পরিষদ)?$/, "")} ইউনিয়ন পরিষদ`;
+}
 
 function readAdminRecords(): AdminRecord[] {
   const stored = localStorage.getItem(ADMIN_RECORDS_KEY);
@@ -707,8 +727,7 @@ export function RegistrationDashboard({
     }
   }, [L, isLocalAdminPreview, user]);
   useEffect(() => {
-    const unionId = user?.unionId;
-    if (!unionId || demoMode) {
+    if (user?.role !== "admin" || !user.unionId || demoMode) {
       setUnionMonthlyTarget(null);
       return;
     }
@@ -718,29 +737,9 @@ export function RegistrationDashboard({
     setUnionMonthlyTarget(null);
     void (async () => {
       try {
-        const { data, error } = await supabase
-          .from("union_targets")
-          .select("union_id, month_year, birth_target, death_target")
-          .eq("union_id", unionId)
-          .eq("month_year", monthYear)
-          .eq("status", "submitted")
-          .maybeSingle();
+        const { target } = await loadSecretaryRegistrationTarget({ data: { monthYear } });
         if (!active) return;
-        if (error) {
-          console.error("Failed to load union monthly targets", error);
-          toast.error(L("ইউনিয়নের মাসিক লক্ষ্যমাত্রা লোড করা যায়নি", "Could not load union monthly targets"));
-        } else {
-          setUnionMonthlyTarget(
-            data
-              ? {
-                  unionId: data.union_id,
-                  monthYear: data.month_year,
-                  birth: data.birth_target,
-                  death: data.death_target,
-                }
-              : null,
-          );
-        }
+        setUnionMonthlyTarget(target);
       } catch (error) {
         if (!active) return;
         console.error("Failed to load union monthly targets", error);
@@ -751,7 +750,7 @@ export function RegistrationDashboard({
     return () => {
       active = false;
     };
-  }, [L, demoMode, user?.unionId]);
+  }, [L, demoMode, user?.id, user?.role, user?.unionId]);
   useEffect(() => {
     if (initialAction) setActiveCard({ kind: "action", id: initialAction });
   }, [initialAction]);
@@ -982,10 +981,20 @@ export function RegistrationDashboard({
     unionMonthlyTarget.monthYear === targetMonthYear
       ? unionMonthlyTarget
       : null;
+  const requiresSubmittedUnionTarget =
+    roleConfig === "admin" && user?.role === "admin" && !demoMode && !simulationEnabled;
   const monthlyTargets = {
-    birth: activeUnionTarget?.birth ?? Math.ceil(TARGET.birth * monthlyTargetScale),
-    death: activeUnionTarget?.death ?? Math.ceil(TARGET.death * monthlyTargetScale),
+    birth: activeUnionTarget?.birth ??
+      (requiresSubmittedUnionTarget ? 0 : Math.ceil(TARGET.birth * monthlyTargetScale)),
+    death: activeUnionTarget?.death ??
+      (requiresSubmittedUnionTarget ? 0 : Math.ceil(TARGET.death * monthlyTargetScale)),
   };
+  const monthlyTargetWarning =
+    hasWardAggregate && !wardMonthlyCounts
+      ? L("ওয়ার্ডের সামগ্রিক তথ্য লোড করা যায়নি", "Ward aggregate could not be loaded")
+      : requiresSubmittedUnionTarget && !activeUnionTarget
+        ? L("এই মাসের জন্য UNO-এর জমা দেওয়া লক্ষ্যমাত্রা পাওয়া যায়নি", "No submitted UNO target was found for this month")
+        : undefined;
   const monthlyTarget = monthlyTargets.birth + monthlyTargets.death;
   const monthlyReceived =
     hasWardAggregate && wardMonthlyCounts ? wardMonthlyCounts.total : monthCases.length;
@@ -1057,6 +1066,9 @@ export function RegistrationDashboard({
             ? L(`ওয়ার্ড ${user.ward}`, `Ward ${user.ward}`)
             : null,
         ].filter(Boolean).join(" · ");
+  const unionBadgeLabel = assignedUnion
+    ? unionBadgeName(assignedUnion, assignedUpazila?.unions ?? [])
+    : undefined;
   const canViewWardKpis =
     simulationEnabled ||
     isLocalAdminPreview ||
@@ -1410,17 +1422,33 @@ export function RegistrationDashboard({
       <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-1 px-4 py-1 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-1.5 sm:px-6 sm:py-1.5 lg:px-8">
         <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
           <div className="flex min-h-0 flex-col justify-center">
-            <span className="mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-100 via-white to-slate-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base">
-              <MapPin
-                aria-hidden="true"
-                className="h-5 w-5 shrink-0 text-emerald-700 sm:h-6 sm:w-6"
-              />
-              <span className="min-w-0">
-                {jurisdictionScope
-                  ? L(jurisdictionScope.labelBn, jurisdictionScope.labelEn)
-                  : scopeLabel || L("জাতীয় পর্যায়", "National scope")}
+            {assignedUnion && unionBadgeLabel && !jurisdictionScope ? (
+              <Link
+                to="/monitoring/union-details"
+                search={{ unionId: assignedUnion.id }}
+                aria-label={L(`${unionBadgeLabel} এর বিস্তারিত দেখুন`, `View details for ${assignedUnion.en}`)}
+                className="group mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-300 bg-gradient-to-r from-emerald-100 via-white to-teal-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 transition duration-200 ease-out hover:scale-105 hover:border-teal-400 hover:from-lime-100 hover:via-emerald-50 hover:to-cyan-100 hover:text-teal-950 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:scale-100 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base"
+              >
+                <MapPin
+                  aria-hidden="true"
+                  className="h-5 w-5 shrink-0 text-emerald-700 transition-colors group-hover:text-teal-800 sm:h-6 sm:w-6"
+                />
+                <span className="min-w-0">{unionBadgeLabel}</span>
+                <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0" />
+              </Link>
+            ) : (
+              <span className="mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-100 via-white to-slate-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base">
+                <MapPin
+                  aria-hidden="true"
+                  className="h-5 w-5 shrink-0 text-emerald-700 sm:h-6 sm:w-6"
+                />
+                <span className="min-w-0">
+                  {jurisdictionScope
+                    ? L(jurisdictionScope.labelBn, jurisdictionScope.labelEn)
+                    : scopeLabel || L("জাতীয় পর্যায়", "National scope")}
+                </span>
               </span>
-            </span>
+            )}
             <h1 className="max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
               ই-নিবন্ধন ট্র্যাকার
             </h1>
@@ -1464,14 +1492,7 @@ export function RegistrationDashboard({
               !!user && ["admin", "district", "uno", "super"].includes(user.role)
             }
             featured
-            {...(hasWardAggregate && !wardMonthlyCounts
-              ? {
-                  warning: L(
-                    "ওয়ার্ডের সামগ্রিক তথ্য লোড করা যায়নি",
-                    "Ward aggregate could not be loaded",
-                  ),
-                }
-              : {})}
+            {...(monthlyTargetWarning ? { warning: monthlyTargetWarning } : {})}
           />
         </div>
 

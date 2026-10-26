@@ -23,6 +23,7 @@ import { Route as ReviewListRouteImport } from './routes/review-list'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as DashboardSectionRouteImport } from './routes/dashboard.$section'
+import { Route as MonitoringUnionDetailsRouteImport } from './routes/monitoring_.union-details'
 import { Route as WorkerApplicationsTypeRouteImport } from './routes/worker-applications.$type'
 
 const IndexRoute = IndexRouteImport.update({
@@ -95,6 +96,11 @@ const DashboardSectionRoute = DashboardSectionRouteImport.update({
   path: '/$section',
   getParentRoute: () => DashboardRoute,
 } as any)
+const MonitoringUnionDetailsRoute = MonitoringUnionDetailsRouteImport.update({
+  id: '/monitoring_/union-details',
+  path: '/monitoring/union-details',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WorkerApplicationsTypeRoute = WorkerApplicationsTypeRouteImport.update({
   id: '/worker-applications/$type',
   path: '/worker-applications/$type',
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
   '/dashboard/$section': typeof DashboardSectionRoute
+  '/monitoring/union-details': typeof MonitoringUnionDetailsRoute
   '/worker-applications/$type': typeof WorkerApplicationsTypeRoute
 }
 export interface FileRoutesByTo {
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
   '/dashboard/$section': typeof DashboardSectionRoute
+  '/monitoring/union-details': typeof MonitoringUnionDetailsRoute
   '/worker-applications/$type': typeof WorkerApplicationsTypeRoute
 }
 export interface FileRoutesById {
@@ -151,6 +159,7 @@ export interface FileRoutesById {
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
   '/dashboard/$section': typeof DashboardSectionRoute
+  '/monitoring_/union-details': typeof MonitoringUnionDetailsRoute
   '/worker-applications/$type': typeof WorkerApplicationsTypeRoute
 }
 export interface FileRouteTypes {
@@ -170,6 +179,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/setup'
     | '/dashboard/$section'
+    | '/monitoring/union-details'
     | '/worker-applications/$type'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -187,6 +197,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/setup'
     | '/dashboard/$section'
+    | '/monitoring/union-details'
     | '/worker-applications/$type'
   id:
     | '__root__'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/security'
     | '/setup'
     | '/dashboard/$section'
+    | '/monitoring_/union-details'
     | '/worker-applications/$type'
   fileRoutesById: FileRoutesById
 }
@@ -221,6 +233,7 @@ export interface RootRouteChildren {
   ReviewListRoute: typeof ReviewListRoute
   SecurityRoute: typeof SecurityRoute
   SetupRoute: typeof SetupRoute
+  MonitoringUnionDetailsRoute: typeof MonitoringUnionDetailsRoute
   WorkerApplicationsTypeRoute: typeof WorkerApplicationsTypeRoute
 }
 
@@ -324,6 +337,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSectionRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/monitoring_/union-details': {
+      id: '/monitoring_/union-details'
+      path: '/monitoring/union-details'
+      fullPath: '/monitoring/union-details'
+      preLoaderRoute: typeof MonitoringUnionDetailsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/worker-applications/$type': {
       id: '/worker-applications/$type'
       path: '/worker-applications/$type'
@@ -360,6 +380,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewListRoute: ReviewListRoute,
   SecurityRoute: SecurityRoute,
   SetupRoute: SetupRoute,
+  MonitoringUnionDetailsRoute: MonitoringUnionDetailsRoute,
   WorkerApplicationsTypeRoute: WorkerApplicationsTypeRoute,
 }
 export const routeTree = rootRouteImport

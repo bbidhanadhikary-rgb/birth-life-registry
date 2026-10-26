@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { getDhakaMonthYear } from "@/lib/monthly-targets";
 import { useApp } from "@/lib/store";
 import { TARGET } from "@/lib/types";
+import {
+  loadUpazilaRegistrationTargets,
+  saveUpazilaRegistrationTargets,
+} from "@/lib/registration-targets.functions";
 
 type TargetRow = {
   unionId: string;
@@ -67,44 +70,28 @@ export function MonitoringTargetEntry({
 }) {
   const { L, n, state, user, demoMode } = useApp();
   const upazila = state.upazilas.find((item) => item.id === user?.upazilaId);
-  const monthYear = getDhakaMonthYear();
+  const [monthYear, setMonthYear] = useState(getDhakaMonthYear);
   const [rows, setRows] = useState<TargetRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [localFallback, setLocalFallback] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState<"draft" | "submitted" | null>(null);
 
   useEffect(() => {
     if (user?.role !== "uno" || !upazila) {
       setRows([]);
       setLoading(false);
+      setLoadError(false);
       return;
     }
 
     let active = true;
     setLoading(true);
-    setLocalFallback(demoMode);
-    const unionIds = upazila.unions.map((union) => union.id);
+    setLoadError(false);
 
     void (async () => {
-      let savedTargets: SavedTarget[] = [];
-      if (demoMode) {
-        savedTargets = readDemoTargets(user.id, monthYear);
-      } else {
-        const { data, error } = await supabase
-          .from("union_targets")
-          .select("union_id, birth_target, death_target, status, updated_at")
-          .eq("month_year", monthYear)
-          .in("union_id", unionIds);
-        if (error) {
-          if (!active) return;
-          console.error("Failed to load monitoring targets", error);
-          savedTargets = readDemoTargets(user.id, monthYear);
-          setLocalFallback(true);
-        } else {
-          savedTargets = data ?? [];
-          setLocalFallback(false);
-        }
-      }
+      const savedTargets: SavedTarget[] = demoMode
+        ? readDemoTargets(user.id, monthYear)
+        : (await loadUpazilaRegistrationTargets({ data: { monthYear } })).targets;
 
       if (!active) return;
 
@@ -135,8 +122,8 @@ export function MonitoringTargetEntry({
       const submittedTotals = upazila.unions.reduce(
         (totals, union) => {
           const submitted = grouped.get(union.id)?.submitted;
-          totals.birth += submitted?.birth_target ?? TARGET.birth;
-          totals.death += submitted?.death_target ?? TARGET.death;
+          totals.birth += submitted?.birth_target ?? 0;
+          totals.death += submitted?.death_target ?? 0;
           return totals;
         },
         { birth: 0, death: 0 },
@@ -144,8 +131,17 @@ export function MonitoringTargetEntry({
 
       setRows(nextRows);
       onSubmittedTargets?.(submittedTotals);
-      setLoading(false);
-    })();
+    })()
+      .catch((error: unknown) => {
+        if (!active) return;
+        console.error("Failed to load registration targets", error);
+        setRows([]);
+        setLoadError(true);
+        toast.error(L("লক্ষ্যমাত্রা লোড করা যায়নি", "Could not load registration targets"));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
 
     return () => {
       active = false;
@@ -164,10 +160,11 @@ export function MonitoringTargetEntry({
   };
 
   const saveTargets = async (status: "draft" | "submitted") => {
-    if (!upazila || saving || !rows.length) return;
+    if (!upazila || saving || !rows.length || loadError) return;
     if (rows.some((row) =>
       !/^\d+$/.test(row.birth) || !/^\d+$/.test(row.death) ||
-      !Number.isSafeInteger(Number(row.birth)) || !Number.isSafeInteger(Number(row.death)),
+      !Number.isSafeInteger(Number(row.birth)) || !Number.isSafeInteger(Number(row.death)) ||
+      Number(row.birth) > 2_147_483_647 || Number(row.death) > 2_147_483_647,
     )) {
       toast.error(L("প্রতিটি লক্ষ্যমাত্রা পূর্ণসংখ্যা হতে হবে", "Targets must be whole numbers"));
       return;
@@ -176,53 +173,41 @@ export function MonitoringTargetEntry({
     setSaving(status);
     const savedAt = new Date().toISOString();
     const savedRows = rows.map((row) => ({
-      union_id: row.unionId,
-      union_name: upazila.unions.find((union) => union.id === row.unionId)?.bn ?? row.name,
-      birth_target: Number(row.birth),
-      death_target: Number(row.death),
-      status,
-      updated_at: savedAt,
+      unionId: row.unionId,
+      birthTarget: Number(row.birth),
+      deathTarget: Number(row.death),
     }));
 
     try {
-      let savedOnDevice = demoMode || localFallback;
-      if (savedOnDevice) {
+      if (demoMode) {
         const previousTargets = readDemoTargets(user.id, monthYear);
+        const localRows: DemoTarget[] = savedRows.map((row) => ({
+          union_id: row.unionId,
+          union_name: upazila.unions.find((union) => union.id === row.unionId)?.bn ?? row.unionId,
+          birth_target: row.birthTarget,
+          death_target: row.deathTarget,
+          status,
+          updated_at: savedAt,
+        }));
         const nextTargets = [
           ...previousTargets.filter((target) =>
-            !savedRows.some((row) => row.union_id === target.union_id && target.status === status),
+            !localRows.some((row) => row.union_id === target.union_id && target.status === status),
           ),
-          ...savedRows,
+          ...localRows,
         ];
         if (!writeDemoTargets(user.id, monthYear, nextTargets)) {
           throw new Error("Could not persist monitoring targets on this device");
         }
       } else {
-        const { error } = await supabase.from("union_targets").upsert(
-          savedRows.map((row) => ({ ...row, month_year: monthYear })),
-          { onConflict: "union_id,month_year,status" },
-        );
-        if (error) {
-          console.error(`Failed to save ${status} monitoring targets to Supabase`, error);
-          const previousTargets = readDemoTargets(user.id, monthYear);
-          const nextTargets = [
-            ...previousTargets.filter((target) =>
-              !savedRows.some((row) => row.union_id === target.union_id && target.status === status),
-            ),
-            ...savedRows,
-          ];
-          if (!writeDemoTargets(user.id, monthYear, nextTargets)) throw error;
-          savedOnDevice = true;
-          setLocalFallback(true);
-        }
+        await saveUpazilaRegistrationTargets({
+          data: { monthYear, status, targets: savedRows },
+        });
       }
 
       if (status === "submitted") onSubmittedTargets?.({ birth: birthTotal, death: deathTotal });
-      toast.success(savedOnDevice && !demoMode
-        ? L("সার্ভারে সংরক্ষণ হয়নি; তথ্য এই ডিভাইসে সংরক্ষিত হয়েছে", "Server unavailable; saved on this device")
-        : status === "draft"
-          ? L("খসড়া সফলভাবে সংরক্ষণ করা হয়েছে", "Draft saved successfully")
-          : L("লক্ষ্যমাত্রা সফলভাবে জমা দেওয়া হয়েছে", "Targets submitted successfully"));
+      toast.success(status === "draft"
+        ? L("খসড়া সফলভাবে সংরক্ষণ করা হয়েছে", "Draft saved successfully")
+        : L("লক্ষ্যমাত্রা সফলভাবে জমা দেওয়া হয়েছে", "Targets submitted successfully"));
     } catch (error) {
       console.error(`Failed to save ${status} monitoring targets`, error);
       toast.error(L("লক্ষ্যমাত্রা সংরক্ষণ করা যায়নি", "Could not save targets"));
@@ -236,7 +221,20 @@ export function MonitoringTargetEntry({
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="font-semibold">{L("ইউনিয়ন/পৌরসভাভিত্তিক লক্ষ্যমাত্রা", "Union/Municipality targets")}</h2>
-          <p className="text-xs text-muted-foreground">{L(`মাস: ${monthYear.slice(0, 7)}`, `Month: ${monthYear.slice(0, 7)}`)}</p>
+          <label className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+            {L("মাস", "Month")}
+            <Input
+              aria-label={L("লক্ষ্যমাত্রার মাস", "Target month")}
+              className="h-8 w-40"
+              type="month"
+              value={monthYear.slice(0, 7)}
+              onChange={(event) => {
+                if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value)) {
+                  setMonthYear(`${event.target.value}-01`);
+                }
+              }}
+            />
+          </label>
         </div>
       </header>
 
@@ -262,6 +260,7 @@ export function MonitoringTargetEntry({
                     className="h-9 w-32 tabular-nums"
                     type="number"
                     min="0"
+                    max="2147483647"
                     step="1"
                     value={row.birth}
                     disabled={loading || saving !== null}
@@ -274,6 +273,7 @@ export function MonitoringTargetEntry({
                     className="h-9 w-32 tabular-nums"
                     type="number"
                     min="0"
+                    max="2147483647"
                     step="1"
                     value={row.death}
                     disabled={loading || saving !== null}
@@ -297,6 +297,13 @@ export function MonitoringTargetEntry({
                 </td>
               </tr>
             )}
+            {loadError && !loading && (
+              <tr>
+                <td colSpan={5} className="px-3 py-6 text-center text-destructive">
+                  {L("লক্ষ্যমাত্রা লোড করা যায়নি", "Targets could not be loaded")}
+                </td>
+              </tr>
+            )}
           </tbody>
           {!!rows.length && (
             <tfoot className="border-t-2 border-slate-300 bg-slate-50 font-bold dark:border-slate-600 dark:bg-slate-800">
@@ -312,10 +319,10 @@ export function MonitoringTargetEntry({
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="outline" disabled={loading || saving !== null || !rows.length} onClick={() => void saveTargets("draft")}>
+        <Button variant="outline" disabled={loading || loadError || saving !== null || !rows.length} onClick={() => void saveTargets("draft")}>
           {saving === "draft" ? L("সংরক্ষণ হচ্ছে…", "Saving…") : L("খসড়া সংরক্ষণ", "Save Draft")}
         </Button>
-        <Button disabled={loading || saving !== null || !rows.length} onClick={() => void saveTargets("submitted")}>
+        <Button disabled={loading || loadError || saving !== null || !rows.length} onClick={() => void saveTargets("submitted")}>
           {saving === "submitted" ? L("জমা হচ্ছে…", "Submitting…") : L("চূড়ান্ত জমা", "Final Submit")}
         </Button>
       </div>
