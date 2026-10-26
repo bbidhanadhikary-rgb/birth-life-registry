@@ -66,6 +66,8 @@ import { isPolicyReadOnlyRole, type PreviewRole } from "@/lib/dashboard-roles";
 import { simulateJurisdiction } from "@/lib/jurisdiction-simulation";
 import { getDhakaMonthYear } from "@/lib/monthly-targets";
 import { useAssignedRegistrationTarget } from "@/lib/use-assigned-registration-target";
+import { getStationsForUpazila, getTargetEntryStations } from "@/lib/monirampur-stations";
+import { readDemoRegistrationTargets } from "@/lib/registration-targets";
 import {
   MonthlyProgressCard,
   type MonthlyProgressCounts,
@@ -376,56 +378,86 @@ function monthKey(timestamp: number) {
   }).format(timestamp);
 }
 
-function createLocalAdminPreviewCases(seedCases: RegCase[]) {
-  const cases = seedCases.filter(
+const LOCAL_ADMIN_PREVIEW_STATION_ID = "mn-dhakuria";
+
+function createLocalAdminPreviewCases(seedCases: RegCase[], stationId: string) {
+  const stations = getStationsForUpazila(
+    "manirampur",
+    seedState().upazilas.find((item) => item.id === "manirampur")?.unions ?? [],
+  );
+  const station = stations.find((item) => item.id === stationId) ?? stations[0]!;
+  const nameBn = station.bn.replace(/^\d+\s*(?:নং|No\.)\s*/, "");
+  const nameEn = station.en.replace(/^\d+ No\.\s*/, "");
+  const savedPreviewCases = seedCases.filter(
     (item) =>
       item.upazilaId === "manirampur" &&
-      item.unionId === "mn-rohita" &&
+      item.unionId === station.id &&
+      item.id.startsWith(`local-preview-${station.id}-`),
+  );
+  if (savedPreviewCases.length) return savedPreviewCases;
+  const sourceCases = seedCases.filter(
+    (item) =>
+      item.upazilaId === "manirampur" &&
+      item.unionId === stationId &&
+      !item.id.startsWith("local-preview-") &&
       item.id !== "preview-birth-ward-2" &&
       item.id !== "preview-death-ward-3",
-  ).map((item) => ({
-    ...item,
-    details: {
-      ...item.details,
-      ...(item.type === "birth"
-        ? { birthPlace: { bn: `রোহিতা · ওয়ার্ড ${item.ward}`, en: `Rohita · Ward ${item.ward}` } }
-        : { deathPlace: { bn: `রোহিতা · ওয়ার্ড ${item.ward}`, en: `Rohita · Ward ${item.ward}` } }),
-    },
-  }));
+  );
+  const fallbackCases = sourceCases.length
+    ? sourceCases
+    : seedCases.filter(
+        (item) =>
+          item.upazilaId === "manirampur" &&
+          item.unionId === "mn-rohita" &&
+          !item.id.startsWith("local-preview-") &&
+          item.id !== "preview-birth-ward-2" &&
+          item.id !== "preview-death-ward-3",
+      );
+  const remapCase = (item: RegCase, id = `local-preview-${stationId}-${item.id}`): RegCase => {
+    const village = station.villages.find((candidate) => candidate.ward === item.ward)
+      ?? station.villages[0];
+    return {
+      ...item,
+      id,
+      upazilaId: "manirampur",
+      stationId,
+      unionId: stationId,
+      villageId: village?.id ?? `${stationId}-v1`,
+      details: {
+        ...item.details,
+        ...(item.type === "birth"
+          ? { birthPlace: { bn: `${nameBn} · ওয়ার্ড ${item.ward}`, en: `${nameEn} · Ward ${item.ward}` } }
+          : { deathPlace: { bn: `${nameBn} · ওয়ার্ড ${item.ward}`, en: `${nameEn} · Ward ${item.ward}` } }),
+      },
+    };
+  };
+  const cases = fallbackCases.map((item) => remapCase(item));
   const birthTemplate = cases.find((item) => item.type === "birth");
   const deathTemplate = cases.find((item) => item.type === "death");
   if (!birthTemplate || !deathTemplate) return cases;
   const now = Date.now();
-  const birthPreview = seedCases.find((item) => item.id === "preview-birth-ward-2");
-  const deathPreview = seedCases.find((item) => item.id === "preview-death-ward-3");
+  const birthPreview = seedCases.find(
+    (item) => item.id === `local-preview-${stationId}-birth-ward-2`,
+  );
+  const deathPreview = seedCases.find(
+    (item) => item.id === `local-preview-${stationId}-death-ward-3`,
+  );
   return [
     ...cases,
-    birthPreview ?? {
+    birthPreview ?? remapCase({
       ...birthTemplate,
-      id: "preview-birth-ward-2",
-      name: { bn: "নমুনা জন্ম আবেদন - ওয়ার্ড ২", en: "Sample birth application - Ward 2" },
-      villageId: "mn-rohita-v2",
+      name: { bn: `নমুনা জন্ম আবেদন - ${nameBn}`, en: `Sample birth application - ${nameEn}` },
       ward: 2,
       createdBy: "local-preview",
       createdAt: now,
-      details: {
-        ...birthTemplate.details,
-        birthPlace: { bn: "রোহিতা · ওয়ার্ড ২", en: "Rohita · Ward 2" },
-      },
-    },
-    deathPreview ?? {
+    }, `local-preview-${stationId}-birth-ward-2`),
+    deathPreview ?? remapCase({
       ...deathTemplate,
-      id: "preview-death-ward-3",
-      name: { bn: "নমুনা মৃত্যু আবেদন - ওয়ার্ড ৩", en: "Sample death application - Ward 3" },
-      villageId: "mn-rohita-v3",
+      name: { bn: `নমুনা মৃত্যু আবেদন - ${nameBn}`, en: `Sample death application - ${nameEn}` },
       ward: 3,
       createdBy: "local-preview",
       createdAt: now - 1,
-      details: {
-        ...deathTemplate.details,
-        deathPlace: { bn: "রোহিতা · ওয়ার্ড ৩", en: "Rohita · Ward 3" },
-      },
-    },
+    }, `local-preview-${stationId}-death-ward-3`),
   ];
 }
 
@@ -610,12 +642,13 @@ export function RegistrationDashboard({
   const [masterPreviewCases, setMasterPreviewCases] = useState<RegCase[]>(
     () => readMasterRegCases(localPreviewSeed.cases),
   );
+  const [previewStationId, setPreviewStationId] = useState(LOCAL_ADMIN_PREVIEW_STATION_ID);
   const [localPreviewCases, setLocalPreviewCases] = useState<RegCase[]>(
-    () => createLocalAdminPreviewCases(masterPreviewCases),
+    () => createLocalAdminPreviewCases(masterPreviewCases, LOCAL_ADMIN_PREVIEW_STATION_ID),
   );
   const baselineLocalPreviewCases = useMemo(
-    () => createLocalAdminPreviewCases(masterPreviewCases),
-    [masterPreviewCases],
+    () => createLocalAdminPreviewCases(masterPreviewCases, previewStationId),
+    [masterPreviewCases, previewStationId],
   );
   const [previewEditingCase, setPreviewEditingCase] = useState<RegCase | null>(null);
   const [previewEditName, setPreviewEditName] = useState("");
@@ -632,6 +665,11 @@ export function RegistrationDashboard({
     death: { pending: number; progress: number; completed: number; total: number };
   } | null>(null);
   const unionMonthlyTarget = useAssignedRegistrationTarget();
+  const [localPreviewTarget, setLocalPreviewTarget] = useState<{
+    unionId: string;
+    birth: number;
+    death: number;
+  } | null>(null);
   const [feedbackCategory, setFeedbackCategory] = useState<"complaint" | "suggestion">("suggestion");
   const [feedbackSubject, setFeedbackSubject] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
@@ -657,7 +695,9 @@ export function RegistrationDashboard({
       if (event.key === MASTER_APPLICATIONS_KEY) {
         const cases = readMasterRegCases(localPreviewSeed.cases);
         refreshMasterCases(cases);
-        if (isLocalAdminPreview) setLocalPreviewCases(createLocalAdminPreviewCases(cases));
+        if (isLocalAdminPreview) {
+          setLocalPreviewCases(createLocalAdminPreviewCases(cases, previewStationId));
+        }
       }
     };
     const onMasterUpdate = (event: Event) => {
@@ -669,7 +709,7 @@ export function RegistrationDashboard({
       window.removeEventListener("storage", onStorage);
       window.removeEventListener(MASTER_APPLICATIONS_UPDATED_EVENT, onMasterUpdate);
     };
-  }, [isLocalAdminPreview, localPreviewSeed.cases]);
+  }, [isLocalAdminPreview, localPreviewSeed.cases, previewStationId]);
   useEffect(() => {
     if (!isLocalAdminPreview) return;
     const masterCases = readMasterRegCases(localPreviewSeed.cases);
@@ -695,14 +735,39 @@ export function RegistrationDashboard({
         readAdminRecords().filter(
           (record) =>
             record.upazilaId === (user?.upazilaId ?? "manirampur") &&
-            record.unionId === (user?.unionId ?? "mn-rohita"),
+            record.unionId === (user?.unionId ?? previewStationId),
         ),
       );
     } catch (cause) {
       console.error("Failed to load administrative records", cause);
       toast.error(L("প্রশাসনিক রেকর্ড লোড করা যায়নি", "Could not load administrative records"));
     }
-  }, [L, isLocalAdminPreview, user]);
+  }, [L, isLocalAdminPreview, previewStationId, user]);
+  useEffect(() => {
+    if (!isLocalAdminPreview) {
+      setLocalPreviewTarget(null);
+      return;
+    }
+
+    const monthYear = getDhakaMonthYear();
+    const refreshTarget = () => {
+      const savedTarget = readDemoRegistrationTargets("manirampur", monthYear)
+        .find((target) => target.union_id === previewStationId && target.status === "submitted");
+      setLocalPreviewTarget(savedTarget ? {
+        unionId: savedTarget.union_id,
+        birth: savedTarget.birth_target,
+        death: savedTarget.death_target,
+      } : null);
+    };
+    refreshTarget();
+
+    const key = `monitoring-union-targets:manirampur:${monthYear}`;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === key) refreshTarget();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [isLocalAdminPreview, previewStationId]);
   useEffect(() => {
     if (initialAction) setActiveCard({ kind: "action", id: initialAction });
   }, [initialAction]);
@@ -893,11 +958,19 @@ export function RegistrationDashboard({
       ? { birth: wardMonthlyCounts.birth, death: wardMonthlyCounts.death }
       : localMonthlyCounts;
   const scopeUpazilaId = user?.upazilaId ?? (isLocalAdminPreview ? "manirampur" : undefined);
-  const scopeUnionId = user?.unionId ?? (isLocalAdminPreview ? "mn-rohita" : undefined);
+  const scopeUnionId = user
+    ? user.stationId ?? user.unionId
+    : isLocalAdminPreview
+      ? previewStationId
+      : undefined;
   const assignedUpazila = scopeUpazilaId
     ? (isLocalAdminPreview ? localPreviewSeed.upazilas : state.upazilas).find((item) => item.id === scopeUpazilaId)
     : undefined;
   const assignedUnion = assignedUpazila?.unions.find((item) => item.id === scopeUnionId);
+  const previewStations = getTargetEntryStations(
+    "manirampur",
+    localPreviewSeed.upazilas.find((item) => item.id === "manirampur")?.unions ?? [],
+  );
   const assignedWardCount = assignedUnion
     ? new Set(assignedUnion.villages.map((village) => village.ward)).size || 9
     : 9;
@@ -926,20 +999,24 @@ export function RegistrationDashboard({
                   : Math.max(1, selectedUnionCount));
   const targetMonthYear = getDhakaMonthYear();
   const activeUnionTarget =
-    (roleConfig === "admin" || roleConfig === "worker" || roleConfig === "police") &&
-    (user?.role === "admin" || user?.role === "worker" || user?.role === "police") &&
-    unionMonthlyTarget !== null &&
-    unionMonthlyTarget.unionId === (user.stationId ?? user.unionId) &&
-    unionMonthlyTarget.monthYear === targetMonthYear
-      ? unionMonthlyTarget
-      : null;
+    isLocalAdminPreview
+      ? localPreviewTarget?.unionId === previewStationId
+        ? localPreviewTarget
+        : null
+      : (roleConfig === "admin" || roleConfig === "worker" || roleConfig === "police") &&
+          (user?.role === "admin" || user?.role === "worker" || user?.role === "police") &&
+          unionMonthlyTarget !== null &&
+          unionMonthlyTarget.unionId === (user.stationId ?? user.unionId) &&
+          unionMonthlyTarget.monthYear === targetMonthYear
+        ? unionMonthlyTarget
+        : null;
   const requiresSubmittedUnionTarget =
     roleConfig === "admin" && user?.role === "admin" && !demoMode && !simulationEnabled;
   const monthlyTargets = {
     birth: activeUnionTarget?.birth ??
-      (requiresSubmittedUnionTarget ? 0 : Math.ceil(TARGET.birth * monthlyTargetScale)),
+      (requiresSubmittedUnionTarget && !isLocalAdminPreview ? 0 : Math.ceil(TARGET.birth * monthlyTargetScale)),
     death: activeUnionTarget?.death ??
-      (requiresSubmittedUnionTarget ? 0 : Math.ceil(TARGET.death * monthlyTargetScale)),
+      (requiresSubmittedUnionTarget && !isLocalAdminPreview ? 0 : Math.ceil(TARGET.death * monthlyTargetScale)),
   };
   const monthlyTargetWarning =
     hasWardAggregate && !wardMonthlyCounts
@@ -1003,9 +1080,13 @@ export function RegistrationDashboard({
         );
   const scopeUpazila = state.upazilas.find((item) => item.id === user?.upazilaId);
   const scopeUnion = scopeUpazila?.unions.find((item) => item.id === user?.unionId);
-  const badgeUnionId = jurisdictionScope?.level === "union"
-    ? jurisdictionScope.unionId
-    : assignedUnion?.id;
+  const badgeUnionId = user
+    ? user.stationId ?? user.unionId
+    : isLocalAdminPreview
+      ? previewStationId
+      : jurisdictionScope?.level === "union"
+        ? jurisdictionScope.unionId
+        : assignedUnion?.id;
   const badgeUnionLocation = badgeUnionId
     ? state.upazilas
         .map((upazila) => ({
@@ -1024,7 +1105,7 @@ export function RegistrationDashboard({
       ? `${unionBadgeLabel} · ${L("ডেভেলপমেন্ট সিমুলেশন", "Development simulation")}`
       : `${L(jurisdictionScope.labelBn, jurisdictionScope.labelEn)} · ${L("ডেভেলপমেন্ট সিমুলেশন", "Development simulation")}`
     : isLocalAdminPreview
-    ? `${L("মণিরামপুর", "Manirampur")} · ${L("০১ নং রোহিতা", "01 No. Rohita")} · ${L("লোকাল নমুনা ডেটা", "Local mock data")}`
+    ? `${L("মণিরামপুর", "Manirampur")} · ${L(assignedUnion?.bn ?? "", assignedUnion?.en ?? "")} · ${L("লোকাল নমুনা ডেটা", "Local mock data")}`
     : !user || user.role === "super"
     ? L("জাতীয় পর্যায়", "National scope")
     : user.role === "district"
@@ -1387,6 +1468,31 @@ export function RegistrationDashboard({
         </div>
       ) : (
       <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-1 px-4 py-1 max-[360px]:gap-1 max-[360px]:py-1 sm:gap-1.5 sm:px-6 sm:py-1.5 lg:px-8">
+        {isLocalAdminPreview && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-white/90 px-3 py-2 shadow-sm">
+            <label htmlFor="local-admin-station-switcher" className="text-sm font-bold text-emerald-950">
+              {L("পরীক্ষার স্টেশন", "Test station")}
+            </label>
+            <Select
+              value={previewStationId}
+              onValueChange={(stationId) => {
+                setPreviewStationId(stationId);
+                setLocalPreviewCases(createLocalAdminPreviewCases(masterPreviewCases, stationId));
+              }}
+            >
+              <SelectTrigger id="local-admin-station-switcher" className="w-full max-w-sm border-emerald-300 bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {previewStations.map((station) => (
+                  <SelectItem key={station.id} value={station.id}>
+                    {L(station.bn, station.en)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
           <div className="flex min-h-0 flex-col justify-center">
             {badgeUnionId && unionBadgeLabel ? (
