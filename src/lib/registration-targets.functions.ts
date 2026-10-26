@@ -33,7 +33,6 @@ async function getActiveProfile(context: AuthContext, expectedRole: "uno" | "adm
   if (context.claims["aal"] !== "aal2") {
     throw new Error("Multi-factor authentication is required");
   }
-
   const [{ data: profile, error: profileError }, { data: roles, error: rolesError }] =
     await Promise.all([
       context.supabase
@@ -51,6 +50,40 @@ async function getActiveProfile(context: AuthContext, expectedRole: "uno" | "adm
   }
   if (!profile.upazila_id) throw new Error("The account has no assigned Upazila");
   return profile as { active: boolean; upazila_id: string; union_id: string | null };
+}
+
+async function getActiveStationProfile(
+  context: AuthContext,
+): Promise<{ active: boolean; upazila_id: string; station_id: string | null }> {
+  if (context.claims["aal"] !== "aal2") {
+    throw new Error("Multi-factor authentication is required");
+  }
+  const [{ data: profile, error: profileError }, { data: roles, error: rolesError }] =
+    await Promise.all([
+      context.supabase
+        .from("profiles")
+        .select("active, upazila_id, station_id")
+        .eq("id", context.userId)
+        .maybeSingle(),
+      context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
+    ]);
+
+  if (profileError) throw new Error(`Could not verify profile: ${profileError.message}`);
+  if (rolesError) throw new Error(`Could not verify role: ${rolesError.message}`);
+  if (
+    !profile?.active ||
+    !roles?.some((role) => ["admin", "worker", "police"].includes(role.role))
+  ) {
+    throw new Error("An active station account is required");
+  }
+  if (!profile.upazila_id || !profile.station_id) {
+    throw new Error("The account has no assigned station");
+  }
+  return {
+    active: profile.active,
+    upazila_id: profile.upazila_id,
+    station_id: profile.station_id,
+  };
 }
 
 const getUpazilaUnions = async (context: AuthContext, upazilaId: string) => {
@@ -138,6 +171,34 @@ export const loadSecretaryRegistrationTarget = createServerFn({ method: "GET" })
       .eq("status", "submitted")
       .maybeSingle();
     if (error) throw new Error(`Could not load union registration target: ${error.message}`);
+    return {
+      target: target
+        ? {
+            unionId: target.union_id,
+            monthYear: target.month_year,
+            birth: target.birth_target,
+            death: target.death_target,
+          }
+        : null,
+    };
+  });
+
+export const loadAssignedStationRegistrationTarget = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .validator((data) => monthInput.parse(data))
+  .handler(async ({ data, context }) => {
+    const profile = await getActiveStationProfile(context);
+    const stationId = profile.station_id;
+    if (!stationId) throw new Error("The account has no assigned station");
+    const { data: target, error } = await context.supabase
+      .from("registration_targets")
+      .select("union_id, month_year, birth_target, death_target")
+      .eq("upazila_id", profile.upazila_id)
+      .eq("union_id", stationId)
+      .eq("month_year", data.monthYear)
+      .eq("status", "submitted")
+      .maybeSingle();
+    if (error) throw new Error(`Could not load station registration target: ${error.message}`);
     return {
       target: target
         ? {

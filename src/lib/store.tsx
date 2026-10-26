@@ -157,7 +157,8 @@ const mapCase = (r: any, remarks: any[]): RegCase => ({
   status: r.status, regNo: r.reg_no ?? undefined,
   remarks: remarks.filter((m) => m.case_id === r.id).map((m) => ({ by: m.author, role: m.role, text: m.text, at: Date.parse(m.created_at) })),
   police: r.police_task ?? undefined,
-  createdBy: r.created_by, upazilaId: r.upazila_id, unionId: r.union_id, ward: r.ward,
+  createdBy: r.created_by, upazilaId: r.upazila_id, stationId: r.station_id ?? r.union_id,
+  unionId: r.union_id, ward: r.ward,
   createdAt: Date.parse(r.created_at), completedAt: r.completed_at ? Date.parse(r.completed_at) : undefined,
   synced: true, smsSent: r.sms_sent,
 });
@@ -267,9 +268,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       divisionBn: u.division_bn, divisionEn: u.division_en, unions: u.unions as unknown as Union[] }));
     const users: User[] = (profs.data ?? []).map((p) => ({ id: p.id, name: { bn: p.name_bn, en: p.name_en },
       role: (roles.data ?? []).find((r) => r.user_id === p.id)?.role ?? "worker",
-      mobile: p.mobile ?? undefined, email: p.email ?? undefined, upazilaId: p.upazila_id ?? "", unionId: p.union_id ?? undefined, ward: p.ward ?? undefined }));
+      mobile: p.mobile ?? undefined, email: p.email ?? undefined, upazilaId: p.upazila_id ?? "",
+      stationId: p.station_id ?? p.union_id ?? undefined, unionId: p.union_id ?? undefined, ward: p.ward ?? undefined }));
     setState({ upazilas, users, cases: (cases.data ?? []).map((c) => mapCase(c, remarks.data ?? [])), audit: [], sessionId: null });
   }, [demoMode]);
+
+  const refreshCases = useCallback(async () => {
+    if (demoMode) return;
+    const [cases, remarks] = await Promise.all([
+      supabase.from("cases").select("*").order("created_at", { ascending: false }).limit(2000),
+      supabase.from("case_remarks").select("*").order("created_at"),
+    ]);
+    if (cases.error || remarks.error) {
+      const error = cases.error ?? remarks.error;
+      console.error("Failed to refresh live registration cases", error);
+      toast.error(L("লাইভ আবেদন হালনাগাদ করা যায়নি", "Could not refresh live applications"));
+      return;
+    }
+    setState((current) => ({
+      ...current,
+      cases: (cases.data ?? []).map((item) => mapCase(item, remarks.data ?? [])),
+    }));
+  }, [L, demoMode]);
 
   const refreshAuth = useCallback(async () => {
     if (demoMode) {
@@ -370,6 +390,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       window.removeEventListener(MASTER_APPLICATIONS_UPDATED_EVENT, onMasterUpdate);
     };
   }, [demoMode]);
+  useEffect(() => {
+    if (!authReady || !user || demoMode || mfa !== "ok") return;
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    const refreshLiveCases = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => void refreshCases(), 100);
+    };
+    const channel = supabase
+      .channel(`live-registration-cases-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "cases" }, refreshLiveCases)
+      .on("postgres_changes", { event: "*", schema: "public", table: "case_remarks" }, refreshLiveCases)
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.error("Live registration case subscription failed", status);
+          toast.error(L("লাইভ আবেদন সংযোগ ব্যর্থ হয়েছে", "Live application connection failed"));
+        }
+      });
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      void supabase.removeChannel(channel);
+    };
+  }, [L, authReady, demoMode, mfa, refreshCases, user]);
   useEffect(() => { if (prefsReady.current) localStorage.setItem(QUEUE, JSON.stringify(pending)); }, [pending]);
 
   // Explicitly submitted offline cases are synced when their owning account reconnects.
@@ -546,6 +588,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return L("প্রতিটি ছবি ৭৫০ KB-এর মধ্যে হতে হবে", "Each image must be 750 KB or smaller");
       }
       const id = crypto.randomUUID();
+      const stationId = user.stationId ?? user.unionId;
+      if (!stationId || stationId !== user.unionId) {
+        return L("আপনার নির্ধারিত স্টেশন সঠিকভাবে সেট করা নেই", "Your assigned station is not configured correctly");
+      }
       if (demoMode) {
         if (state.cases.some((existing) => isDuplicateCase(existing, c, user))) {
           return dupMsg(c.type);
@@ -561,6 +607,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           status: "pending",
           createdBy: user.id,
           upazilaId: user.upazilaId,
+          stationId,
           unionId: user.unionId ?? "",
           ward: user.ward ?? 1,
           files: c.files.map((file, index) => ({
@@ -587,7 +634,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         id, client_id: id, type: c.type, name_bn: c.name.bn, name_en: c.name.en, father_bn: c.father.bn, father_en: c.father.en,
         mother_bn: c.mother.bn, mother_en: c.mother.en, nid: c.nid.trim() || null, gender: c.gender, dob: c.dob, child_order: c.order ?? null,
         parent_mobile: c.parentMobile ?? null, dod: c.dod ?? null, cause_bn: c.cause?.bn ?? null, cause_en: c.cause?.en ?? null, village_id: c.villageId, details: c.details ?? {},
-        created_by: user.id, upazila_id: user.upazilaId, union_id: user.unionId, ward: user.ward ?? 1,
+        created_by: user.id, upazila_id: user.upazilaId, station_id: stationId, union_id: user.unionId, ward: user.ward ?? 1,
       };
       if (state.cases.some((existing) => isDuplicateCase(existing, c, user))) return dupMsg(c.type);
       if (!navigator.onLine) {
@@ -793,8 +840,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (patch.status) upd.status = patch.status;
       if (patch.regNo !== undefined) upd.reg_no = patch.regNo;
       if (patch.police !== undefined) upd.police_task = patch.police;
-      const { error } = await supabase.from("cases").update(upd).eq("id", id);
+      const { data, error } = await supabase.from("cases").update(upd).eq("id", id).select("id").maybeSingle();
       if (error) { toast.error(error.message); return false; }
+      if (!data) {
+        toast.error(L("আবেদনের অবস্থা হালনাগাদ করা যায়নি", "Could not update the application status"));
+        return false;
+      }
       await loadData(); return true;
     },
     addRemark: async (id, text) => {
@@ -839,7 +890,9 @@ export function scopedCases(state: AppState, u: User | null) {
   return state.cases.filter((c) => {
     if (c.upazilaId !== u.upazilaId) return false;
     if (u.role === "uno") return true;
-    if (c.unionId !== u.unionId) return false;
+    const assignedStationId = u.stationId ?? u.unionId;
+    const caseStationId = c.stationId ?? c.unionId;
+    if (!assignedStationId || caseStationId !== assignedStationId || c.unionId !== u.unionId) return false;
     if (u.role === "admin") return true;
     if (u.role === "police") return c.ward === u.ward && (c.createdBy === u.id || !!c.police);
     return c.createdBy === u.id;

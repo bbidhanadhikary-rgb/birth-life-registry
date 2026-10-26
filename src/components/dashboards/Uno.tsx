@@ -20,7 +20,7 @@ export function UnoDashboard() {
   const stations = getStationsForUpazila(up.id, up.unions);
   const flags = redFlags(state, up.id);
   const data = stations.map((u) => {
-    const cs = cases.filter((c) => c.unionId === u.id);
+    const cs = cases.filter((c) => (c.stationId ?? c.unionId) === u.id);
     return { name: L(u.bn, u.en).replace(/^(\S+ (নং|No\.) )/, ""), births: monthCount(cs, "birth"), deaths: monthCount(cs, "death"), flagged: flags.some((f) => f.unionId === u.id) };
   });
   const shown = cases.filter((c) => unionId === "all" || c.unionId === unionId);

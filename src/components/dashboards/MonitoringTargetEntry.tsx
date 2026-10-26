@@ -5,7 +5,13 @@ import { Input } from "@/components/ui/input";
 import { getDhakaMonthYear } from "@/lib/monthly-targets";
 import { useApp } from "@/lib/store";
 import { TARGET } from "@/lib/types";
-import { getStationsForUpazila } from "@/lib/monirampur-stations";
+import { getTargetEntryStations } from "@/lib/monirampur-stations";
+import {
+  readDemoRegistrationTargets,
+  writeDemoRegistrationTargets,
+  type DemoRegistrationTarget,
+  type SavedRegistrationTarget,
+} from "@/lib/registration-targets";
 import {
   loadUpazilaRegistrationTargets,
   saveUpazilaRegistrationTargets,
@@ -19,49 +25,8 @@ type TargetRow = {
 };
 
 type TargetTotals = { birth: number; death: number };
-type SavedTarget = {
-  union_id: string;
-  birth_target: number;
-  death_target: number;
-  status: string;
-  updated_at: string;
-};
-type DemoTarget = SavedTarget & { union_name: string };
-const DEMO_TARGETS_KEY = "monitoring-union-targets";
-
 function targetValue(value: string) {
   return Number(value) || 0;
-}
-
-function readDemoTargets(userId: string, monthYear: string): DemoTarget[] {
-  try {
-    const stored = localStorage.getItem(`${DEMO_TARGETS_KEY}:${userId}:${monthYear}`);
-    if (!stored) return [];
-    const parsed: unknown = JSON.parse(stored);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is DemoTarget =>
-      typeof item === "object" && item !== null &&
-      "union_id" in item && typeof item.union_id === "string" &&
-      "union_name" in item && typeof item.union_name === "string" &&
-      "birth_target" in item && typeof item.birth_target === "number" &&
-      "death_target" in item && typeof item.death_target === "number" &&
-      "status" in item && (item.status === "draft" || item.status === "submitted") &&
-      "updated_at" in item && typeof item.updated_at === "string",
-    );
-  } catch (error) {
-    console.error("Failed to read demo union targets", error);
-    return [];
-  }
-}
-
-function writeDemoTargets(userId: string, monthYear: string, targets: DemoTarget[]) {
-  try {
-    localStorage.setItem(`${DEMO_TARGETS_KEY}:${userId}:${monthYear}`, JSON.stringify(targets));
-    return true;
-  } catch (error) {
-    console.error("Failed to save demo union targets", error);
-    return false;
-  }
 }
 
 export function MonitoringTargetEntry({
@@ -90,13 +55,13 @@ export function MonitoringTargetEntry({
     setLoadError(false);
 
     void (async () => {
-      const savedTargets: SavedTarget[] = demoMode
-        ? readDemoTargets(user.id, monthYear)
+      const savedTargets: SavedRegistrationTarget[] = demoMode
+        ? readDemoRegistrationTargets(upazila.id, monthYear)
         : (await loadUpazilaRegistrationTargets({ data: { monthYear } })).targets;
 
       if (!active) return;
 
-      const grouped = new Map<string, { draft?: SavedTarget; submitted?: SavedTarget }>();
+      const grouped = new Map<string, { draft?: SavedRegistrationTarget; submitted?: SavedRegistrationTarget }>();
       for (const record of savedTargets) {
         const target = grouped.get(record.union_id) ?? {};
         if (record.status === "draft") target.draft = record;
@@ -104,7 +69,7 @@ export function MonitoringTargetEntry({
         grouped.set(record.union_id, target);
       }
 
-      const stations = getStationsForUpazila(upazila.id, upazila.unions);
+      const stations = getTargetEntryStations(upazila.id, upazila.unions);
       const nextRows = stations.map((union) => {
         const targets = grouped.get(union.id);
         const draft = targets?.draft;
@@ -182,8 +147,8 @@ export function MonitoringTargetEntry({
 
     try {
       if (demoMode) {
-        const previousTargets = readDemoTargets(user.id, monthYear);
-        const localRows: DemoTarget[] = savedRows.map((row) => ({
+        const previousTargets = readDemoRegistrationTargets(upazila.id, monthYear);
+        const localRows: DemoRegistrationTarget[] = savedRows.map((row) => ({
           union_id: row.unionId,
           union_name: upazila.unions.find((union) => union.id === row.unionId)?.bn ?? row.unionId,
           birth_target: row.birthTarget,
@@ -197,7 +162,7 @@ export function MonitoringTargetEntry({
           ),
           ...localRows,
         ];
-        if (!writeDemoTargets(user.id, monthYear, nextTargets)) {
+        if (!writeDemoRegistrationTargets(upazila.id, monthYear, nextTargets)) {
           throw new Error("Could not persist monitoring targets on this device");
         }
       } else {

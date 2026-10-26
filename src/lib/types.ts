@@ -52,6 +52,7 @@ export interface User {
   email?: string | undefined;
   password?: string;
   upazilaId: string;
+  stationId?: string | undefined;
   unionId?: string | undefined;
   ward?: number | undefined;
   districtId?: string | undefined;
@@ -122,6 +123,7 @@ export interface RegCase {
     undefined | { epiCard: boolean; parentNid: boolean; collected: boolean; collectedAt?: number };
   createdBy: string;
   upazilaId: string;
+  stationId?: string | undefined;
   unionId: string;
   ward: number;
   createdAt: number;

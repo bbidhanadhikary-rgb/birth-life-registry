@@ -51,3 +51,17 @@ export function getStationsForUpazila(upazilaId: string, unions: Union[]): Stati
     };
   });
 }
+
+export function getTargetEntryStations(upazilaId: string, unions: Union[]): Station[] {
+  const stations = getStationsForUpazila(upazilaId, unions);
+  if (upazilaId !== "manirampur") return stations;
+
+  return stations
+    .map((station, index) => ({ station, index }))
+    .sort(
+      (left, right) =>
+        Number(left.station.type === "paurashava") - Number(right.station.type === "paurashava") ||
+        left.index - right.index,
+    )
+    .map(({ station }) => station);
+}

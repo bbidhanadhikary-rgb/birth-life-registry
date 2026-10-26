@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { Paperclip, ShieldCheck } from "lucide-react";
+import { Check, Paperclip, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,14 +21,24 @@ export function CaseReview({
   const { L, n, patchCase, addRemark, state } = useApp();
   const { address, date } = useCaseHelpers();
   const [remark, setRemark] = useState(""); const [regNo, setRegNo] = useState(c.regNo ?? "");
+  const [savingStatus, setSavingStatus] = useState(false);
   const worker = state.users.find((u) => u.id === c.createdBy);
 
   const setStatus = async (s: Status) => {
-    if (s === "completed") {
-      if (!/^\d{17}$/.test(regNo)) { toast.error(L("সম্পন্ন করতে ১৭ অঙ্কের নিবন্ধন নম্বর দিন", "Enter the 17-digit registration number to complete")); return; }
-      if (!(await patchCase(c.id, { status: s, regNo }))) return;
-    } else if (!(await patchCase(c.id, { status: s }))) return;
-    toast.success(L("অবস্থা হালনাগাদ হয়েছে", "Status updated"));
+    if (savingStatus) return;
+    if (s === "completed" && !/^\d{17}$/.test(regNo)) {
+      toast.error(L("সম্পন্ন করতে ১৭ অঙ্কের নিবন্ধন নম্বর দিন", "Enter the 17-digit registration number to complete"));
+      return;
+    }
+    setSavingStatus(true);
+    try {
+      const updated = s === "completed"
+        ? await patchCase(c.id, { status: s, regNo })
+        : await patchCase(c.id, { status: s });
+      if (updated) toast.success(L("অবস্থা হালনাগাদ হয়েছে", "Status updated"));
+    } finally {
+      setSavingStatus(false);
+    }
   };
 
   return (
@@ -69,7 +79,7 @@ export function CaseReview({
       </div>
       {mode === "admin" && (
         <div className="mt-2 flex flex-wrap gap-2">
-          <Select value={c.status} onValueChange={(s) => setStatus(s as Status)}>
+          <Select value={c.status} onValueChange={(s) => setStatus(s as Status)} disabled={savingStatus}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="pending">{L("অপেক্ষমাণ", "Pending")}</SelectItem>
@@ -78,15 +88,18 @@ export function CaseReview({
               {(!dedicatedCompletion || c.status === "rejected") && <SelectItem value="rejected">{L("বাতিল", "Rejected")}</SelectItem>}
             </SelectContent>
           </Select>
-          {dedicatedCompletion && c.status !== "completed" && c.status !== "rejected" ? (
-            <>
-              <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("নিবন্ধন নং (১৭ অঙ্ক)", "Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} />
-              <Button className="bg-emerald-800 text-white hover:bg-emerald-900" onClick={() => setStatus("completed")}>
-                {L("বিডিআরআইএস-এ সম্পন্ন হিসেবে চিহ্নিত করুন", "Mark as Completed (BDRIS Status Done)")}
-              </Button>
-            </>
-          ) : (
-            <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("নিবন্ধন নং (১৭ অঙ্ক)", "Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} />
+          <Input className="w-56" inputMode="numeric" maxLength={17} placeholder={L("নিবন্ধন নং (১৭ অঙ্ক)", "Reg. No (17 digits)")} value={regNo} onChange={(e) => setRegNo(e.target.value.replace(/\D/g, ""))} disabled={savingStatus} />
+          {c.status !== "completed" && c.status !== "rejected" && (
+            <Button
+              className="bg-emerald-800 text-white hover:bg-emerald-900"
+              onClick={() => setStatus("completed")}
+              disabled={savingStatus}
+            >
+              <Check className="h-4 w-4" />
+              {dedicatedCompletion
+                ? L("বিডিআরআইএস-এ সম্পন্ন হিসেবে চিহ্নিত করুন", "Mark as Completed (BDRIS Status Done)")
+                : L("নিবন্ধন সম্পন্ন", "Complete registration")}
+            </Button>
           )}
           {!c.police && c.status !== "completed" && c.status !== "rejected" && (
             <Button variant="outline" onClick={async () => { if (!(await patchCase(c.id, { police: { epiCard: false, parentNid: false, collected: false }, status: "progress" }))) return; toast.success(L("গ্রাম পুলিশকে কাজ দেওয়া হয়েছে", "Task sent to Village Police")); }}>

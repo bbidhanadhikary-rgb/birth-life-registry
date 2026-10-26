@@ -10,6 +10,7 @@ import { TARGET, type Status, type Upazila, type Union, type Village } from "@/l
 import { PageTitle, Stat, monthCount, redFlags, useCaseHelpers } from "../shared";
 import { CaseReview } from "./CaseReview";
 import { UnionStatisticsPanel } from "./UnionStatisticsPanel";
+import { useAssignedRegistrationTarget } from "@/lib/use-assigned-registration-target";
 
 function VillageManager({ upazila, union }: { upazila: Upazila; union: Union }) {
   const { L, saveUnionVillages } = useApp();
@@ -115,6 +116,7 @@ function VillageManager({ upazila, union }: { upazila: Upazila; union: Union }) 
 
 export function AdminDashboard() {
   const { L, n, user, state } = useApp();
+  const stationTarget = useAssignedRegistrationTarget();
   const { rows } = useCaseHelpers();
   const [filter, setFilter] = useState<Status | "all">("all");
   const cases = scopedCases(state, user);
@@ -123,6 +125,9 @@ export function AdminDashboard() {
   const b = monthCount(cases, "birth"), d = monthCount(cases, "death");
   const flags = redFlags(state, user!.upazilaId, user!.unionId);
   const shown = cases.filter((c) => filter === "all" || c.status === filter);
+  const targets = stationTarget && stationTarget.unionId === (user!.stationId ?? user!.unionId)
+    ? stationTarget
+    : { birth: TARGET.birth, death: TARGET.death };
 
   return (
     <>
@@ -132,7 +137,7 @@ export function AdminDashboard() {
           <Button variant="outline" onClick={() => printPDF(`Union Report — ${un.en}`, rows(cases))}><FileText className="mr-1 h-4 w-4" />PDF</Button>
         </>} />
       <div className="mb-6 grid gap-3 sm:grid-cols-2">
-        {([["birth", b, TARGET.birth, L("এ মাসে জন্ম", "Births this month")], ["death", d, TARGET.death, L("এ মাসে মৃত্যু", "Deaths this month")]] as const).map(([k, v, t, lbl]) => (
+        {([["birth", b, targets.birth, L("এ মাসে জন্ম", "Births this month")], ["death", d, targets.death, L("এ মাসে মৃত্যু", "Deaths this month")]] as const).map(([k, v, t, lbl]) => (
           <div key={k} className="rounded-xl border border-border bg-card p-4">
             <div className="flex justify-between text-sm"><span>{lbl}</span><b>{n(v)} / {n(t)}</b></div>
             <Progress value={Math.min(100, (v / t) * 100)} className="mt-2 h-3" />

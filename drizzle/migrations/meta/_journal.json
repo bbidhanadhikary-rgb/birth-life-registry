@@ -176,6 +176,20 @@
       "when": 1793010000000,
       "tag": "0024_administrative_stations",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793020000000,
+      "tag": "0025_station_scoped_cases",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793030000000,
+      "tag": "0026_registration_target_realtime",
+      "breakpoints": true
     }
   ]
 }
