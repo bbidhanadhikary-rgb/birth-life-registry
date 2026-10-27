@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { PageTitle, Stat } from "@/components/shared";
 import { useApp } from "@/lib/store";
 import { formatUnionBadgeName } from "@/lib/union-label";
+import { UnifiedStationDashboardTop } from "./UnifiedStationDashboardTop";
 
 const viewableRoles = ["worker", "admin", "police", "uno", "district", "super"] as const;
 
@@ -60,6 +61,7 @@ export function UnionOverview({ unionId }: { unionId: string | undefined }) {
 
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+      <UnifiedStationDashboardTop stationId={union?.id ?? unionId} />
       <PageTitle
         title={L(`${placeName} — এক নজরে`, `${union.en} — At a glance`)}
         sub={L(

@@ -10,6 +10,7 @@ import { PageTitle, Stat, monthCount, redFlags, useCaseHelpers } from "../shared
 import { CaseReview } from "./CaseReview";
 import { MonitoringTargetEntry } from "./MonitoringTargetEntry";
 import { getStationsForUpazila } from "@/lib/monirampur-stations";
+import { UnifiedStationDashboardTop } from "./UnifiedStationDashboardTop";
 
 export function UnoDashboard() {
   const { L, n, user, state } = useApp();
@@ -27,6 +28,7 @@ export function UnoDashboard() {
 
   return (
     <>
+      <UnifiedStationDashboardTop stationId={unionId !== "all" ? unionId : undefined} />
       <PageTitle title={L(`${up.bn} উপজেলা — মাস্টার ভিউ`, `${up.en} Upazila — Master View`)} sub={L(`${up.districtBn} · ${n(stations.length)}টি ইউনিয়ন/পৌরসভা`, `${up.districtEn} · ${stations.length} unions/municipality`)}
         actions={<>
           <Button variant="outline" onClick={() => downloadCSV(rows(cases), "master-report.csv")}><Download className="mr-1 h-4 w-4" />{L("মাস্টার রিপোর্ট", "Master Report")}</Button>

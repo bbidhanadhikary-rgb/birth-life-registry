@@ -22,7 +22,6 @@ import {
   Inbox,
   MapPinned,
   Megaphone,
-  MapPin,
   MessageSquare,
   MessageSquareWarning,
   PencilLine,
@@ -871,6 +870,22 @@ export function RegistrationDashboard({
       ? roleScopedCases.filter((item) => item.ward === user.ward)
       : roleScopedCases;
   }, [jurisdictionScope, roleScopedCases, user]);
+  const unifiedStationCases = useMemo(() => {
+    if (isLocalAdminPreview) {
+      return masterPreviewCases.filter((item) =>
+        item.upazilaId === "manirampur" &&
+        (item.stationId ?? item.unionId) === previewStationId,
+      );
+    }
+    if (jurisdictionScope) return jurisdictionScope.cases;
+    if (!user || !["admin", "worker", "police"].includes(user.role)) return filteredCases;
+    const stationId = user.stationId ?? user.unionId;
+    if (!stationId) return [];
+    return state.cases.filter((item) =>
+      item.upazilaId === user.upazilaId &&
+      (item.stationId ?? item.unionId) === stationId,
+    );
+  }, [filteredCases, isLocalAdminPreview, jurisdictionScope, masterPreviewCases, previewStationId, state.cases, user]);
   const currentMonth = monthKey(Date.now());
   const monthCases = filteredCases.filter((item) => monthKey(item.createdAt) === currentMonth);
   const localMetricMonthCases = isLocalAdminPreview
@@ -894,8 +909,9 @@ export function RegistrationDashboard({
       total: localMetricMonthCases.filter((item) => item.type === "death").length,
     },
   };
+  const sharedStationRoleView = roleConfig === "admin" || roleConfig === "worker" || roleConfig === "police";
   const usesStationMetrics =
-    !simulationEnabled && !isLocalAdminPreview &&
+    !simulationEnabled && !isLocalAdminPreview && sharedStationRoleView &&
     (user?.role === "admin" || user?.role === "worker" || user?.role === "police");
   const monthlyCounts: MonthlyProgressCounts = usesStationMetrics
     ? stationMonthlyMetrics?.counts ?? {
@@ -1027,15 +1043,16 @@ export function RegistrationDashboard({
         );
   const scopeUpazila = state.upazilas.find((item) => item.id === user?.upazilaId);
   const scopeUnion = scopeUpazila?.unions.find((item) => item.id === user?.unionId);
-  const badgeUnionId = user
-    ? user.stationId ?? user.unionId
-    : isLocalAdminPreview
-      ? previewStationId
+  const activeStationId = isLocalAdminPreview
+    ? previewStationId
+    : user
+      ? user.stationId ?? user.unionId
       : jurisdictionScope?.level === "union"
         ? jurisdictionScope.unionId
         : assignedUnion?.id;
+  const badgeUnionId = activeStationId;
   const badgeUnionLocation = badgeUnionId
-    ? state.upazilas
+    ? (isLocalAdminPreview ? localPreviewSeed.upazilas : state.upazilas)
         .map((upazila) => ({
           upazila,
           union: upazila.unions.find((item) => item.id === badgeUnionId),
@@ -1459,34 +1476,13 @@ export function RegistrationDashboard({
         )}
         <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
           <div className="flex min-h-0 flex-col justify-center">
-            {activeBadgeLabel && badgeUnionId ? (
-              <Link
-                to="/monitoring/union-details"
-                search={{ unionId: badgeUnionId }}
-                aria-label={L(`${activeBadgeLabel} এর বিস্তারিত দেখুন`, `View details for ${activeBadgeLabel}`)}
-                className="group mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-300 bg-gradient-to-r from-emerald-100 via-white to-teal-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 transition duration-200 ease-out hover:scale-105 hover:border-teal-400 hover:from-lime-100 hover:via-emerald-50 hover:to-cyan-100 hover:text-teal-950 hover:shadow-lg active:-translate-y-0.5 active:scale-105 active:border-teal-500 active:from-lime-100 active:to-cyan-100 active:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:translate-y-0 motion-reduce:active:scale-100 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base"
-              >
-                <MapPin aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-700 transition-colors group-hover:text-teal-800 sm:h-6 sm:w-6" />
-                <span className="min-w-0">{activeBadgeLabel}</span>
-                <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0" />
-              </Link>
+            {unionFullLabel && badgeUnionId ? (
+              <p className="mb-1 max-w-3xl text-sm font-extrabold leading-snug text-emerald-950 sm:text-base">
+                {unionFullLabel}
+              </p>
             ) : null}
             <h1 className="max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
-              {badgeUnionId && unionBadgeLabel ? (
-                <Link
-                  to="/monitoring/union-details"
-                  search={{ unionId: badgeUnionId }}
-                  aria-label={L(
-                    `${unionBadgeLabel} এর সারসংক্ষেপ দেখুন`,
-                    `View ${unionBadgeLabel} overview`,
-                  )}
-                  className="inline-block rounded-sm transition-colors duration-200 hover:text-emerald-700 hover:drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 motion-reduce:transition-none"
-                >
-                  ই-নিবন্ধন ট্র্যাকার
-                </Link>
-              ) : (
-                "ই-নিবন্ধন ট্র্যাকার"
-              )}
+              ই-নিবন্ধন ট্র্যাকার
             </h1>
             <p className="mt-1 max-w-3xl text-xs font-semibold leading-snug text-teal-800 max-[360px]:text-[11px] sm:text-sm lg:text-base">
               Birth &amp; Death Registration 365-Day Compliance System
@@ -1522,8 +1518,9 @@ export function RegistrationDashboard({
             counts={monthlyCounts}
             received={monthlyReceived}
             targets={monthlyTargets}
-            reportCases={filteredCases}
+            reportCases={unifiedStationCases}
             reportsEnabled={
+              sharedStationRoleView ||
               isLocalAdminPreview ||
               !!user && ["admin", "district", "uno", "super"].includes(user.role)
             }

@@ -11,6 +11,7 @@ import { createStaff } from "@/lib/auth.functions";
 import { makeUnions } from "@/lib/seed";
 import type { Role } from "@/lib/types";
 import { PageTitle, Stat } from "../shared";
+import { UnifiedStationDashboardTop } from "./UnifiedStationDashboardTop";
 
 export function SuperDashboard() {
   const { L, n, state, addUpazila, refresh } = useApp();
@@ -41,8 +42,8 @@ export function SuperDashboard() {
 
   return (
     <>
-      <PageTitle title={L("সুপার অ্যাডমিন প্যানেল", "Super Admin Panel")} sub={L("জেলা ও উপজেলা অনবোর্ডিং", "District & Upazila onboarding")} />
-      <div className="mb-6 grid grid-cols-3 gap-3">
+      <UnifiedStationDashboardTop />
+      <PageTitle title={L("সুপার অ্যাডমিন প্যানেল", "Super Admin Panel")} sub={L("জেলা ও উপজেলা অনবোর্ডিং", "District & Upazila onboarding")} />      <div className="mb-6 grid grid-cols-3 gap-3">
         <Stat label={L("উপজেলা", "Upazilas")} value={n(state.upazilas.length)} />
         <Stat label={L("ব্যবহারকারী", "Users")} value={n(state.users.length)} />
         <Stat label={L("অডিট লগ", "Audit entries")} value={n(state.audit.length)} />
