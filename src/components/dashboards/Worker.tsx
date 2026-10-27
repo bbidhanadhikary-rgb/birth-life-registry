@@ -167,6 +167,123 @@ function isValidIsoDate(value: string) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+function toBengaliDigits(value: number | string) {
+  return String(value).replace(/\d/g, (digit) => "০১২৩৪৫৬৭৮৯".charAt(Number(digit)));
+}
+
+function DateDropdowns({
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  ariaLabel: string;
+}) {
+  const normalizedValue = normalizeBengaliDigits(value);
+  const match = /^([0-9]{4})-([0-9]{2})-([0-9]{2})$/.exec(normalizedValue);
+  const parsedYear = match?.[1] ?? "";
+  const parsedMonth = match?.[2] ?? "";
+  const parsedDay = match?.[3] ?? "";
+  const [day, setDay] = useState(parsedDay);
+  const [month, setMonth] = useState(parsedMonth);
+  const [year, setYear] = useState(parsedYear);
+  const currentYear = new Date().getFullYear();
+  const monthNames = [
+    "জানুয়ারি", "ফেব্রুয়ারি", "মার্চ", "এপ্রিল", "মে", "জুন",
+    "জুলাই", "আগস্ট", "সেপ্টেম্বর", "অক্টোবর", "নভেম্বর", "ডিসেম্বর",
+  ];
+  const maxDay = year && month
+    ? new Date(Number(year), Number(month), 0).getDate()
+    : 31;
+
+  useEffect(() => {
+    setDay(parsedDay);
+    setMonth(parsedMonth);
+    setYear(parsedYear);
+  }, [parsedDay, parsedMonth, parsedYear]);
+
+  const updateParts = (nextDay: string, nextMonth: string, nextYear: string) => {
+    if (nextDay && nextMonth && nextYear) {
+      const nextMaxDay = new Date(Number(nextYear), Number(nextMonth), 0).getDate();
+      if (Number(nextDay) > nextMaxDay) {
+        setDay("");
+        onChange("");
+        return;
+      }
+      onChange(`${nextYear}-${nextMonth}-${nextDay}`);
+    } else {
+      onChange("");
+    }
+  };
+
+  const setDayPart = (nextDay: string) => {
+    setDay(nextDay);
+    updateParts(nextDay, month, year);
+  };
+  const setMonthPart = (nextMonth: string) => {
+    setMonth(nextMonth);
+    const nextMaxDay = year
+      ? new Date(Number(year), Number(nextMonth), 0).getDate()
+      : 31;
+    const nextDay = day && Number(day) <= nextMaxDay ? day : "";
+    if (nextDay !== day) setDay(nextDay);
+    updateParts(nextDay, nextMonth, year);
+  };
+  const setYearPart = (nextYear: string) => {
+    setYear(nextYear);
+    const nextMaxDay = month
+      ? new Date(Number(nextYear), Number(month), 0).getDate()
+      : 31;
+    const nextDay = day && Number(day) <= nextMaxDay ? day : "";
+    if (nextDay !== day) setDay(nextDay);
+    updateParts(nextDay, month, nextYear);
+  };
+
+  return (
+    <div className="grid min-w-0 grid-cols-3 gap-1.5 sm:gap-2" aria-label={ariaLabel}>
+      <select
+        className="h-11 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+        aria-label={`দিন / Day for ${ariaLabel}`}
+        value={day}
+        onChange={(event) => setDayPart(event.target.value)}
+        required
+      >
+        <option value="">দিন</option>
+        {Array.from({ length: maxDay }, (_, index) => {
+          const valueDay = String(index + 1).padStart(2, "0");
+          return <option key={valueDay} value={valueDay}>{toBengaliDigits(index + 1)}</option>;
+        })}
+      </select>
+      <select
+        className="h-11 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+        aria-label={`মাস / Month for ${ariaLabel}`}
+        value={month}
+        onChange={(event) => setMonthPart(event.target.value)}
+        required
+      >
+        <option value="">মাস</option>
+        {monthNames.map((name, index) => {
+          const valueMonth = String(index + 1).padStart(2, "0");
+          return <option key={valueMonth} value={valueMonth}>{name}</option>;
+        })}
+      </select>
+      <select
+        className="h-11 min-w-0 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+        aria-label={`বছর / Year for ${ariaLabel}`}
+        value={year}
+        onChange={(event) => setYearPart(event.target.value)}
+        required
+      >
+        <option value="">বছর</option>
+        {Array.from({ length: 121 }, (_, index) => currentYear - index).map((valueYear) => (
+          <option key={valueYear} value={valueYear}>{toBengaliDigits(valueYear)}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function captureCoordinates(): Promise<{ latitude: number; longitude: number }> {
   if (!navigator.geolocation) {
     return Promise.reject(new Error("এই ডিভাইসে GPS পাওয়া যায়নি"));
@@ -242,7 +359,6 @@ function VillageAddressField({
 }) {
   const village = union.villages.find((item) => item.id === villageId);
   const details = [
-    [L("ওয়ার্ড", "Ward"), village ? `${n(village.ward)} ${L("নং", "No.")}` : ""],
     [L("ডাকঘর", "Post office"), village ? L(village.poBn, village.poEn) : ""],
     [L("ইউনিয়ন", "Union"), L(union.bn, union.en)],
     [L("উপজেলা", "Upazila"), L(upazila.bn, upazila.en)],
@@ -268,7 +384,13 @@ function VillageAddressField({
           ))}
         </SelectContent>
       </Select>
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="min-w-0 rounded-md bg-white px-2 py-1">
+          <p className="text-[10px] font-medium text-slate-500">{L("ওয়ার্ড নং", "Ward number")}</p>
+          <p className="truncate text-xs font-semibold text-slate-800">
+            {village ? n(village.ward) : "—"}
+          </p>
+        </div>
         {details.map(([label, value]) => (
           <div key={label} className="min-w-0 rounded-md bg-white px-2 py-1">
             <p className="text-[10px] font-medium text-slate-500">{label}</p>
@@ -1090,16 +1212,10 @@ export function RegForm({
           <div className="min-w-0 space-y-1">
             <div className="grid min-w-0 grid-cols-2 gap-3">
               <FormRow labelBn="জন্মতারিখ" labelEn="Date of Birth" required compact inline inlineLarger>
-                <Input
-                  className="h-11 min-w-0 px-1.5 text-xs"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={10}
-                  placeholder="YYYY-MM-DD"
-                  aria-label="জন্মতারিখ / Date of birth"
-                  required
+                <DateDropdowns
                   value={dob}
-                  onChange={(event) => setDob(normalizeBengaliDigits(event.target.value))}
+                  onChange={setDob}
+                  ariaLabel="জন্মতারিখ / Date of birth"
                 />
               </FormRow>
               <FormRow labelBn="কত তম সন্তান" labelEn="Child Order" required compact inline inlineLarger>
@@ -1224,16 +1340,10 @@ export function RegForm({
             </FormRow>
             <BiField label="মৃত্যুর কারণ" labelEn="Cause of Death" value={cause} onChange={setCause} required compact />
             <FormRow labelBn="জন্ম তারিখ" labelEn="Date of Birth" required compact>
-              <Input
-                className="h-11 text-base"
-                type="text"
-                inputMode="numeric"
-                maxLength={10}
-                placeholder="YYYY-MM-DD"
-                aria-label="জন্মতারিখ / Date of birth"
-                required
+              <DateDropdowns
                 value={dob}
-                onChange={(event) => setDob(normalizeBengaliDigits(event.target.value))}
+                onChange={setDob}
+                ariaLabel="জন্মতারিখ / Date of birth"
               />
             </FormRow>
             <BiField label="মৃত ব্যক্তির নাম" labelEn="Deceased Name" value={name} onChange={setName} required compact />
@@ -1408,6 +1518,7 @@ function EpiAttendanceForm({ onSaved }: { onSaved: () => void }) {
   const [name, setName] = useState<Bi>(emptyBi);
   const [mobile, setMobile] = useState("");
   const [villageId, setVillageId] = useState("");
+  const selectedVillage = assignedUnion?.villages.find((item) => item.id === villageId);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -1478,6 +1589,10 @@ function EpiAttendanceForm({ onSaved }: { onSaved: () => void }) {
               ))}
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold">{L("ওয়ার্ড নং", "Ward number")}</Label>
+          <Input value={selectedVillage ? String(n(selectedVillage.ward)) : ""} readOnly placeholder="—" />
         </div>
       </div>
       {error && (

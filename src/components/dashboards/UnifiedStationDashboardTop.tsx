@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import { useApp } from "@/lib/store";
 import { useAssignedRegistrationTarget } from "@/lib/use-assigned-registration-target";
-import { formatUnionFullName } from "@/lib/union-label";
 import type { RegCase } from "@/lib/types";
 import { MonthlyProgressCard, type MonthlyProgressCounts } from "./MonthlyProgressCard";
 
@@ -25,13 +24,6 @@ export function UnifiedStationDashboardTop({ stationId: stationIdProp }: { stati
         }))
         .find((item) => item.union)
     : undefined;
-  const fullStationName = location
-    ? L(
-        formatUnionFullName(location.union!, location.upazila.unions, location.upazila, "bn"),
-        formatUnionFullName(location.union!, location.upazila.unions, location.upazila, "en"),
-      )
-    : L("মণিরামপুর, যশোর", "Manirampur, Jashore");
-
   const unifiedCases = useMemo(() => {
     if (!stationId) return [];
     return state.cases.filter((item) =>
@@ -70,9 +62,22 @@ export function UnifiedStationDashboardTop({ stationId: stationIdProp }: { stati
   return (
     <div className="grid min-h-0 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
       <div className="flex min-h-0 flex-col justify-center">
-        <p className="mb-1 max-w-3xl text-sm font-extrabold leading-snug text-emerald-950 sm:text-base">
-          {fullStationName}
-        </p>
+        <div
+          className="mb-3 max-w-3xl text-center text-white"
+          style={{
+            background: "linear-gradient(135deg, #065f46 0%, #047857 100%)",
+            color: "#ffffff",
+            fontSize: "1.5rem",
+            fontWeight: 700,
+            padding: "16px 24px",
+            borderRadius: "12px",
+            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3)",
+            border: "2px solid #34d399",
+            textAlign: "center",
+          }}
+        >
+          ০৪ নং ঢাকুরিয়া ইউনিয়ন পরিষদ, মণিরামপুর, যশোর
+        </div>
         <h1 className="max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
           ই-নিবন্ধন ট্র্যাকার
         </h1>

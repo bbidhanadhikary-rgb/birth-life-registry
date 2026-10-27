@@ -15,7 +15,7 @@ import { useAssignedRegistrationTarget } from "@/lib/use-assigned-registration-t
 function VillageManager({ upazila, union }: { upazila: Upazila; union: Union }) {
   const { L, saveUnionVillages } = useApp();
   const [villages, setVillages] = useState(union.villages);
-  const [newVillage, setNewVillage] = useState({ bn: "", en: "", ward: "1", poBn: "", poEn: "" });
+  const [newVillage, setNewVillage] = useState({ bn: "", en: "", ward: "1" });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => setVillages(union.villages), [union.villages]);
@@ -32,13 +32,11 @@ function VillageManager({ upazila, union }: { upazila: Upazila; union: Union }) 
     if (
       !newVillage.bn.trim() ||
       !newVillage.en.trim() ||
-      !newVillage.poBn.trim() ||
-      !newVillage.poEn.trim() ||
       !Number.isInteger(ward) ||
       ward < 1 ||
       ward > 99
     ) {
-      toast.error(L("সব গ্রামের তথ্য পূরণ করুন এবং ওয়ার্ড ১–৯৯-এর মধ্যে দিন", "Complete all village details and enter a ward from 1 to 99"));
+      toast.error(L("গ্রামের বাংলা ও ইংরেজি নাম এবং ১–৯৯-এর মধ্যে ওয়ার্ড দিন", "Enter the village name in Bangla and English and a ward from 1 to 99"));
       return;
     }
     setVillages((current) => [
@@ -48,11 +46,11 @@ function VillageManager({ upazila, union }: { upazila: Upazila; union: Union }) 
         bn: newVillage.bn.trim(),
         en: newVillage.en.trim(),
         ward,
-        poBn: newVillage.poBn.trim(),
-        poEn: newVillage.poEn.trim(),
+        poBn: "",
+        poEn: "",
       },
     ]);
-    setNewVillage({ bn: "", en: "", ward: "1", poBn: "", poEn: "" });
+    setNewVillage({ bn: "", en: "", ward: "1" });
   };
 
   const save = async () => {
@@ -78,35 +76,37 @@ function VillageManager({ upazila, union }: { upazila: Upazila; union: Union }) 
         </p>
       </div>
 
-      <form onSubmit={addVillage} className="mb-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <form onSubmit={addVillage} className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_8rem_auto]">
         <Input required value={newVillage.bn} maxLength={160} placeholder={L("গ্রামের নাম (বাংলা)", "Village name (Bangla)")} onChange={(event) => setNewVillage((current) => ({ ...current, bn: event.target.value }))} />
         <Input required value={newVillage.en} maxLength={160} placeholder={L("গ্রামের নাম (ইংরেজি)", "Village name (English)")} onChange={(event) => setNewVillage((current) => ({ ...current, en: event.target.value }))} />
         <Input required type="number" min={1} max={99} value={newVillage.ward} placeholder={L("ওয়ার্ড নং", "Ward no.")} onChange={(event) => setNewVillage((current) => ({ ...current, ward: event.target.value }))} />
-        <Input required value={newVillage.poBn} maxLength={160} placeholder={L("ডাকঘর (বাংলা)", "Post office (Bangla)")} onChange={(event) => setNewVillage((current) => ({ ...current, poBn: event.target.value }))} />
-        <div className="flex gap-2">
-          <Input required value={newVillage.poEn} maxLength={160} placeholder={L("ডাকঘর (ইংরেজি)", "Post office (English)")} onChange={(event) => setNewVillage((current) => ({ ...current, poEn: event.target.value }))} />
-          <Button type="submit" aria-label={L("গ্রাম যোগ করুন", "Add village")}><Plus className="h-4 w-4" /></Button>
-        </div>
+        <Button type="submit" className="w-full lg:w-auto" aria-label={L("গ্রাম যোগ করুন", "Add village")}><Plus className="mr-2 h-4 w-4" />{L("যোগ করুন", "Add")}</Button>
       </form>
 
-      <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
+      <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="hidden min-w-[720px] grid-cols-[1fr_1fr_8rem_3rem] gap-2 border-b bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-950 sm:grid">
+          <span>{L("গ্রামের নাম বাংলায়", "Village name in Bangla")}</span>
+          <span>{L("গ্রামের নাম ইংরেজিতে", "Village name in English")}</span>
+          <span>{L("ওয়ার্ড নং", "Ward number")}</span>
+          <span className="text-center">{L("মুছুন", "Delete")}</span>
+        </div>
+        <div className="max-h-80 min-w-0 space-y-2 overflow-y-auto p-2 sm:min-w-[720px]">
         {villages.map((village) => (
-          <div key={village.id} className="grid gap-2 rounded-lg border border-border p-2 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_7rem_1fr_1fr_auto]">
+          <div key={village.id} className="grid gap-2 rounded-lg border border-border p-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_8rem_auto]">
             <Input aria-label={L("গ্রামের নাম বাংলা", "Village name in Bangla")} value={village.bn} maxLength={160} onChange={(event) => updateVillage(village.id, { bn: event.target.value })} />
             <Input aria-label={L("গ্রামের নাম ইংরেজি", "Village name in English")} value={village.en} maxLength={160} onChange={(event) => updateVillage(village.id, { en: event.target.value })} />
             <Input aria-label={L("ওয়ার্ড নং", "Ward number")} type="number" min={1} max={99} value={village.ward} onChange={(event) => updateVillage(village.id, { ward: Number(event.target.value) })} />
-            <Input aria-label={L("ডাকঘর বাংলা", "Post office in Bangla")} value={village.poBn} maxLength={160} onChange={(event) => updateVillage(village.id, { poBn: event.target.value })} />
-            <Input aria-label={L("ডাকঘর ইংরেজি", "Post office in English")} value={village.poEn} maxLength={160} onChange={(event) => updateVillage(village.id, { poEn: event.target.value })} />
             <Button type="button" variant="outline" aria-label={L("গ্রাম মুছুন", "Remove village")} onClick={() => setVillages((current) => current.filter((item) => item.id !== village.id))}>
               <Trash2 className="h-4 w-4 text-red-700" />
             </Button>
           </div>
         ))}
         {villages.length === 0 && <p className="text-sm text-muted-foreground">{L("এখনও কোনো গ্রাম যোগ করা হয়নি", "No villages have been added yet")}</p>}
+        </div>
       </div>
 
       <div className="mt-3 flex justify-end">
-        <Button type="button" onClick={() => void save()} disabled={saving || villages.length === 0}>
+        <Button type="button" onClick={() => void save()} disabled={saving}>
           <Save className="mr-2 h-4 w-4" />{saving ? L("সংরক্ষণ হচ্ছে…", "Saving…") : L("গ্রাম ও ওয়ার্ড সংরক্ষণ", "Save village setup")}
         </Button>
       </div>
