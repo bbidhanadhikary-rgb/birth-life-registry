@@ -37,7 +37,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { TARGET, type RegCase, type Role } from "@/lib/types";
-import { formatUnionBadgeName } from "@/lib/union-label";
+import { formatUnionBadgeName, formatUnionFullName } from "@/lib/union-label";
 import {
   getDemoAttachmentPreview,
   MASTER_APPLICATIONS_KEY,
@@ -917,9 +917,6 @@ export function RegistrationDashboard({
     "manirampur",
     localPreviewSeed.upazilas.find((item) => item.id === "manirampur")?.unions ?? [],
   );
-  const assignedWardCount = assignedUnion
-    ? new Set(assignedUnion.villages.map((village) => village.ward)).size || 9
-    : 9;
   const scopedUpazilas = (isLocalAdminPreview ? localPreviewSeed.upazilas : state.upazilas).filter((item) => {
     if (!user || user.role === "super") return true;
     if (user.role === "district") return item.districtEn === user.districtId;
@@ -935,13 +932,13 @@ export function RegistrationDashboard({
         : roleConfig === "admin" && (user?.role === "admin" || isLocalAdminPreview)
           ? 1
           : roleConfig === "worker" && user?.role === "worker"
-            ? 1 / assignedWardCount
+            ? 1
             : roleConfig === "police" && user?.role === "police"
-              ? 1 / assignedWardCount
+              ? 1
               : roleConfig === "uno"
                 ? Math.max(1, selectedUnionCount)
                 : roleConfig === "worker" || roleConfig === "police"
-                  ? 1 / 9
+                  ? 1
                   : Math.max(1, selectedUnionCount));
   const targetMonthYear = getDhakaMonthYear();
   const activeUnionTarget =
@@ -1050,11 +1047,23 @@ export function RegistrationDashboard({
       ? formatUnionBadgeName(badgeUnionLocation.union, badgeUnionLocation.upazila.unions)
       : undefined
     : undefined;
-  const activeBadgeLabel = user?.role === "worker" || user?.role === "police"
-    ? user.ward !== undefined && user.ward !== null
-      ? L(`ওয়ার্ড ${user.ward}`, `Ward ${user.ward}`)
-      : undefined
-    : unionBadgeLabel;
+  const unionFullLabel = badgeUnionId && badgeUnionLocation?.union
+    ? L(
+        formatUnionFullName(
+          badgeUnionLocation.union,
+          badgeUnionLocation.upazila.unions,
+          badgeUnionLocation.upazila,
+          "bn",
+        ),
+        formatUnionFullName(
+          badgeUnionLocation.union,
+          badgeUnionLocation.upazila.unions,
+          badgeUnionLocation.upazila,
+          "en",
+        ),
+      )
+    : undefined;
+  const activeBadgeLabel = unionFullLabel;
   const scopeLabel = jurisdictionScope
     ? jurisdictionScope.level === "union" && unionBadgeLabel
       ? `${unionBadgeLabel} · ${L("ডেভেলপমেন্ট সিমুলেশন", "Development simulation")}`

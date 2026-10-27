@@ -1,4 +1,4 @@
-import type { Union } from "@/lib/types";
+import type { Union, Upazila } from "@/lib/types";
 import { MONIRAMPUR_STATIONS } from "@/lib/monirampur-stations";
 
 const banglaDigits = (value: number) =>
@@ -39,4 +39,21 @@ export function formatUnionBadgeName(union: Union, unions: Union[]) {
       )} নং ${name}`;
 
   return `${numberedName.replace(/\s*ইউনিয়ন(?: পরিষদ)?$/, "")} ইউনিয়ন পরিষদ`;
+}
+
+export function formatUnionFullName(
+  union: Union,
+  unions: Union[],
+  upazila: Upazila,
+  language: "bn" | "en" = "bn",
+) {
+  if (language === "en") {
+    const isMunicipality = /pourashava|municipality/i.test(`${union.id} ${union.en}`) || union.bn.includes("পৌরসভা");
+    const stationName = union.en.trim()
+      ? `${union.en.trim()}${isMunicipality ? " Municipality" : " Union Parishad"}`
+      : "Union Parishad";
+    return [stationName, upazila.en.trim(), upazila.districtEn.trim()].filter(Boolean).join(", ");
+  }
+  const stationName = formatUnionBadgeName(union, unions);
+  return [stationName, upazila.bn.trim(), upazila.districtBn.trim()].filter(Boolean).join(", ");
 }

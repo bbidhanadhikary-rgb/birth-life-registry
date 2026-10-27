@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seedState } from "./seed";
-import { formatUnionBadgeName, getUnionLabel } from "./union-label";
+import { formatUnionBadgeName, formatUnionFullName, getUnionLabel } from "./union-label";
 
 describe("union badge labels", () => {
   const upazila = seedState().upazilas.find((area) => area.id === "manirampur")!;
@@ -13,6 +13,14 @@ describe("union badge labels", () => {
     expect(formatUnionBadgeName(dhakuria, upazila.unions)).toBe("০৪ নং ঢাকুরিয়া ইউনিয়ন পরিষদ");
     expect(getUnionLabel("mn-rohita")).toBe("০১ নং রোহিতা ইউনিয়ন পরিষদ");
     expect(getUnionLabel("mn-dhakuria")).toBe("০৪ নং ঢাকুরিয়া ইউনিয়ন পরিষদ");
+  });
+
+  it("formats a full station header with upazila and district", () => {
+    const dhakuria = upazila.unions.find((union) => union.id === "mn-dhakuria")!;
+
+    expect(formatUnionFullName(dhakuria, upazila.unions, upazila)).toBe(
+      "০৪ নং ঢাকুরিয়া ইউনিয়ন পরিষদ, মণিরামপুর, যশোর",
+    );
   });
 
   it("keeps municipal areas labeled as municipalities", () => {
