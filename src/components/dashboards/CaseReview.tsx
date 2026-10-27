@@ -59,7 +59,7 @@ export function CaseReview({
               }).format(new Date(completedTime));
               return itemMonth === monthPrefix;
             }).length;
-            incrementStationCompletedCount(upazilaId, stationId, monthYear, c.id, databaseCompletedCount);
+            incrementStationCompletedCount(upazilaId, stationId, monthYear, c.id, databaseCompletedCount, c.type);
           }
         }
         toast.success(L("অবস্থা হালনাগাদ হয়েছে", "Status updated"));

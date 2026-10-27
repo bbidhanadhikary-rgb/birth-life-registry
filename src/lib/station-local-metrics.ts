@@ -5,6 +5,8 @@ export type StationLocalMetrics = {
   birthTarget?: number;
   deathTarget?: number;
   completedCount?: number;
+  birthCompletedCount?: number;
+  deathCompletedCount?: number;
   completedCaseIds?: string[];
 };
 
@@ -65,6 +67,7 @@ export function incrementStationCompletedCount(
   monthYear: string,
   caseId: string,
   databaseCompletedCount?: number,
+  caseType?: "birth" | "death",
 ) {
   const current = readStationLocalMetrics(upazilaId, stationId, monthYear);
   const completedCaseIds = current.completedCaseIds ?? [];
@@ -75,9 +78,13 @@ export function incrementStationCompletedCount(
     databaseCompletedCount ?? 0,
   ) + 1;
   const nextIds = [...completedCaseIds, caseId];
+  const birthCompletedCount = current.birthCompletedCount ?? 0;
+  const deathCompletedCount = current.deathCompletedCount ?? 0;
   if (!writeStationLocalMetrics(upazilaId, stationId, monthYear, {
     ...current,
     completedCount: nextCount,
+    birthCompletedCount: birthCompletedCount + (caseType === "birth" ? 1 : 0),
+    deathCompletedCount: deathCompletedCount + (caseType === "death" ? 1 : 0),
     completedCaseIds: nextIds,
   })) return databaseCompletedCount ?? nextCount;
   return nextCount;

@@ -102,8 +102,8 @@ export function useAssignedRegistrationTarget(): StationMonthlyMetrics | null {
             const counts = countStationCases(state.cases, user.upazilaId, stationId, monthYear);
             const localCompleted = local.completedCount;
             if (localCompleted !== undefined) {
-              counts.birth.completed = localCompleted;
-              counts.death.completed = 0;
+              counts.birth.completed = local.birthCompletedCount ?? localCompleted;
+              counts.death.completed = local.deathCompletedCount ?? Math.max(0, localCompleted - counts.birth.completed);
             }
             setMetrics({
               target: saved || local.birthTarget !== undefined || local.deathTarget !== undefined ? {
@@ -139,8 +139,8 @@ export function useAssignedRegistrationTarget(): StationMonthlyMetrics | null {
             total: row.death_total_count,
           };
           if (local.completedCount !== undefined) {
-            birth.completed = local.completedCount;
-            death.completed = 0;
+            birth.completed = local.birthCompletedCount ?? local.completedCount;
+            death.completed = local.deathCompletedCount ?? Math.max(0, local.completedCount - birth.completed);
           }
           setMetrics({
             target: row.target_present || local.birthTarget !== undefined || local.deathTarget !== undefined ? {
