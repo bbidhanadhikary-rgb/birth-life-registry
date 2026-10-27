@@ -190,6 +190,13 @@
       "when": 1793030000000,
       "tag": "0026_registration_target_realtime",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793120000000,
+      "tag": "0027_station_monthly_dashboard_metrics",
+      "breakpoints": true
     }
   ]
 }

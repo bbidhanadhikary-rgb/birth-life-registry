@@ -9,6 +9,7 @@ export type SavedRegistrationTarget = {
 export type DemoRegistrationTarget = SavedRegistrationTarget & { union_name: string };
 
 const DEMO_TARGETS_KEY = "monitoring-union-targets";
+export const DEMO_REGISTRATION_TARGETS_UPDATED_EVENT = "demo-registration-targets-updated";
 
 export function getDemoTargetsStorageKey(upazilaId: string, monthYear: string) {
   return `${DEMO_TARGETS_KEY}:${upazilaId}:${monthYear}`;
@@ -48,6 +49,7 @@ export function writeDemoRegistrationTargets(
       getDemoTargetsStorageKey(upazilaId, monthYear),
       JSON.stringify(targets),
     );
+    window.dispatchEvent(new Event(DEMO_REGISTRATION_TARGETS_UPDATED_EVENT));
     return true;
   } catch (error) {
     console.error("Failed to save demo registration targets", error);

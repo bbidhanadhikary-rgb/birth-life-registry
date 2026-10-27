@@ -7,13 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useApp } from "@/lib/store";
 import { downloadCSV, printPDF } from "@/lib/report";
 import { filterAdvancedReport, type AdvancedReportFilters } from "@/lib/advanced-report";
-import { getCompletionPercent } from "@/lib/monthly-targets";
+import { getCompletionPercent, getMonthlyStatusProgress } from "@/lib/monthly-targets";
 import type { RegCase } from "@/lib/types";
 
 type CaseTypeCounts = {
   pending: number;
   progress: number;
   completed: number;
+  total?: number;
 };
 
 export type MonthlyProgressCounts = {
@@ -130,8 +131,10 @@ export function MonthlyProgressCard({
   const gradientId = `monthly-progress-${useId().replaceAll(":", "")}`;
   const target = targets.birth + targets.death;
   const completed = counts.birth.completed + counts.death.completed;
-  const submitted = counts.birth.pending + counts.death.pending;
-  const inProgress = counts.birth.progress + counts.death.progress;
+  const submitted =
+    getMonthlyStatusProgress(counts.birth, targets.birth, "submitted").value +
+    getMonthlyStatusProgress(counts.death, targets.death, "submitted").value;
+  const inFlight = counts.birth.pending + counts.birth.progress + counts.death.pending + counts.death.progress;
   const circumference = 2 * Math.PI * 88;
   const completion = getCompletionPercent(
     counts.birth.completed,
@@ -140,22 +143,20 @@ export function MonthlyProgressCard({
     targets.death,
   );
   const completionArc = (Math.min(completed, target) / Math.max(1, target)) * circumference;
-  const statusDetails = (status: keyof CaseTypeCounts) => [
-    L(
-      `জন্ম ${n(counts.birth[status])} / ${n(targets.birth)} (${n(targets.birth ? Math.round((counts.birth[status] / targets.birth) * 100) : 0)}%)`,
-      `Birth ${n(counts.birth[status])} / ${n(targets.birth)} (${n(targets.birth ? Math.round((counts.birth[status] / targets.birth) * 100) : 0)}%)`,
-    ),
-    L(
-      `মৃত্যু ${n(counts.death[status])} / ${n(targets.death)} (${n(targets.death ? Math.round((counts.death[status] / targets.death) * 100) : 0)}%)`,
-      `Death ${n(counts.death[status])} / ${n(targets.death)} (${n(targets.death ? Math.round((counts.death[status] / targets.death) * 100) : 0)}%)`,
-    ),
-  ];
+  const statusDetails = (status: "submitted" | "completed" | "progress") =>
+    (["birth", "death"] as const).map((type) => {
+      const progress = getMonthlyStatusProgress(counts[type], targets[type], status);
+      return L(
+        `${type === "birth" ? "জন্ম" : "মৃত্যু"} ${n(progress.value)} / ${n(progress.denominator)} (${n(progress.percentage)}%)`,
+        `${type === "birth" ? "Birth" : "Death"} ${n(progress.value)} / ${n(progress.denominator)} (${n(progress.percentage)}%)`,
+      );
+    });
   const statusItems = [
     {
       id: "submitted",
       label: L("জমা হয়েছে", "Submitted"),
       value: submitted,
-      details: statusDetails("pending"),
+      details: statusDetails("submitted"),
       classes: "border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50 shadow-blue-500/10",
       dot: "bg-blue-500",
       text: "text-blue-800",
@@ -172,7 +173,7 @@ export function MonthlyProgressCard({
     {
       id: "progress",
       label: L("প্রক্রিয়াধীন", "In progress"),
-      value: inProgress,
+      value: inFlight,
       details: statusDetails("progress"),
       classes: "border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 shadow-amber-500/10",
       dot: "bg-amber-500",
@@ -187,7 +188,7 @@ export function MonthlyProgressCard({
     ? [selectedStatus]
     : statusItems;
   const countForStatus = (status: (typeof statusItems)[number]["id"], type: "birth" | "death") =>
-    counts[type][status === "submitted" ? "pending" : status];
+    getMonthlyStatusProgress(counts[type], targets[type], status).value;
   const printCurrentReport = () => {
     const headers = [
       L("সূচক", "Metric"),
@@ -231,13 +232,13 @@ export function MonthlyProgressCard({
     const statusRows = (selectedStatus ? [selectedStatus] : reportStatuses).flatMap((status) =>
       (["birth", "death"] as const).map((type) => {
         const value = countForStatus(status.id, type);
-        const typeTarget = targets[type];
+        const typeTarget = getMonthlyStatusProgress(counts[type], targets[type], status.id);
         return [
           status.label,
           L(type === "birth" ? "জন্ম" : "মৃত্যু", type),
           value,
-          typeTarget,
-          typeTarget ? `${Math.round((value / typeTarget) * 100)}%` : "0%",
+          typeTarget.denominator,
+          `${typeTarget.percentage}%`,
         ];
       }),
     );
@@ -532,7 +533,7 @@ export function MonthlyProgressCard({
                   <div className="mt-2 space-y-2">
                   {(["birth", "death"] as const).map((type) => {
                     const value = countForStatus(item.id, type);
-                    const typeTarget = targets[type];
+                    const typeTarget = getMonthlyStatusProgress(counts[type], targets[type], item.id);
                     return (
                       <div key={type} className="flex items-center gap-2">
                         <span
@@ -546,7 +547,7 @@ export function MonthlyProgressCard({
                         </span>
                         <MetricProgress
                           value={value}
-                          target={typeTarget}
+                          target={typeTarget.denominator}
                           color={type === "birth" ? "bg-blue-500" : "bg-slate-500"}
                           trackColor={type === "birth" ? "bg-blue-100" : "bg-slate-200"}
                         />

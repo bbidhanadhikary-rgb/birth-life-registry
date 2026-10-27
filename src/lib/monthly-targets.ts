@@ -23,3 +23,32 @@ export function getCompletionPercent(
     ? Math.round(((achievedBirth + achievedDeath) / totalTarget) * 100)
     : 0;
 }
+
+export type MonthlyCaseStatusCounts = {
+  pending: number;
+  progress: number;
+  completed: number;
+  total?: number;
+};
+
+export type MonthlyStatusComparison = "submitted" | "completed" | "progress";
+
+export function getMonthlyStatusProgress(
+  counts: MonthlyCaseStatusCounts,
+  target: number,
+  status: MonthlyStatusComparison,
+) {
+  const total = counts.total ?? counts.pending + counts.progress + counts.completed;
+  const value =
+    status === "submitted"
+      ? total
+      : status === "completed"
+        ? counts.completed
+        : counts.pending + counts.progress;
+  const denominator = status === "submitted" ? target : total;
+  return {
+    value,
+    denominator,
+    percentage: denominator ? Math.round((value / denominator) * 100) : 0,
+  };
+}

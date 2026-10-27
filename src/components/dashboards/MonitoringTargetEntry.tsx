@@ -16,6 +16,7 @@ import {
   loadUpazilaRegistrationTargets,
   saveUpazilaRegistrationTargets,
 } from "@/lib/registration-targets.functions";
+import { writeStationLocalTarget } from "@/lib/station-local-metrics";
 
 type TargetRow = {
   unionId: string;
@@ -171,7 +172,12 @@ export function MonitoringTargetEntry({
         });
       }
 
-      if (status === "submitted") onSubmittedTargets?.({ birth: birthTotal, death: deathTotal });
+      if (status === "submitted") {
+        for (const row of savedRows) {
+          writeStationLocalTarget(upazila.id, row.unionId, monthYear, row.birthTarget, row.deathTarget);
+        }
+        onSubmittedTargets?.({ birth: birthTotal, death: deathTotal });
+      }
       toast.success(status === "draft"
         ? L("খসড়া সফলভাবে সংরক্ষণ করা হয়েছে", "Draft saved successfully")
         : L("লক্ষ্যমাত্রা সফলভাবে জমা দেওয়া হয়েছে", "Targets submitted successfully"));

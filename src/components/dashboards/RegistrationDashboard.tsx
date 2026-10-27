@@ -656,15 +656,7 @@ export function RegistrationDashboard({
     null,
   );
   const [correctionSearch, setCorrectionSearch] = useState("");
-  const [wardMonthlyCounts, setWardMonthlyCounts] = useState<{
-    pending: number;
-    progress: number;
-    completed: number;
-    total: number;
-    birth: { pending: number; progress: number; completed: number; total: number };
-    death: { pending: number; progress: number; completed: number; total: number };
-  } | null>(null);
-  const unionMonthlyTarget = useAssignedRegistrationTarget();
+  const stationMonthlyMetrics = useAssignedRegistrationTarget();
   const [localPreviewTarget, setLocalPreviewTarget] = useState<{
     unionId: string;
     birth: number;
@@ -890,73 +882,36 @@ export function RegistrationDashboard({
   }, [jurisdictionScope, roleScopedCases, user]);
   const currentMonth = monthKey(Date.now());
   const monthCases = filteredCases.filter((item) => monthKey(item.createdAt) === currentMonth);
-  useEffect(() => {
-    setWardMonthlyCounts(null);
-    if (demoMode || !user || (user.role !== "worker" && user.role !== "police")) {
-      return;
-    }
-    let active = true;
-    void supabase.rpc("monthly_ward_case_type_counts").then(({ data, error }) => {
-      if (!active) return;
-      const row = data?.[0];
-      if (error) {
-        console.error("Failed to load role-scoped monthly case counts", error);
-        toast.error(L("এলাকাভিত্তিক মাসিক পরিসংখ্যান লোড করা যায়নি", "Could not load area-scoped monthly statistics"));
-        setWardMonthlyCounts(null);
-        return;
-      }
-      if (!row) {
-        setWardMonthlyCounts(null);
-        return;
-      }
-      const birth = {
-        pending: Number(row.birth_pending_count),
-        progress: Number(row.birth_progress_count),
-        completed: Number(row.birth_completed_count),
-        total: Number(row.birth_total_count),
-      };
-      const death = {
-        pending: Number(row.death_pending_count),
-        progress: Number(row.death_progress_count),
-        completed: Number(row.death_completed_count),
-        total: Number(row.death_total_count),
-      };
-      setWardMonthlyCounts({
-        pending: birth.pending + death.pending,
-        progress: birth.progress + death.progress,
-        completed: birth.completed + death.completed,
-        total: birth.total + death.total,
-        birth,
-        death,
-      });
-    }, (error: unknown) => {
-      if (!active) return;
-      console.error("Failed to load role-scoped monthly case counts", error);
-      toast.error(L("এলাকাভিত্তিক মাসিক পরিসংখ্যান লোড করা যায়নি", "Could not load area-scoped monthly statistics"));
-      setWardMonthlyCounts(null);
-    });
-    return () => {
-      active = false;
-    };
-  }, [L, demoMode, user]);
-  const hasWardAggregate =
-    !simulationEnabled && !demoMode && (user?.role === "worker" || user?.role === "police");
+  const localMetricMonthCases = isLocalAdminPreview
+    ? monthCases.filter(
+        (item) =>
+          item.upazilaId === "manirampur" &&
+          (item.stationId ?? item.unionId) === previewStationId,
+      )
+    : monthCases;
   const localMonthlyCounts: MonthlyProgressCounts = {
     birth: {
-      pending: monthCases.filter((item) => item.type === "birth" && item.status === "pending").length,
-      progress: monthCases.filter((item) => item.type === "birth" && item.status === "progress").length,
-      completed: monthCases.filter((item) => item.type === "birth" && item.status === "completed").length,
+      pending: localMetricMonthCases.filter((item) => item.type === "birth" && item.status === "pending").length,
+      progress: localMetricMonthCases.filter((item) => item.type === "birth" && item.status === "progress").length,
+      completed: localMetricMonthCases.filter((item) => item.type === "birth" && item.status === "completed").length,
+      total: localMetricMonthCases.filter((item) => item.type === "birth").length,
     },
     death: {
-      pending: monthCases.filter((item) => item.type === "death" && item.status === "pending").length,
-      progress: monthCases.filter((item) => item.type === "death" && item.status === "progress").length,
-      completed: monthCases.filter((item) => item.type === "death" && item.status === "completed").length,
+      pending: localMetricMonthCases.filter((item) => item.type === "death" && item.status === "pending").length,
+      progress: localMetricMonthCases.filter((item) => item.type === "death" && item.status === "progress").length,
+      completed: localMetricMonthCases.filter((item) => item.type === "death" && item.status === "completed").length,
+      total: localMetricMonthCases.filter((item) => item.type === "death").length,
     },
   };
-  const monthlyCounts: MonthlyProgressCounts =
-    hasWardAggregate && wardMonthlyCounts
-      ? { birth: wardMonthlyCounts.birth, death: wardMonthlyCounts.death }
-      : localMonthlyCounts;
+  const usesStationMetrics =
+    !simulationEnabled && !isLocalAdminPreview &&
+    (user?.role === "admin" || user?.role === "worker" || user?.role === "police");
+  const monthlyCounts: MonthlyProgressCounts = usesStationMetrics
+    ? stationMonthlyMetrics?.counts ?? {
+        birth: { pending: 0, progress: 0, completed: 0, total: 0 },
+        death: { pending: 0, progress: 0, completed: 0, total: 0 },
+      }
+    : localMonthlyCounts;
   const scopeUpazilaId = user?.upazilaId ?? (isLocalAdminPreview ? "manirampur" : undefined);
   const scopeUnionId = user
     ? user.stationId ?? user.unionId
@@ -1005,13 +960,16 @@ export function RegistrationDashboard({
         : null
       : (roleConfig === "admin" || roleConfig === "worker" || roleConfig === "police") &&
           (user?.role === "admin" || user?.role === "worker" || user?.role === "police") &&
-          unionMonthlyTarget !== null &&
-          unionMonthlyTarget.unionId === (user.stationId ?? user.unionId) &&
-          unionMonthlyTarget.monthYear === targetMonthYear
-        ? unionMonthlyTarget
+          stationMonthlyMetrics?.target !== null &&
+          stationMonthlyMetrics?.target?.unionId === (user.stationId ?? user.unionId) &&
+          stationMonthlyMetrics?.target?.monthYear === targetMonthYear
+        ? stationMonthlyMetrics.target
         : null;
   const requiresSubmittedUnionTarget =
-    roleConfig === "admin" && user?.role === "admin" && !demoMode && !simulationEnabled;
+    (roleConfig === "admin" || roleConfig === "worker" || roleConfig === "police") &&
+    (user?.role === "admin" || user?.role === "worker" || user?.role === "police") &&
+    !demoMode &&
+    !simulationEnabled;
   const monthlyTargets = {
     birth: activeUnionTarget?.birth ??
       (requiresSubmittedUnionTarget && !isLocalAdminPreview ? 0 : Math.ceil(TARGET.birth * monthlyTargetScale)),
@@ -1019,14 +977,15 @@ export function RegistrationDashboard({
       (requiresSubmittedUnionTarget && !isLocalAdminPreview ? 0 : Math.ceil(TARGET.death * monthlyTargetScale)),
   };
   const monthlyTargetWarning =
-    hasWardAggregate && !wardMonthlyCounts
-      ? L("ওয়ার্ডের সামগ্রিক তথ্য লোড করা যায়নি", "Ward aggregate could not be loaded")
+    usesStationMetrics && !stationMonthlyMetrics
+      ? L("স্টেশনের সামগ্রিক তথ্য লোড করা যায়নি", "Station aggregate could not be loaded")
       : requiresSubmittedUnionTarget && !activeUnionTarget
         ? L("এই মাসের জন্য UNO-এর জমা দেওয়া লক্ষ্যমাত্রা পাওয়া যায়নি", "No submitted UNO target was found for this month")
         : undefined;
   const monthlyTarget = monthlyTargets.birth + monthlyTargets.death;
   const monthlyReceived =
-    hasWardAggregate && wardMonthlyCounts ? wardMonthlyCounts.total : monthCases.length;
+    (monthlyCounts.birth.total ?? monthlyCounts.birth.pending + monthlyCounts.birth.progress + monthlyCounts.birth.completed) +
+    (monthlyCounts.death.total ?? monthlyCounts.death.pending + monthlyCounts.death.progress + monthlyCounts.death.completed);
   const openCases = filteredCases.filter((item) => item.status !== "completed" && item.status !== "rejected");
   const urgency = useMemo(() => {
     const counts = { green: 0, yellow: 0, red: 0, expired: 0, review: 0 };

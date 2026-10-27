@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Check, Paperclip, ShieldCheck } from "lucide-react";
+import { getDhakaMonthYear } from "@/lib/monthly-targets";
+import { incrementStationCompletedCount } from "@/lib/station-local-metrics";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,7 +20,7 @@ export function CaseReview({
   mode: "admin" | "uno";
   dedicatedCompletion?: boolean;
 }) {
-  const { L, n, patchCase, addRemark, state } = useApp();
+  const { L, n, patchCase, addRemark, state, user } = useApp();
   const { address, date } = useCaseHelpers();
   const [remark, setRemark] = useState(""); const [regNo, setRegNo] = useState(c.regNo ?? "");
   const [savingStatus, setSavingStatus] = useState(false);
@@ -35,7 +37,33 @@ export function CaseReview({
       const updated = s === "completed"
         ? await patchCase(c.id, { status: s, regNo })
         : await patchCase(c.id, { status: s });
-      if (updated) toast.success(L("অবস্থা হালনাগাদ হয়েছে", "Status updated"));
+      if (updated) {
+        if (s === "completed" && c.status !== "completed") {
+          const upazilaId = user?.upazilaId ?? c.upazilaId;
+          const stationId = user?.stationId ?? user?.unionId ?? c.stationId ?? c.unionId;
+          if (upazilaId && stationId) {
+            const monthYear = getDhakaMonthYear();
+            const monthPrefix = monthYear.slice(0, 7);
+            const databaseCompletedCount = state.cases.filter((item) => {
+              if (
+                item.status !== "completed" ||
+                item.id === c.id ||
+                item.upazilaId !== upazilaId ||
+                (item.stationId ?? item.unionId) !== stationId
+              ) return false;
+              const completedTime = item.completedAt ?? item.createdAt;
+              const itemMonth = new Intl.DateTimeFormat("en-CA", {
+                timeZone: "Asia/Dhaka",
+                year: "numeric",
+                month: "2-digit",
+              }).format(new Date(completedTime));
+              return itemMonth === monthPrefix;
+            }).length;
+            incrementStationCompletedCount(upazilaId, stationId, monthYear, c.id, databaseCompletedCount);
+          }
+        }
+        toast.success(L("অবস্থা হালনাগাদ হয়েছে", "Status updated"));
+      }
     } finally {
       setSavingStatus(false);
     }

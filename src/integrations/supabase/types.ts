@@ -795,6 +795,22 @@ export type Database = {
           death_total_count: number
         }[]
       }
+      station_monthly_dashboard_metrics: {
+        Args: { _month_year: string }
+        Returns: {
+          birth_completed_count: number
+          birth_pending_count: number
+          birth_progress_count: number
+          birth_target: number
+          birth_total_count: number
+          death_completed_count: number
+          death_pending_count: number
+          death_progress_count: number
+          death_target: number
+          death_total_count: number
+          target_present: boolean
+        }[]
+      }
       save_union_villages: {
         Args: { _union_id: string; _villages: Json }
         Returns: undefined

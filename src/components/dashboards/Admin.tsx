@@ -122,11 +122,13 @@ export function AdminDashboard() {
   const cases = scopedCases(state, user);
   const up = state.upazilas.find((u) => u.id === user!.upazilaId)!;
   const un = up.unions.find((u) => u.id === user!.unionId)!;
-  const b = monthCount(cases, "birth"), d = monthCount(cases, "death");
+  const b = stationTarget?.counts.birth.total ?? monthCount(cases, "birth");
+  const d = stationTarget?.counts.death.total ?? monthCount(cases, "death");
   const flags = redFlags(state, user!.upazilaId, user!.unionId);
   const shown = cases.filter((c) => filter === "all" || c.status === filter);
-  const targets = stationTarget && stationTarget.unionId === (user!.stationId ?? user!.unionId)
-    ? stationTarget
+  const targets = stationTarget?.target &&
+    stationTarget.target.unionId === (user!.stationId ?? user!.unionId)
+    ? stationTarget.target
     : { birth: TARGET.birth, death: TARGET.death };
 
   return (
