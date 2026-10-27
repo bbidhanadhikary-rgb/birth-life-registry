@@ -1459,12 +1459,7 @@ export function RegistrationDashboard({
         )}
         <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
           <div className="flex min-h-0 flex-col justify-center">
-            {activeBadgeLabel && (user?.role === "worker" || user?.role === "police") ? (
-              <span className="mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-100 via-white to-slate-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base">
-                <MapPin aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-700 sm:h-6 sm:w-6" />
-                <span className="min-w-0">{activeBadgeLabel}</span>
-              </span>
-            ) : activeBadgeLabel && badgeUnionId ? (
+            {activeBadgeLabel && badgeUnionId ? (
               <Link
                 to="/monitoring/union-details"
                 search={{ unionId: badgeUnionId }}

@@ -17,9 +17,13 @@ describe("union badge labels", () => {
 
   it("formats a full station header with upazila and district", () => {
     const dhakuria = upazila.unions.find((union) => union.id === "mn-dhakuria")!;
+    const bhojgati = upazila.unions.find((union) => union.id === "mn-bhojgati")!;
 
     expect(formatUnionFullName(dhakuria, upazila.unions, upazila)).toBe(
       "০৪ নং ঢাকুরিয়া ইউনিয়ন পরিষদ, মণিরামপুর, যশোর",
+    );
+    expect(formatUnionFullName(bhojgati, upazila.unions, upazila)).toBe(
+      "০৩ নং ভোজগাতি ইউনিয়ন পরিষদ, মণিরামপুর, যশোর",
     );
   });
 
