@@ -37,7 +37,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { TARGET, type RegCase, type Role } from "@/lib/types";
-import { formatUnionBadgeName, getUnionLabel } from "@/lib/union-label";
+import { formatUnionBadgeName } from "@/lib/union-label";
 import {
   getDemoAttachmentPreview,
   MASTER_APPLICATIONS_KEY,
@@ -403,16 +403,7 @@ function createLocalAdminPreviewCases(seedCases: RegCase[], stationId: string) {
       item.id !== "preview-birth-ward-2" &&
       item.id !== "preview-death-ward-3",
   );
-  const fallbackCases = sourceCases.length
-    ? sourceCases
-    : seedCases.filter(
-        (item) =>
-          item.upazilaId === "manirampur" &&
-          item.unionId === "mn-rohita" &&
-          !item.id.startsWith("local-preview-") &&
-          item.id !== "preview-birth-ward-2" &&
-          item.id !== "preview-death-ward-3",
-      );
+  const fallbackCases = sourceCases;
   const remapCase = (item: RegCase, id = `local-preview-${stationId}-${item.id}`): RegCase => {
     const village = station.villages.find((candidate) => candidate.ward === item.ward)
       ?? station.villages[0];
@@ -1057,8 +1048,13 @@ export function RegistrationDashboard({
   const unionBadgeLabel = badgeUnionId
     ? badgeUnionLocation?.union
       ? formatUnionBadgeName(badgeUnionLocation.union, badgeUnionLocation.upazila.unions)
-      : getUnionLabel(badgeUnionId)
+      : undefined
     : undefined;
+  const activeBadgeLabel = user?.role === "worker" || user?.role === "police"
+    ? user.ward !== undefined && user.ward !== null
+      ? L(`ওয়ার্ড ${user.ward}`, `Ward ${user.ward}`)
+      : undefined
+    : unionBadgeLabel;
   const scopeLabel = jurisdictionScope
     ? jurisdictionScope.level === "union" && unionBadgeLabel
       ? `${unionBadgeLabel} · ${L("ডেভেলপমেন্ট সিমুলেশন", "Development simulation")}`
@@ -1179,7 +1175,7 @@ export function RegistrationDashboard({
         id: crypto.randomUUID(),
         caseId: adminDraft.item.id,
         upazilaId: user?.upazilaId ?? "manirampur",
-        unionId: user?.unionId ?? "mn-rohita",
+        unionId: badgeUnionId ?? user?.stationId ?? user?.unionId ?? "",
         kind: adminDraft.kind,
         title: adminDraft.kind === "greeting"
           ? adminDraft.item.type === "birth" ? "শুভেচ্ছা বার্তা" : "সমবেদনা বার্তা"
@@ -1454,44 +1450,31 @@ export function RegistrationDashboard({
         )}
         <div className="grid min-h-0 flex-1 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
           <div className="flex min-h-0 flex-col justify-center">
-            {badgeUnionId && unionBadgeLabel ? (
+            {activeBadgeLabel && (user?.role === "worker" || user?.role === "police") ? (
+              <span className="mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-100 via-white to-slate-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base">
+                <MapPin aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-700 sm:h-6 sm:w-6" />
+                <span className="min-w-0">{activeBadgeLabel}</span>
+              </span>
+            ) : activeBadgeLabel && badgeUnionId ? (
               <Link
                 to="/monitoring/union-details"
                 search={{ unionId: badgeUnionId }}
-                aria-label={L(
-                  `${unionBadgeLabel} এর বিস্তারিত দেখুন`,
-                  `View details for ${badgeUnionLocation?.union?.en ?? badgeUnionId}`,
-                )}
+                aria-label={L(`${activeBadgeLabel} এর বিস্তারিত দেখুন`, `View details for ${activeBadgeLabel}`)}
                 className="group mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-300 bg-gradient-to-r from-emerald-100 via-white to-teal-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 transition duration-200 ease-out hover:scale-105 hover:border-teal-400 hover:from-lime-100 hover:via-emerald-50 hover:to-cyan-100 hover:text-teal-950 hover:shadow-lg active:-translate-y-0.5 active:scale-105 active:border-teal-500 active:from-lime-100 active:to-cyan-100 active:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:scale-100 motion-reduce:active:translate-y-0 motion-reduce:active:scale-100 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base"
               >
-                <MapPin
-                  aria-hidden="true"
-                  className="h-5 w-5 shrink-0 text-emerald-700 transition-colors group-hover:text-teal-800 sm:h-6 sm:w-6"
-                />
-                <span className="min-w-0">{unionBadgeLabel}</span>
+                <MapPin aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-700 transition-colors group-hover:text-teal-800 sm:h-6 sm:w-6" />
+                <span className="min-w-0">{activeBadgeLabel}</span>
                 <ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0" />
               </Link>
-            ) : (
-              <span className="mb-2 inline-flex w-fit max-w-full items-center gap-2.5 rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-100 via-white to-slate-100 px-4 py-2 text-sm font-extrabold leading-snug text-emerald-950 shadow-md ring-1 ring-white/80 max-[360px]:mb-1 sm:gap-3 sm:px-5 sm:py-2.5 sm:text-base">
-                <MapPin
-                  aria-hidden="true"
-                  className="h-5 w-5 shrink-0 text-emerald-700 sm:h-6 sm:w-6"
-                />
-                <span className="min-w-0">
-                  {jurisdictionScope
-                    ? L(jurisdictionScope.labelBn, jurisdictionScope.labelEn)
-                    : scopeLabel || L("জাতীয় পর্যায়", "National scope")}
-                </span>
-              </span>
-            )}
+            ) : null}
             <h1 className="max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
-              {badgeUnionId ? (
+              {badgeUnionId && unionBadgeLabel ? (
                 <Link
                   to="/monitoring/union-details"
                   search={{ unionId: badgeUnionId }}
                   aria-label={L(
-                    `${unionBadgeLabel ?? "ইউনিয়ন পরিষদ"} এর সারসংক্ষেপ দেখুন`,
-                    `View ${badgeUnionLocation?.union?.en ?? badgeUnionId} overview`,
+                    `${unionBadgeLabel} এর সারসংক্ষেপ দেখুন`,
+                    `View ${unionBadgeLabel} overview`,
                   )}
                   className="inline-block rounded-sm transition-colors duration-200 hover:text-emerald-700 hover:drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 motion-reduce:transition-none"
                 >

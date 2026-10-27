@@ -312,7 +312,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
     const role = r[0]!.role as Role;
     setUser({ id: au.id, name: { bn: p.name_bn, en: p.name_en }, role, mobile: p.mobile ?? undefined, email: p.email ?? undefined,
-      upazilaId: p.upazila_id ?? "", unionId: p.union_id ?? undefined, ward: p.ward ?? undefined });
+      upazilaId: p.upazila_id ?? "", stationId: p.station_id ?? p.union_id ?? undefined, unionId: p.union_id ?? undefined, ward: p.ward ?? undefined });
     let m: Mfa = "ok";
     if (PRIV.includes(role)) {
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
