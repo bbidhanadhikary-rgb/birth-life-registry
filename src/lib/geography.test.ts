@@ -4,6 +4,8 @@ import {
   BANGLADESH_ADMINISTRATIVE_AREAS,
   filterCasesByAdministrativeArea,
   getAdministrativeWards,
+  getUnionVillages,
+  resolveVillageAddress,
   sameAdministrativeName,
 } from "./geography";
 
@@ -20,6 +22,32 @@ describe("Bangladesh administrative geography", () => {
     expect(new Set(BANGLADESH_ADMINISTRATIVE_AREAS.map((area) => area.id)).size).toBe(
       BANGLADESH_ADMINISTRATIVE_AREAS.length,
     );
+  });
+
+  it("loads villages union-wise and resolves all address fields from the selected village", () => {
+    const upazila = seedState().upazilas.find((area) => area.id === "manirampur")!;
+    const rohita = upazila.unions.find((union) => union.id === "mn-rohita")!;
+    const dhakuria = upazila.unions.find((union) => union.id === "mn-dhakuria")!;
+
+    expect(getUnionVillages(upazila, rohita.id).map((village) => village.id)).toEqual([
+      "mn-rohita-v1",
+      "mn-rohita-v2",
+      "mn-rohita-v3",
+    ]);
+    expect(getUnionVillages(upazila, dhakuria.id).every((village) => village.id.startsWith("mn-dhakuria"))).toBe(true);
+
+    const address = resolveVillageAddress(upazila, rohita.id, "mn-rohita-v2")!;
+    expect(address.ward).toBe(2);
+    expect(address.postOfficeBn).toBe("রোহিতা");
+    expect(address.postOfficeEn).toBe("Rohita");
+    expect(address.upazilaBn).toBe("মণিরামপুর");
+    expect(address.districtBn).toBe("যশোর");
+
+    const dhakuriaAddress = resolveVillageAddress(upazila, rohita.id, "mn-dhakuria-v1")!;
+    expect(dhakuriaAddress.union.id).toBe("mn-dhakuria");
+    expect(dhakuriaAddress.union.bn).toContain("ঢাকুরিয়া");
+    expect(dhakuriaAddress.village.bn).toBe("ব্রাহ্মণডাঙ্গা");
+    expect(dhakuriaAddress.postOfficeBn).toBe("ঢাকুরিয়া");
   });
 
   it("cascades from a division to only its districts and their upazilas", () => {

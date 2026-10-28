@@ -39,10 +39,11 @@ import { useCaseHelpers } from "@/components/shared";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { compressImage } from "@/lib/compress-image";
-import { isValidBrn, isValidNid, normalizeBdDigits } from "@/lib/bd-identifiers";
+import { isValidBrn, normalizeBdDigits } from "@/lib/bd-identifiers";
 import { checkCaseDuplicate } from "@/lib/case.functions";
 import { getCaseDeadline, getDeadlineBand } from "@/lib/compliance";
 import { downloadCSV, printPDF } from "@/lib/report";
+import { getUnionVillages, resolveVillageAddress } from "@/lib/geography";
 import { roleLabel, scopedCases, useApp } from "@/lib/store";
 import type { Bi, CaseFileMetadata, RegCase, Union, Upazila, Village } from "@/lib/types";
 import { UnifiedStationDashboardTop } from "./UnifiedStationDashboardTop";
@@ -357,10 +358,13 @@ function VillageAddressField({
   L: (bn: string, en: string) => string;
   n: (value: number | string) => string;
 }) {
-  const village = union.villages.find((item) => item.id === villageId);
+  const villages = getUnionVillages(upazila, union.id);
+  const address = resolveVillageAddress(upazila, union.id, villageId);
+  const resolvedUnion = address?.union ?? union;
+
   const details = [
-    [L("ডাকঘর", "Post office"), village ? L(village.poBn, village.poEn) : ""],
-    [L("ইউনিয়ন", "Union"), L(union.bn, union.en)],
+    [L("ডাকঘর", "Post office"), address ? L(address.postOfficeBn, address.postOfficeEn) : ""],
+    [L("ইউনিয়ন", "Union"), L(resolvedUnion.bn, resolvedUnion.en)],
     [L("উপজেলা", "Upazila"), L(upazila.bn, upazila.en)],
     [L("জেলা", "District"), L(districtBn, districtEn)],
   ];
@@ -379,7 +383,7 @@ function VillageAddressField({
           <SelectValue placeholder={L("গ্রাম/মহল্লা নির্বাচন করুন", "Choose village/neighborhood")} />
         </SelectTrigger>
         <SelectContent>
-          {union.villages.map((item) => (
+          {villages.map((item) => (
             <SelectItem key={item.id} value={item.id}>{L(item.bn, item.en)}</SelectItem>
           ))}
         </SelectContent>
@@ -388,7 +392,7 @@ function VillageAddressField({
         <div className="min-w-0 rounded-md bg-white px-2 py-1">
           <p className="text-[10px] font-medium text-slate-500">{L("ওয়ার্ড নং", "Ward number")}</p>
           <p className="truncate text-xs font-semibold text-slate-800">
-            {village ? n(village.ward) : "—"}
+            {address ? n(address.ward) : "—"}
           </p>
         </div>
         {details.map(([label, value]) => (
@@ -513,7 +517,9 @@ export function RegForm({
   const [addressHolding, setAddressHolding] = useState(
     savedDraft?.addressHolding ?? entry?.details?.addressHolding ?? "",
   );
-  const selectedVillage = union?.villages.find((village) => village.id === villageId);
+  const resolvedVillageAddress = resolveVillageAddress(upazila, union?.id, villageId);
+  const selectedUnion = resolvedVillageAddress?.union ?? union;
+  const selectedVillage = resolvedVillageAddress?.village ?? undefined;
   const [attachments, setAttachments] = useState<(File | null)[]>([null, null, null]);
   const [visitPhoto, setVisitPhoto] = useState<File | null>(null);
   const [visitPhotoMetadata, setVisitPhotoMetadata] =
@@ -953,15 +959,6 @@ export function RegForm({
       setError(L("আবেদনকারীর নাম ও সম্পর্ক পূরণ করুন", "Enter the applicant's name and relationship"));
       return;
     }
-    if (!isValidNid(nid)) {
-      setError(
-        L(
-          "NID ১০, ১৩ বা ১৭ অঙ্কের হতে হবে",
-          "NID must contain 10, 13 or 17 digits",
-        ),
-      );
-      return;
-    }
     if (!/^01[3-9]\d{8}$/.test(mobile)) {
       setError(
         L(
@@ -1078,7 +1075,7 @@ export function RegForm({
       }
       const registryAddress = configuredAddress(
         selectedVillage,
-        union,
+        selectedUnion ?? union,
         upazila,
         addressHolding,
       );
@@ -1350,24 +1347,16 @@ export function RegForm({
             <BiField label="পিতার নাম" labelEn="Father's Name" value={father} onChange={setFather} required compact />
             <BiField label="মাতার নাম" labelEn="Mother's Name" value={mother} onChange={setMother} required compact />
             <BiField label="স্বামী/স্ত্রীর নাম" labelEn="Spouse's Name" value={spouseName} onChange={setSpouseName} compact />
-            <FormRow labelBn="জাতীয় পরিচয়পত্র নং" labelEn="National ID No." required compact>
+            <FormRow labelBn="জাতীয় পরিচয়পত্র নং" labelEn="National ID No." compact>
               <Input
                 className="h-11 text-base"
                 autoComplete="off"
                 inputMode="numeric"
                 maxLength={17}
-                placeholder="১০, ১৩ বা ১৭ অঙ্ক / 10, 13 or 17 digits"
-                required
+                placeholder="ঐচ্ছিক / Optional"
                 value={nid}
-                aria-invalid={nid.length > 0 && !isValidNid(nid)}
-                aria-describedby="nid-validation"
                 onChange={(event) => setNid(normalizeBdDigits(event.target.value).replace(/\D/g, "").slice(0, 17))}
               />
-              {nid.length > 0 && !isValidNid(nid) && (
-                <p id="nid-validation" className="mt-1 text-xs font-medium text-red-700" role="alert">
-                  {L("NID ১০, ১৩ বা ১৭ অঙ্কের হতে হবে", "NID must contain 10, 13 or 17 digits")}
-                </p>
-              )}
             </FormRow>
             <FormRow labelBn="মোবাইল নম্বর" labelEn="Mobile Number" required compact><Input className="h-11 text-base" autoComplete="tel" inputMode="tel" maxLength={11} placeholder="01XXXXXXXXX" required value={mobile} onChange={(event) => setMobile(event.target.value.replace(/\D/g, "").slice(0, 11))} /></FormRow>
           </div>
@@ -1518,7 +1507,8 @@ function EpiAttendanceForm({ onSaved }: { onSaved: () => void }) {
   const [name, setName] = useState<Bi>(emptyBi);
   const [mobile, setMobile] = useState("");
   const [villageId, setVillageId] = useState("");
-  const selectedVillage = assignedUnion?.villages.find((item) => item.id === villageId);
+  const selectedVillageAddress = resolveVillageAddress(assignedUpazila, assignedUnion?.id, villageId);
+  const selectedVillage = selectedVillageAddress?.village ?? undefined;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 

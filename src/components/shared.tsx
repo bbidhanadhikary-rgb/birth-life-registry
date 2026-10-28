@@ -3,14 +3,15 @@ import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/lib/store";
 import type { AppState, RegCase, Status, User } from "@/lib/types";
 
-export function StatusBadge({ s }: { s: Status }) {
+export function StatusBadge({ s, status }: { s?: Status; status?: Status }) {
   const { L } = useApp();
+  const value: Status = s ?? status ?? "pending";
   const m = {
     pending: ["bg-warning text-warning-foreground", L("অপেক্ষমাণ", "Pending")],
     progress: ["bg-info text-info-foreground", L("চলমান", "In Progress")],
     completed: ["bg-success text-success-foreground", L("সম্পন্ন", "Completed")],
     rejected: ["bg-destructive text-destructive-foreground", L("বাতিল", "Rejected")],
-  }[s];
+  }[value];
   return <Badge className={`${m[0]} border-0`}>{m[1]}</Badge>;
 }
 

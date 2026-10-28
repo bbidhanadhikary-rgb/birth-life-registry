@@ -28,7 +28,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { roleLabel, useApp } from "@/lib/store";
+import { getStationsForUpazila } from "@/lib/monirampur-stations";
 import {
   EXECUTIVE_PREVIEW_ROLES,
   isPreviewRole,
@@ -52,6 +54,9 @@ export function Header() {
     demoLoginAvailable,
     demoMode,
     enterDemoLogin,
+    state,
+    activeUnionId,
+    setActiveUnionId,
   } = useApp();
   const [dlg, setDlg] = useState<null | "login" | "manual" | "support">(null);
   const [isExecutiveMenuOpen, setIsExecutiveMenuOpen] = useState(false);
@@ -100,6 +105,9 @@ export function Header() {
     role !== undefined &&
     EXECUTIVE_PREVIEW_ROLES.some((executiveRole) => executiveRole === role);
   const executiveActive = isExecutiveRole(activeRole);
+  const canSwitchUnion = user?.role === "admin" && demoMode;
+  const stationUpazila = state.upazilas.find((item) => item.id === "manirampur") ?? state.upazilas.find((item) => item.id === user?.upazilaId);
+  const stationOptions = stationUpazila ? getStationsForUpazila(stationUpazila.id, stationUpazila.unions) : [];
 
   useEffect(() => {
     if (selectedPreviewRole) {
@@ -335,6 +343,26 @@ export function Header() {
             <span className="hidden text-sm text-emerald-50 sm:block">{L("জন্ম ও মৃত্যু নিবন্ধন · উপজেলা", "Birth & Death · Upazila")}</span>
           </span>
         </Link>
+        {canSwitchUnion && stationOptions.length > 0 && (
+          <Select
+            value={activeUnionId ?? (stationOptions.some((station) => station.id === "mn-dhakuria") ? "mn-dhakuria" : stationOptions[0]?.id)}
+            onValueChange={(stationId) => {
+              setActiveUnionId(stationId);
+              void nav({ to: "/union-master" });
+            }}
+          >
+            <SelectTrigger className="h-11 max-w-44 border-white/40 bg-white/10 text-sm font-bold text-white hover:bg-white/15 max-[400px]:max-w-32" aria-label={L("সক্রিয় স্টেশন নির্বাচন", "Select active station")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {stationOptions.map((station) => (
+                <SelectItem key={station.id} value={station.id}>
+                  {L(station.bn, station.en)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Button variant="ghost" size="sm" className="h-11 shrink-0 bg-white/10 px-3 text-base font-semibold text-white transition hover:bg-amber-300/25 hover:text-amber-50 max-[400px]:h-9 max-[400px]:px-2 max-[400px]:text-sm sm:px-4" onClick={toggleLang} aria-label="Language">
           <Languages className="h-6 w-6 max-[400px]:h-5 max-[400px]:w-5" /><span className="ml-1">{lang === "bn" ? "EN" : "বাং"}</span>
         </Button>

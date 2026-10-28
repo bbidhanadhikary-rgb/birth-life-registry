@@ -1,4 +1,4 @@
-import type { AdministrativeArea, Upazila } from "./types";
+import type { AdministrativeArea, Upazila, Union, Village } from "./types";
 import rawBangladeshGeo from "./data/bangladesh-geo.json";
 
 type NamedPlace = { name: string; bn_name: string };
@@ -433,4 +433,51 @@ export function buildAdministrativeAreas(upazilas: Upazila[]): AdministrativeAre
   }
 
   return areas;
+}
+
+/** Returns villages only for the active union/station, keeping union data hierarchical. */
+export function getUnionVillages(upazila: Upazila | null | undefined, unionId: string | null | undefined): Village[] {
+  if (!upazila || !unionId) return [];
+  return upazila.unions.find((union) => union.id === unionId)?.villages ?? [];
+}
+
+export type VillageAddressAutoFill = {
+  union: Union;
+  village: Village;
+  ward: number;
+  postOfficeBn: string;
+  postOfficeEn: string;
+  upazilaBn: string;
+  upazilaEn: string;
+  districtBn: string;
+  districtEn: string;
+};
+
+/** Resolves every address field from a village selected inside the active union. */
+export function resolveVillageAddress(
+  upazila: Upazila | null | undefined,
+  unionId: string | null | undefined,
+  villageId: string | null | undefined,
+): VillageAddressAutoFill | null {
+  if (!upazila || !villageId) return null;
+  // Village IDs and LocalStorage records can exist after a station switch. Resolve
+  // from the hierarchical union containing the village, never by assuming unionId.
+  const union = unionId
+    ? upazila.unions.find((item) => item.id === unionId)?.villages.some((item) => item.id === villageId)
+      ? upazila.unions.find((item) => item.id === unionId)
+      : upazila.unions.find((item) => item.villages.some((village) => village.id === villageId))
+    : upazila.unions.find((item) => item.villages.some((village) => village.id === villageId));
+  const village = union?.villages.find((item) => item.id === villageId);
+  if (!union || !village) return null;
+  return {
+    union,
+    village,
+    ward: village.ward,
+    postOfficeBn: village.poBn,
+    postOfficeEn: village.poEn,
+    upazilaBn: upazila.bn,
+    upazilaEn: upazila.en,
+    districtBn: upazila.districtBn,
+    districtEn: upazila.districtEn,
+  };
 }

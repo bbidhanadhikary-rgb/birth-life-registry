@@ -128,8 +128,10 @@ interface Ctx {
   announcements: UpazilaAnnouncement[];
   selectedUpazilaId: string | undefined;
   setSelectedUpazilaId: (id: string | undefined) => void;
+  activeUnionId: string | undefined;
+  setActiveUnionId: (id: string | undefined) => void;
   saveAnnouncement: (upazilaId: string, noticeBn: string, noticeEn: string, active: boolean) => Promise<boolean>;
-  saveUnionVillages: (villages: Village[]) => Promise<boolean>;
+  saveUnionVillages: (villages: Village[], unionId?: string) => Promise<boolean>;
   epiVisits: EpiVisit[]; enterDemoLogin: (role: "worker" | "police" | "admin" | "uno") => void; addEpiVisit: (visit: NewEpiVisit) => Promise<string | null>;
   lang: Lang; toggleLang: () => void; L: (bn: string, en: string) => string; n: (v: number | string) => string;
   dark: boolean; toggleTheme: () => void;
@@ -146,7 +148,7 @@ const QUEUE = "uert-offline-queue";
 const UNION_VILLAGES_PREFIX = "birth-life-registry:union-villages:";
 const PRIV: Role[] = ["admin", "uno", "super"];
 
-function readUnionVillageMaster(unionId: string): Village[] | null {
+export function readUnionVillageMaster(unionId: string): Village[] | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(`${UNION_VILLAGES_PREFIX}${unionId}`);
@@ -156,11 +158,21 @@ function readUnionVillageMaster(unionId: string): Village[] | null {
     const villages = parsed.filter((item): item is Village => {
       if (!item || typeof item !== "object") return false;
       const value = item as Partial<Village>;
-      return typeof value.id === "string" && typeof value.bn === "string" && typeof value.en === "string" && typeof value.ward === "number";
+      return typeof value.id === "string" && typeof value.bn === "string" && typeof value.en === "string" && typeof value.ward === "number" && typeof value.poBn === "string" && typeof value.poEn === "string";
     });
     return villages;
   } catch {
     return null;
+  }
+}
+
+export function saveUnionVillageDraft(unionId: string, villages: Village[]): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    window.localStorage.setItem(`${UNION_VILLAGES_PREFIX}${unionId}`, JSON.stringify(villages));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -230,6 +242,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [epiVisits, setEpiVisits] = useState<EpiVisit[]>([]);
   const [announcements, setAnnouncements] = useState<UpazilaAnnouncement[]>([]);
   const [selectedUpazilaId, setSelectedUpazilaId] = useState<string>();
+  const [activeUnionId, setActiveUnionId] = useState<string>();
   const [online, setOnline] = useState(true);
   const [lang, setLang] = useState<Lang>("bn");
   const [dark, setDark] = useState(false);
@@ -263,6 +276,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const attendedAt = new Date().toISOString();
     setState(previewUser.unionId ? { ...demo, upazilas: applyUnionVillageMaster(demo.upazilas, previewUser.unionId) } : demo);
     setUser(previewUser);
+    if (role === "admin") setActiveUnionId(previewUser.stationId ?? previewUser.unionId ?? "mn-dhakuria");
     setMfa("ok");
     setEpiVisits(role === "worker" && union ? [
       {
@@ -394,6 +408,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (prefsReady.current) { localStorage.setItem("uert-theme", dark ? "dark" : "light"); localStorage.setItem("uert-lang", lang); }
   }, [dark, lang]);
   useEffect(() => {
+    if (!user) {
+      setActiveUnionId(undefined);
+      return;
+    }
+    if (user.role === "admin" || user.role === "super") {
+      setActiveUnionId((current) => {
+        if (current) return current;
+        const defaultUnion = state.upazilas
+          .find((upazila) => upazila.id === "manirampur")
+          ?.unions.some((union) => union.id === "mn-dhakuria")
+          ? "mn-dhakuria"
+          : user.stationId ?? user.unionId;
+        return defaultUnion;
+      });
+    }
+  }, [state.upazilas, user?.id, user?.role, user?.stationId, user?.unionId]);
+  useEffect(() => {
     if (!demoMode || !user) return;
     writeDemoCases(MASTER_APPLICATIONS_KEY, state.cases);
   }, [demoMode, state.cases, user]);
@@ -512,7 +543,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value: Ctx = {
     state: { ...state, cases: [...pending.filter((p) => p.created_by === user?.id).map((p) => ({ ...mapCase({ ...p, created_at: p.queued_at, files: [], files_purged: false, status: "pending", sms_sent: false }, []), synced: false })), ...state.cases] },
     user, authReady, mfa, online, lang, L, n, dark, demoMode, demoLoginAvailable: localDemoLoginAvailable, epiVisits,
-    announcements, selectedUpazilaId, setSelectedUpazilaId,
+    announcements, selectedUpazilaId, setSelectedUpazilaId, activeUnionId, setActiveUnionId,
     saveAnnouncement: async (upazilaId, noticeBn, noticeEn, active) => {
       if (!user || user.role !== "uno" || user.upazilaId !== upazilaId) {
         toast.error(L("শুধু নিজ উপজেলার ইউএনও বিজ্ঞপ্তি প্রকাশ করতে পারবেন", "Only the assigned Upazila UNO can publish this notice"));
@@ -543,8 +574,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       await loadData();
       return true;
     },
-    saveUnionVillages: async (villages) => {
-      if (!user || user.role !== "admin" || !user.unionId || mfa !== "ok") {
+    saveUnionVillages: async (villages, targetUnionId = activeUnionId ?? user?.unionId) => {
+      if (!user || user.role !== "admin" || !targetUnionId || mfa !== "ok") {
         toast.error(L("শুধু নির্ধারিত ইউপি প্রশাসনিক কর্মকর্তা গ্রাম-ওয়ার্ডের তথ্য পরিবর্তন করতে পারবেন", "Only the assigned UP Administrative Officer can manage village and ward details"));
         return false;
       }
@@ -564,7 +595,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return false;
       }
       try {
-        window.localStorage.setItem(`${UNION_VILLAGES_PREFIX}${user.unionId}`, JSON.stringify(villages));
+        window.localStorage.setItem(`${UNION_VILLAGES_PREFIX}${targetUnionId}`, JSON.stringify(villages));
       } catch (cause) {
         console.error("Could not persist union village master setup", cause);
       }
@@ -577,7 +608,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               : {
                   ...area,
                   unions: area.unions.map((union) =>
-                    union.id === user.unionId ? { ...union, villages } : union,
+                    union.id === targetUnionId ? { ...union, villages } : union,
                   ),
                 },
           ),
@@ -585,7 +616,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return true;
       }
       const { error } = await supabase.rpc("save_union_villages", {
-        _union_id: user.unionId,
+        _union_id: targetUnionId,
         _villages: villages.map(({ id, bn, en, ward, poBn, poEn }) => ({
           id,
           bn,

@@ -15,7 +15,7 @@ export const Route = createFileRoute("/monitoring")({
 
 function MonitoringRoute() {
   const { L, user } = useApp();
-  const canMonitor = user && ["worker", "admin", "police", "uno", "district", "super"].includes(user.role);
+  const canMonitor = user && ["uno", "district", "super"].includes(user.role);
   return (
     <DashboardGate fitViewport flushViewport workerLayout={false} developmentPreviewRole="uno">
       {canMonitor ? (

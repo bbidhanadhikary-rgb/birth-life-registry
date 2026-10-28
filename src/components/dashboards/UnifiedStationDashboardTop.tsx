@@ -62,23 +62,28 @@ export function UnifiedStationDashboardTop({ stationId: stationIdProp }: { stati
   return (
     <div className="grid min-h-0 gap-1 sm:gap-2 lg:grid-cols-[0.72fr_1.28fr] lg:items-center lg:gap-3">
       <div className="flex min-h-0 flex-col justify-center">
-        <div
-          className="mb-3 max-w-3xl text-center text-white"
+        <button
+          type="button"
+          className="mb-3 block w-full max-w-3xl cursor-pointer text-center text-white transition-transform duration-200 hover:scale-[1.02] hover:brightness-110 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-300/60"
           style={{
-            background: "linear-gradient(135deg, #065f46 0%, #047857 100%)",
+            display: "block",
+            background: "linear-gradient(135deg, #059669 0%, #10b981 100%)",
+            border: "0",
             color: "#ffffff",
             fontSize: "1.5rem",
+            lineHeight: "1.35",
             fontWeight: 700,
             padding: "16px 24px",
-            borderRadius: "12px",
-            boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3)",
-            border: "2px solid #34d399",
+            borderRadius: "10px",
+            boxShadow: "0 8px 20px rgba(0, 0, 0, 0.15)",
             textAlign: "center",
           }}
+          onClick={() => document.getElementById("e-registration-tracker")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          aria-label="০৪ নং ঢাকুরিয়া ইউনিয়ন পরিষদ, মণিরামপুর, যশোর — ই-নিবন্ধন ট্র্যাকার দেখুন"
         >
           ০৪ নং ঢাকুরিয়া ইউনিয়ন পরিষদ, মণিরামপুর, যশোর
-        </div>
-        <h1 className="max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
+        </button>
+        <h1 id="e-registration-tracker" className="max-w-3xl scroll-mt-24 font-display text-2xl font-bold leading-tight tracking-tight text-[#102a43] max-[360px]:text-xl sm:text-3xl lg:text-4xl">
           ই-নিবন্ধন ট্র্যাকার
         </h1>
         <p className="mt-1 max-w-3xl text-xs font-semibold leading-snug text-teal-800 max-[360px]:text-[11px] sm:text-sm lg:text-base">

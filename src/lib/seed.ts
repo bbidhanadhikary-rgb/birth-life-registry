@@ -35,6 +35,10 @@ export function seedState(): AppState {
     { id: "mn-rohita-v2", bn: "নেংগুড়াহাট", en: "Nengurahat", poBn: "রোহিতা", poEn: "Rohita", ward: 2 },
     { id: "mn-rohita-v3", bn: "খোদ্দ", en: "Khodda", poBn: "রোহিতা", poEn: "Rohita", ward: 3 },
   ];
+  // Dhakuria villages must remain nested under the Dhakuria union/station.
+  mani.unions[4]!.villages = [
+    { id: "mn-dhakuria-v1", bn: "ব্রাহ্মণডাঙ্গা", en: "Brahmandanga", poBn: "ঢাকুরিয়া", poEn: "Dhakuria", ward: 1 },
+  ];
   const kesh: Upazila = {
     id: "keshabpur", bn: "কেশবপুর", en: "Keshabpur",
     districtBn: "যশোর", districtEn: "Jashore", divisionBn: "খুলনা", divisionEn: "Khulna",
@@ -74,9 +78,9 @@ export function seedState(): AppState {
     users: [
       { id: "u-super", name: { bn: "সুপার অ্যাডমিন", en: "Super Admin" }, role: "super", email: "super@demo.gov.bd", password: "123456", upazilaId: "" },
       { id: "u-uno", name: { bn: "ইউএনও, মণিরামপুর", en: "UNO, Manirampur" }, role: "uno", email: "uno@manirampur.gov.bd", password: "123456", upazilaId: "manirampur" },
-      { id: "u-a1", name: { bn: "মো. রফিক", en: "Md. Rafiq" }, role: "admin", email: "admin.rohita@demo.gov.bd", password: "123456", upazilaId: "manirampur", unionId: "mn-rohita" },
+      { id: "u-a1", name: { bn: "মো. রফিক", en: "Md. Rafiq" }, role: "admin", email: "admin.dhakuria@demo.gov.bd", password: "123456", upazilaId: "manirampur", stationId: "mn-dhakuria", unionId: "mn-dhakuria" },
       { id: "u-a2", name: { bn: "শাহানা পারভীন", en: "Shahana Parvin" }, role: "admin", email: "admin.pourashava@demo.gov.bd", password: "123456", upazilaId: "manirampur", unionId: "mn-pourashava" },
-      { id: "u-w1", name: { bn: "ফাতেমা খাতুন", en: "Fatema Khatun" }, role: "worker", mobile: "01711000001", upazilaId: "manirampur", unionId: "mn-rohita", ward: 1 },
+      { id: "u-w1", name: { bn: "ফাতেমা খাতুন", en: "Fatema Khatun" }, role: "worker", mobile: "01711000001", upazilaId: "manirampur", stationId: "mn-dhakuria", unionId: "mn-dhakuria", ward: 1 },
       { id: "u-w2", name: { bn: "সালমা আক্তার", en: "Salma Akter" }, role: "worker", mobile: "01711000002", upazilaId: "manirampur", unionId: "mn-rohita", ward: 2 },
       { id: "u-w3", name: { bn: "রুনা লায়লা", en: "Runa Laila" }, role: "worker", mobile: "01711000003", upazilaId: "manirampur", unionId: "mn-pourashava", ward: 1 },
       { id: "u-p1", name: { bn: "হাবিবুর রহমান", en: "Habibur Rahman" }, role: "police", mobile: "01811000001", upazilaId: "manirampur", unionId: "mn-rohita", ward: 1 },

@@ -73,6 +73,9 @@ import {
 } from "@/components/dashboards/MonthlyProgressCard";
 import { LoginDialog } from "@/components/Header";
 import { WorkerApplicationListPage } from "@/components/modules/WorkerApplicationListPage";
+import { BirthRegList } from "@/components/modules/BirthRegList";
+import { DeathRegList } from "@/components/modules/DeathRegList";
+import { AdministrativeErrorBoundary } from "@/components/AdministrativeErrorBoundary";
 import { WardKpiPanel } from "@/components/dashboards/WardKpiPanel";
 
 type DashboardRole = Role | "public";
@@ -85,7 +88,7 @@ type RoleAction = {
   descriptionEn: string;
   Icon?: typeof MapPinned;
   icon?: string;
-  link?: "/monitoring";
+  link?: "/monitoring" | "/union-master";
   filter?: ActionFilter;
 };
 type AdminRecord = {
@@ -454,7 +457,7 @@ function createLocalAdminPreviewCases(seedCases: RegCase[], stationId: string) {
 const executiveQuickAccessActions: RoleAction[] = [
   { id: "reports", titleBn: "এলাকাভিত্তিক প্রতিবেদন", titleEn: "Area-wise report", descriptionBn: "প্রশাসনিক এলাকার সারসংক্ষেপ", descriptionEn: "Administrative area summaries", Icon: MapPinned },
   { id: "deadlines", titleBn: "সময়সীমা পর্যবেক্ষণ", titleEn: "Deadline monitoring", descriptionBn: "৩৬৫ দিনের সম্মতি ও সতর্কতা", descriptionEn: "365-day compliance and alerts", Icon: CalendarCheck2, filter: "urgent" },
-  { id: "smart-monitoring", titleBn: "স্মার্ট মনিটরিং সিস্টেম", titleEn: "Smart Monitoring System", descriptionBn: "সার্বিক অগ্রগতি, টার্গেট ও ডেটা মনিটরিং", descriptionEn: "Overall progress, targets, and data monitoring", icon: "📊", link: "/monitoring" },
+  { id: "smart-monitoring", titleBn: "স্মার্ট মনিটরিং সিস্টেম", titleEn: "Smart Monitoring System", descriptionBn: "সার্বিক অগ্রগতি, টার্গেট ও ডাটা মনিটরিং", descriptionEn: "Overall progress, targets, and data monitoring", Icon: ChartNoAxesCombined, link: "/monitoring" },
   { id: "feedback", titleBn: "অভিযোগ জানান বা পরামর্শ দিন", titleEn: "Submit complaint or suggestion", descriptionBn: "আইসিটি সহায়তা ও পরামর্শ দিন", descriptionEn: "Request ICT support or share a suggestion", Icon: MessageSquare },
 ];
 const publicActions = executiveQuickAccessActions.filter((item) => item.id !== "smart-monitoring");
@@ -477,7 +480,7 @@ const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district"
   admin: [
     { id: "birth-list", titleBn: "জন্ম নিবন্ধনের আবেদন তালিকা", titleEn: "Birth Registration Application List", descriptionBn: "ইউনিয়নের সব ওয়ার্ডের জন্ম আবেদন ও প্রশাসনিক কার্যক্রম", descriptionEn: "Birth applications and administrative actions across all union wards", Icon: FileText, filter: "birth" },
     { id: "death-list", titleBn: "মৃত্যু নিবন্ধনের আবেদন তালিকা", titleEn: "Death Registration Application List", descriptionBn: "ইউনিয়নের সব ওয়ার্ডের মৃত্যু আবেদন ও প্রশাসনিক কার্যক্রম", descriptionEn: "Death applications and administrative actions across all union wards", Icon: FileCheck2, filter: "death" },
-    { id: "legal-tracker", titleBn: "ইস্যুকৃত আইনি নোটিশ ট্র্যাকার", titleEn: "Issued Legal Notice Tracker", descriptionBn: "ধারা ৭(২)-এর নোটিশের খসড়া ও রেকর্ড", descriptionEn: "Section 7(2) notice drafts and records", Icon: ShieldAlert },
+    { id: "smart-monitoring", titleBn: "স্মার্ট মনিটরিং সিস্টেম", titleEn: "Smart Monitoring System", descriptionBn: "সার্বিক অগ্রগতি, টার্গেট ও ডাটা মনিটরিং", descriptionEn: "Overall progress, targets, and data monitoring", Icon: ChartNoAxesCombined, link: "/union-master" },
     { id: "message-tracker", titleBn: "প্রেরিত বার্তা ও পরিদর্শন ট্র্যাকার", titleEn: "Messages & Inspection Tracker", descriptionBn: "শুভেচ্ছা, সমবেদনা ও মাঠ পরিদর্শনের তথ্য", descriptionEn: "Greetings, condolences, and field inspection details", Icon: MessageSquare },
     { id: "pending-cases", titleBn: "অপেক্ষমাণ আবেদন", titleEn: "Pending applications", descriptionBn: "পর্যালোচনার অপেক্ষায় থাকা কেস", descriptionEn: "Cases awaiting review", Icon: Inbox, filter: "pending" },
     { id: "progress-cases", titleBn: "চলমান কেস", titleEn: "Cases in progress", descriptionBn: "চলমান নিবন্ধন কার্যক্রম", descriptionEn: "Registration work in progress", Icon: Clock3, filter: "progress" },
@@ -489,7 +492,7 @@ const roleActions: Record<Exclude<DashboardRole, "public" | "super" | "district"
   uno: [
     { id: "upazila-progress", titleBn: "উপজেলা অগ্রগতি", titleEn: "Upazila progress", descriptionBn: "সামগ্রিক নিবন্ধন অগ্রগতি দেখুন", descriptionEn: "Review overall registration progress", Icon: MapPinned },
     { id: "upazila-births", titleBn: "জন্ম নিবন্ধন", titleEn: "Birth registrations", descriptionBn: "উপজেলার জন্ম নিবন্ধনের কেস", descriptionEn: "Birth registration cases across the upazila", Icon: Baby, filter: "birth" },
-    { id: "smart-monitoring", titleBn: "স্মার্ট মনিটরিং সিস্টেম", titleEn: "Smart Monitoring System", descriptionBn: "সার্বিক অগ্রগতি, টার্গেট ও ডেটা মনিটরিং", descriptionEn: "Overall progress, targets, and data monitoring", Icon: ChartNoAxesCombined },
+    { id: "smart-monitoring", titleBn: "স্মার্ট মনিটরিং সিস্টেম", titleEn: "Smart Monitoring System", descriptionBn: "সার্বিক অগ্রগতি, টার্গেট ও ডাটা মনিটরিং", descriptionEn: "Overall progress, targets, and data monitoring", Icon: ChartNoAxesCombined, link: "/monitoring" },
     { id: "upazila-deaths", titleBn: "মৃত্যু নিবন্ধন", titleEn: "Death registrations", descriptionBn: "উপজেলার মৃত্যু নিবন্ধনের কেস", descriptionEn: "Death registration cases across the upazila", Icon: HeartPulse, filter: "death" },
     { id: "birth-list", titleBn: "জন্ম আবেদনের তালিকা", titleEn: "Birth applications", descriptionBn: "উপজেলার জন্ম আবেদন দেখুন", descriptionEn: "View upazila birth applications", Icon: FileText, filter: "birth" },
     { id: "death-list", titleBn: "মৃত্যু আবেদনের তালিকা", titleEn: "Death applications", descriptionBn: "উপজেলার মৃত্যু আবেদন দেখুন", descriptionEn: "View upazila death applications", Icon: FileCheck2, filter: "death" },
@@ -612,7 +615,7 @@ export function RegistrationDashboard({
   initialAction?: "worker-report" | "feedback";
   onActionDismiss?: () => void;
 }) {
-  const { state, L, n, user, demoMode, patchCase } = useApp();
+  const { state, L, n, user, demoMode, patchCase, setActiveUnionId } = useApp();
   const simulationEnabled = import.meta.env.DEV && simulationRole !== undefined;
   const readOnlyPolicyPanel = isPolicyReadOnlyRole(simulationRole);
   const [localPreviewSeed] = useState(seedState);
@@ -1437,10 +1440,13 @@ export function RegistrationDashboard({
       {applicationListType && roleConfig === "admin" && !editEntry ? (
         <div className="mx-auto flex min-h-0 w-full max-w-none flex-1 flex-col gap-2 px-4 py-2 sm:px-6 lg:px-6">
           {administrativeList ? (
-            <WorkerApplicationListPage
-              type={applicationListType}
-              administrative={administrativeList}
-            />
+            <AdministrativeErrorBoundary>
+              {applicationListType === "birth" ? (
+                <BirthRegList cases={actionCases} onHome={dismissActiveCard} />
+              ) : (
+                <DeathRegList cases={actionCases} onHome={dismissActiveCard} />
+              )}
+            </AdministrativeErrorBoundary>
           ) : (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
               {L("এই তালিকা দেখতে অনুমোদিত প্রশাসনিক অ্যাকাউন্টে প্রবেশ করুন।", "Sign in with an authorized administrative account to view this list.")}
@@ -1458,6 +1464,7 @@ export function RegistrationDashboard({
               value={previewStationId}
               onValueChange={(stationId) => {
                 setPreviewStationId(stationId);
+                setActiveUnionId(stationId);
                 setLocalPreviewCases(createLocalAdminPreviewCases(masterPreviewCases, stationId));
               }}
             >
@@ -1630,30 +1637,6 @@ export function RegistrationDashboard({
                   onReject={rejectApplication}
                   onEdit={(item) => setEditEntry(item)}
                 />
-              ) : activeCard?.id === "legal-tracker" ? (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {L("এই ব্রাউজারে সংরক্ষিত ধারা ৭(২) নোটিশের খসড়া", "Section 7(2) notice drafts saved in this browser")}
-                  </p>
-                  {adminRecords.filter((record) => record.kind === "legal").length === 0 ? (
-                    <p className="rounded-lg border p-4 text-sm text-muted-foreground">{L("এখনও কোনো নোটিশের খসড়া নেই। আবেদন তালিকা থেকে নোটিশ তৈরি করুন।", "No notice drafts yet. Create one from an application list.")}</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {adminRecords.filter((record) => record.kind === "legal").map((record) => {
-                        const relatedCase = roleScopedCases.find((item) => item.id === record.caseId);
-                        return (
-                          <article key={record.id} className="rounded-lg border border-amber-100 bg-amber-50/40 p-3">
-                            <div className="flex flex-wrap justify-between gap-2 text-sm">
-                              <strong>{record.title} · {relatedCase ? L(relatedCase.name.bn, relatedCase.name.en) : record.caseId}</strong>
-                              <span className="text-muted-foreground">{new Date(record.createdAt).toLocaleDateString()}</span>
-                            </div>
-                            <p className="mt-2 whitespace-pre-wrap text-sm">{record.text}</p>
-                          </article>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
               ) : activeCard?.id === "message-tracker" ? (
                 <div className="space-y-4">
                   <section className="space-y-2">

@@ -22,6 +22,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ReviewListRouteImport } from './routes/review-list'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as UnionMasterRouteImport } from './routes/union-master'
 import { Route as DashboardSectionRouteImport } from './routes/dashboard.$section'
 import { Route as MonitoringUnionDetailsRouteImport } from './routes/monitoring_.union-details'
 import { Route as WorkerApplicationsTypeRouteImport } from './routes/worker-applications.$type'
@@ -91,6 +92,11 @@ const SetupRoute = SetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UnionMasterRoute = UnionMasterRouteImport.update({
+  id: '/union-master',
+  path: '/union-master',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardSectionRoute = DashboardSectionRouteImport.update({
   id: '/$section',
   path: '/$section',
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/review-list': typeof ReviewListRoute
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
+  '/union-master': typeof UnionMasterRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/monitoring/union-details': typeof MonitoringUnionDetailsRoute
   '/worker-applications/$type': typeof WorkerApplicationsTypeRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/review-list': typeof ReviewListRoute
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
+  '/union-master': typeof UnionMasterRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/monitoring/union-details': typeof MonitoringUnionDetailsRoute
   '/worker-applications/$type': typeof WorkerApplicationsTypeRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/review-list': typeof ReviewListRoute
   '/security': typeof SecurityRoute
   '/setup': typeof SetupRoute
+  '/union-master': typeof UnionMasterRoute
   '/dashboard/$section': typeof DashboardSectionRoute
   '/monitoring_/union-details': typeof MonitoringUnionDetailsRoute
   '/worker-applications/$type': typeof WorkerApplicationsTypeRoute
@@ -178,6 +187,7 @@ export interface FileRouteTypes {
     | '/review-list'
     | '/security'
     | '/setup'
+    | '/union-master'
     | '/dashboard/$section'
     | '/monitoring/union-details'
     | '/worker-applications/$type'
@@ -196,6 +206,7 @@ export interface FileRouteTypes {
     | '/review-list'
     | '/security'
     | '/setup'
+    | '/union-master'
     | '/dashboard/$section'
     | '/monitoring/union-details'
     | '/worker-applications/$type'
@@ -214,6 +225,7 @@ export interface FileRouteTypes {
     | '/review-list'
     | '/security'
     | '/setup'
+    | '/union-master'
     | '/dashboard/$section'
     | '/monitoring_/union-details'
     | '/worker-applications/$type'
@@ -233,6 +245,7 @@ export interface RootRouteChildren {
   ReviewListRoute: typeof ReviewListRoute
   SecurityRoute: typeof SecurityRoute
   SetupRoute: typeof SetupRoute
+  UnionMasterRoute: typeof UnionMasterRoute
   MonitoringUnionDetailsRoute: typeof MonitoringUnionDetailsRoute
   WorkerApplicationsTypeRoute: typeof WorkerApplicationsTypeRoute
 }
@@ -330,6 +343,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/union-master': {
+      id: '/union-master'
+      path: '/union-master'
+      fullPath: '/union-master'
+      preLoaderRoute: typeof UnionMasterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard/$section': {
       id: '/dashboard/$section'
       path: '/$section'
@@ -380,6 +400,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReviewListRoute: ReviewListRoute,
   SecurityRoute: SecurityRoute,
   SetupRoute: SetupRoute,
+  UnionMasterRoute: UnionMasterRoute,
   MonitoringUnionDetailsRoute: MonitoringUnionDetailsRoute,
   WorkerApplicationsTypeRoute: WorkerApplicationsTypeRoute,
 }
